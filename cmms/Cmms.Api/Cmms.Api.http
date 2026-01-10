@@ -1,0 +1,6 @@
+@Cmms.Api_HostAddress = http://localhost:5026
+
+GET {{Cmms.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

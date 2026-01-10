@@ -1,0 +1,41 @@
+dotnet run --project .\Cmms.Api\Cmms.Api.csproj --urls "http://localhost:5026"
+
+Swagger: http://localhost:5026/swagger/index.html
+
+Swagger: http://localhost:5026/swagger/index.html
+
+
+
+0.1 Porneste API-ul (backend)
+
+In folderul proiectului (ex. E:\CMMS\cmms), ruleaza:
+
+PowerShell / CMD:
+
+dotnet run --project .\Cmms.Api\Cmms.Api.csproj
+
+Apoi deschizi in browser:
+
+http://localhost:5000/swagger (sau portul tau real din launchSettings)
+
+In discutiile tale reiese ca ai rulat pe 5000/5026 la momente diferite; important este sa te fixezi pe un port si UI sa pointeze la el. 
+
+discutie gpt
+
+ 
+
+discutie gpt
+
+0.2 Porneste UI (frontend)
+
+In folderul React (ex. E:\CMMS\cmms\cmms-frontend):
+
+npm.cmd run dev
+
+Deschizi:
+
+http://localhost:5173
+
+Daca ai Execution Policy pe PowerShell, foloseste mereu npm.cmd / npx.cmd (asa cum era deja in discutii). 
+
+discutie gpt
