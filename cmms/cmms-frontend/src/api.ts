@@ -1,5 +1,8 @@
 const API_BASE = "http://localhost:5026";
 
+// src/api.ts
+export * from "./api";
+
 function getToken() {
   return localStorage.getItem("cmms_token");
 }
@@ -175,3 +178,6 @@ export async function updateWorkOrder(id: string, req: {
 }) {
   return apiFetch(`/api/work-orders/${id}`, { method: "PUT", body: JSON.stringify(req) });
 }
+
+
+

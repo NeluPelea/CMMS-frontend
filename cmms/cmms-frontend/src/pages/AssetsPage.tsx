@@ -1,17 +1,11 @@
+// src/pages/AssetsPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  createAsset,
-  deleteAsset,
-  getAssets,
-  getLocs,
-  logout,
-  type AssetDto,
-  type LocDto,
-} from "../api";
+import { createAsset, deleteAsset, getAssets, getLocs, logout, type AssetDto, type LocDto } from "../api";
 
 export default function AssetsPage() {
   const [items, setItems] = useState<AssetDto[]>([]);
+  const [locs, setLocs] = useState<LocDto[]>([]);
   const [q, setQ] = useState("");
   const [showDel, setShowDel] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,50 +13,44 @@ export default function AssetsPage() {
 
   const [newName, setNewName] = useState("");
   const [newCode, setNewCode] = useState("");
-
-  const [locs, setLocs] = useState<LocDto[]>([]);
-  const [locId, setLocId] = useState<string>("");
+  const [locId, setLocId] = useState("");
 
   const canCreate = useMemo(() => newName.trim().length >= 2, [newName]);
 
-  async function loadAssets() {
+  async function load() {
     setLoading(true);
     setErr(null);
     try {
-      const data = await getAssets({
-        q: q.trim() || undefined,
-        take: 200,
-        ia: showDel,
-      });
-      setItems(data);
+      const data = await getAssets({ q: q.trim() || undefined, take: 200, ia: showDel });
+      setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setErr(e?.message || String(e));
+      setItems([]);
     } finally {
       setLoading(false);
     }
   }
 
-  async function loadLocations() {
+  async function loadLocs() {
     try {
       const data = await getLocs({ take: 500 });
-      setLocs(data);
+      setLocs(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setErr(e?.message || String(e));
+      setLocs([]);
     }
   }
 
   useEffect(() => {
-    // initial: locatii + assets
     (async () => {
-      await loadLocations();
-      await loadAssets();
+      await loadLocs();
+      await load();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    // refresh la schimbarea "Show deleted"
-    loadAssets();
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showDel]);
 
@@ -74,12 +62,10 @@ export default function AssetsPage() {
         code: newCode.trim() ? newCode.trim() : null,
         locId: locId ? locId : null,
       });
-
       setNewName("");
       setNewCode("");
       setLocId("");
-
-      await loadAssets();
+      await load();
     } catch (e: any) {
       setErr(e?.message || String(e));
     }
@@ -90,7 +76,7 @@ export default function AssetsPage() {
     setErr(null);
     try {
       await deleteAsset(id);
-      await loadAssets();
+      await load();
     } catch (e: any) {
       setErr(e?.message || String(e));
     }
@@ -102,6 +88,7 @@ export default function AssetsPage() {
         <h2 style={{ margin: 0 }}>Assets</h2>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <Link to="/work-orders">Work Orders</Link>
+          <Link to="/locations">Locations</Link>
           <button
             onClick={() => {
               logout();
@@ -120,7 +107,7 @@ export default function AssetsPage() {
           placeholder="Search (q)"
           style={{ padding: 8, minWidth: 260 }}
         />
-        <button onClick={loadAssets} disabled={loading}>
+        <button onClick={load} disabled={loading}>
           {loading ? "Loading..." : "Search"}
         </button>
 
@@ -130,11 +117,7 @@ export default function AssetsPage() {
         </label>
       </div>
 
-      {err && (
-        <div style={{ marginTop: 12, color: "crimson", whiteSpace: "pre-wrap" }}>
-          {err}
-        </div>
-      )}
+      {err && <div style={{ marginTop: 12, color: "crimson", whiteSpace: "pre-wrap" }}>{err}</div>}
 
       <div style={{ marginTop: 16, padding: 12, border: "1px solid #ddd", borderRadius: 8 }}>
         <div style={{ fontWeight: 600, marginBottom: 10 }}>New Asset</div>
@@ -151,7 +134,6 @@ export default function AssetsPage() {
             placeholder="Code (optional)"
             style={{ padding: 8, minWidth: 160 }}
           />
-
           <select value={locId} onChange={(e) => setLocId(e.target.value)} style={{ padding: 8, minWidth: 260 }}>
             <option value="">(No location)</option>
             {locs.map((l) => (
@@ -160,7 +142,6 @@ export default function AssetsPage() {
               </option>
             ))}
           </select>
-
           <button onClick={onCreate} disabled={!canCreate}>
             Create
           </button>

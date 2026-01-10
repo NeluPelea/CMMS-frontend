@@ -1,17 +1,7 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+﻿// src/pages/WorkOrdersPage.tsx
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  createWorkOrder,
-  getAssets,
-  getWorkOrders,
-  logout,
-  startWorkOrder,
-  stopWorkOrder,
-  cancelWorkOrder,
-  reopenWorkOrder,
-  type AssetDto,
-  type WorkOrderDto,
-} from "../api";
+import { createWorkOrder, getAssets, getWorkOrders, logout, type AssetDto, type WorkOrderDto } from "../api";
 
 function fmt(dt?: string | null) {
   if (!dt) return "";
@@ -22,109 +12,76 @@ function fmt(dt?: string | null) {
   }
 }
 
-function safeArray<T>(v: any): T[] {
-  return Array.isArray(v) ? (v as T[]) : [];
+function typeLabel(t: number) {
+  if (t === 1) return "AdHoc";
+  if (t === 2) return "Preventive";
+  if (t === 3) return "Extra";
+  return String(t);
 }
 
-function woTypeLabel(t: number) {
-  switch (t) {
-    case 1: return "AdHoc";
-    case 2: return "Preventive";
-    case 3: return "Extra";
-    default: return String(t);
-  }
-}
-
-function woStatusLabel(s: number) {
-  switch (s) {
-    case 1: return "Open";
-    case 2: return "In Progress";
-    case 3: return "Done";
-    case 4: return "Cancelled";
-    default: return String(s);
-  }
-}
-
-function badgeStyle(s: number): CSSProperties {
-  const base: CSSProperties = {
-    display: "inline-block",
-    padding: "2px 8px",
-    borderRadius: 999,
-    fontSize: 12,
-    border: "1px solid #ddd",
-    background: "#fff",
-  };
-  if (s === 2) return { ...base, background: "#f7f7f7" }; // In Progress
-  if (s === 3) return { ...base, background: "#f0f0f0" }; // Done
-  if (s === 4) return { ...base, background: "#f0f0f0", opacity: 0.8 }; // Cancelled
-  return base; // Open
+function statusLabel(s: number) {
+  // ajustează după enum-ul tău din backend dacă diferă
+  if (s === 1) return "Open";
+  if (s === 2) return "In Progress";
+  if (s === 3) return "Closed";
+  if (s === 4) return "Canceled";
+  return String(s);
 }
 
 export default function WorkOrdersPage() {
   const [items, setItems] = useState<WorkOrderDto[]>([]);
-  const [total, setTotal] = useState<number>(0);
-
+  const [total, setTotal] = useState(0);
   const [assets, setAssets] = useState<AssetDto[]>([]);
-  const [loadingList, setLoadingList] = useState(false);
-  const [busy, setBusy] = useState(false);
+
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // New WO form
   const [showNew, setShowNew] = useState(false);
   const [title, setTitle] = useState("");
   const [type, setType] = useState<number>(1);
   const [assetId, setAssetId] = useState<string>("");
-  const [startAt, setStartAt] = useState<string>(""); // datetime-local
-  const [stopAt, setStopAt] = useState<string>(""); // datetime-local
+  const [startAt, setStartAt] = useState<string>("");
+  const [stopAt, setStopAt] = useState<string>("");
 
-  const badRange = useMemo(() => {
-    if (!startAt || !stopAt) return false;
-    const s = new Date(startAt).getTime();
-    const e = new Date(stopAt).getTime();
-    return Number.isFinite(s) && Number.isFinite(e) && e < s;
-  }, [startAt, stopAt]);
-
-  const canCreate = useMemo(
-    () => title.trim().length >= 2 && !badRange,
-    [title, badRange]
-  );
+  const canCreate = useMemo(() => title.trim().length >= 2, [title]);
 
   async function load() {
-    setLoadingList(true);
+    setLoading(true);
     setErr(null);
     try {
       const resp = await getWorkOrders({ take: 200, skip: 0 });
-      const list = safeArray<WorkOrderDto>((resp as any).items);
+      const list = Array.isArray(resp.items) ? resp.items : [];
       setItems(list);
-      setTotal(typeof (resp as any).total === "number" ? (resp as any).total : list.length);
+      setTotal(typeof resp.total === "number" ? resp.total : list.length);
     } catch (e: any) {
       setErr(e?.message || String(e));
       setItems([]);
       setTotal(0);
     } finally {
-      setLoadingList(false);
+      setLoading(false);
+    }
+  }
+
+  async function loadAssets() {
+    try {
+      const data = await getAssets({ take: 500 });
+      setAssets(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+      setAssets([]);
     }
   }
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
     (async () => {
-      try {
-        const data = await getAssets({ take: 500 });
-        setAssets(Array.isArray(data) ? data : []);
-      } catch (e: any) {
-        setErr(e?.message || String(e));
-      }
+      await loadAssets();
+      await load();
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onCreate() {
     setErr(null);
-    setBusy(true);
     try {
       const startIso = startAt ? new Date(startAt).toISOString() : null;
       const stopIso = stopAt ? new Date(stopAt).toISOString() : null;
@@ -147,63 +104,6 @@ export default function WorkOrdersPage() {
       await load();
     } catch (e: any) {
       setErr(e?.message || String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onStart(id: string) {
-    setErr(null);
-    setBusy(true);
-    try {
-      await startWorkOrder(id);
-      await load();
-    } catch (e: any) {
-      setErr(e?.message || String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onStop(id: string) {
-    if (!confirm("Stop work order and mark as Done?")) return;
-    setErr(null);
-    setBusy(true);
-    try {
-      await stopWorkOrder(id);
-      await load();
-    } catch (e: any) {
-      setErr(e?.message || String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onCancel(id: string) {
-    if (!confirm("Cancel work order?")) return;
-    setErr(null);
-    setBusy(true);
-    try {
-      await cancelWorkOrder(id);
-      await load();
-    } catch (e: any) {
-      setErr(e?.message || String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onReopen(id: string) {
-    if (!confirm("Reopen this work order (back to Open)?")) return;
-    setErr(null);
-    setBusy(true);
-    try {
-      await reopenWorkOrder(id);
-      await load();
-    } catch (e: any) {
-      setErr(e?.message || String(e));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -230,27 +130,19 @@ export default function WorkOrdersPage() {
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "center" }}>
-        <button onClick={() => setShowNew(true)} disabled={busy}>
-          New WO
-        </button>
-        <button onClick={load} disabled={loadingList || busy}>
-          {loadingList ? "Loading..." : "Refresh"}
+        <button onClick={() => setShowNew(true)}>New WO</button>
+        <button onClick={load} disabled={loading}>
+          {loading ? "Loading..." : "Refresh"}
         </button>
       </div>
 
-      {err && (
-        <div style={{ marginTop: 12, color: "crimson", whiteSpace: "pre-wrap" }}>
-          {err}
-        </div>
-      )}
+      {err && <div style={{ marginTop: 12, color: "crimson", whiteSpace: "pre-wrap" }}>{err}</div>}
 
       {showNew && (
         <div style={{ marginTop: 16, padding: 12, border: "1px solid #ddd", borderRadius: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontWeight: 600 }}>New Work Order</div>
-            <button onClick={() => setShowNew(false)} disabled={busy}>
-              Close
-            </button>
+            <button onClick={() => setShowNew(false)}>Close</button>
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
@@ -281,16 +173,14 @@ export default function WorkOrdersPage() {
             <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 8 }} />
             <input type="datetime-local" value={stopAt} onChange={(e) => setStopAt(e.target.value)} style={{ padding: 8 }} />
 
-            <button onClick={onCreate} disabled={!canCreate || busy}>
+            <button onClick={onCreate} disabled={!canCreate}>
               Create
             </button>
           </div>
 
-          {badRange && (
-            <div style={{ marginTop: 8, fontSize: 12, color: "crimson" }}>
-              Stop trebuie sa fie dupa Start.
-            </div>
-          )}
+          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
+            Start/Stop sunt opționale. Dacă sunt completate, backend calculează DurationMinutes (UTC).
+          </div>
         </div>
       )}
 
@@ -304,64 +194,26 @@ export default function WorkOrdersPage() {
             <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Start</th>
             <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Stop</th>
             <th style={{ textAlign: "right", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Min</th>
-            <th style={{ textAlign: "right", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Actions</th>
           </tr>
         </thead>
-
         <tbody>
-          {safeArray<WorkOrderDto>(items).map((w) => {
-            const s = w.status;
-
-            const canStart = s === 1;               // Open
-            const canStop = s === 2;                // In Progress
-            const canCancel = s === 1 || s === 2;   // Open/InProgress
-            const canReopen = s === 3 || s === 4;   // Done/Cancelled
-
-            return (
-              <tr key={w.id}>
-                <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>
-                  <Link to={`/work-orders/${w.id}`}>{w.title}</Link>
-                </td>
-
-                <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>
-                  {woTypeLabel(w.type)}
-                </td>
-
-                <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>
-                  <span style={badgeStyle(s)}>{woStatusLabel(s)}</span>
-                </td>
-
-                <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>
-                  {(w as any).asset?.name || ""}
-                </td>
-
-                <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>
-                  {fmt(w.startAt)}
-                </td>
-
-                <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>
-                  {fmt(w.stopAt)}
-                </td>
-
-                <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px", textAlign: "right" }}>
-                  {w.durationMinutes ?? ""}
-                </td>
-
-                <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px", textAlign: "right" }}>
-                  <div style={{ display: "inline-flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    <button onClick={() => onStart(w.id)} disabled={!canStart || busy || loadingList}>Start</button>
-                    <button onClick={() => onStop(w.id)} disabled={!canStop || busy || loadingList}>Stop</button>
-                    <button onClick={() => onCancel(w.id)} disabled={!canCancel || busy || loadingList}>Cancel</button>
-                    <button onClick={() => onReopen(w.id)} disabled={!canReopen || busy || loadingList}>Reopen</button>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
+          {items.map((w) => (
+            <tr key={w.id}>
+              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>
+                <Link to={`/work-orders/${w.id}`}>{w.title}</Link>
+              </td>
+              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{typeLabel(w.type)}</td>
+              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{statusLabel(w.status)}</td>
+              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{(w as any).asset?.name || ""}</td>
+              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{fmt(w.startAt)}</td>
+              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{fmt(w.stopAt)}</td>
+              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px", textAlign: "right" }}>{w.durationMinutes ?? ""}</td>
+            </tr>
+          ))}
 
           {items.length === 0 && (
             <tr>
-              <td colSpan={8} style={{ padding: 12, opacity: 0.7 }}>
+              <td colSpan={7} style={{ padding: 12, opacity: 0.7 }}>
                 No work orders.
               </td>
             </tr>

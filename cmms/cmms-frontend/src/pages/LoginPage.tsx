@@ -1,63 +1,64 @@
+﻿// src/pages/LoginPage.tsx
 import { useState } from "react";
-import { login, isAuthed } from "../api";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { login } from "../api";
 
 export default function LoginPage() {
   const nav = useNavigate();
+  const loc = useLocation() as any;
 
-  const [email, setEmail] = useState("admin@cmms.local");
-  const [password, setPassword] = useState("Parola123");
+  const [email, setEmail] = useState("admin@local");
+  const [password, setPassword] = useState("admin");
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  if (isAuthed()) return <Navigate to="/work-orders" replace />;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    setBusy(true);
+    setLoading(true);
     try {
       await login(email.trim(), password);
-      nav("/work-orders", { replace: true });
+      const to = loc?.state?.from || "/work-orders";
+      nav(to, { replace: true });
     } catch (ex: any) {
-      setErr(String(ex?.message ?? ex));
+      setErr(ex?.message || String(ex));
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "60px auto", padding: 20, border: "1px solid #ddd", borderRadius: 8 }}>
-      <h2 style={{ marginTop: 0 }}>Login</h2>
+    <div style={{ padding: 16, maxWidth: 420, margin: "40px auto" }}>
+      <h2 style={{ marginTop: 0 }}>CMMS Login</h2>
 
-      <form onSubmit={onSubmit}>
-        <div style={{ marginBottom: 10 }}>
-          <label>Email</label>
-          <input
-            style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="username"
-          />
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          <label>Password</label>
-          <input
-            style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
-        </div>
-
-        {err && <div style={{ color: "crimson", marginBottom: 10, whiteSpace: "pre-wrap" }}>{err}</div>}
-
-        <button type="submit" disabled={busy} style={{ padding: "8px 12px" }}>
-          {busy ? "Logging in..." : "Login"}
+      <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          style={{ padding: 10 }}
+        />
+        <input
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          type="password"
+          style={{ padding: 10 }}
+        />
+        <button type="submit" disabled={loading} style={{ padding: 10 }}>
+          {loading ? "Signing in..." : "Login"}
         </button>
       </form>
+
+      {err && (
+        <div style={{ marginTop: 12, color: "crimson", whiteSpace: "pre-wrap" }}>
+          {err}
+        </div>
+      )}
+
+      <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+        Dacă nu ai user încă, creează-l din Swagger (register) sau ajustează credentialele.
+      </div>
     </div>
   );
 }

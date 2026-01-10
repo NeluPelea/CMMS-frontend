@@ -1,11 +1,12 @@
+// src/App.tsx
 import { Navigate, Route, Routes } from "react-router-dom";
-import AssetsPage from "./pages/AssetsPage";
-import WorkOrdersPage from "./pages/WorkOrdersPage";
-import LoginPage from "./pages/LoginPage";
 import RequireAuth from "./RequireAuth";
-import LocationsPage from "./pages/LocationsPage";
-import WorkOrderDetailsPage from "./pages/WorkOrderDetailsPage";
 
+import LoginPage from "./pages/LoginPage";
+import WorkOrdersPage from "./pages/WorkOrdersPage";
+import WorkOrderDetailsPage from "./pages/WorkOrderDetailsPage";
+import AssetsPage from "./pages/AssetsPage";
+import LocationsPage from "./pages/LocationsPage";
 
 export default function App() {
   return (
@@ -17,6 +18,15 @@ export default function App() {
         element={
           <RequireAuth>
             <WorkOrdersPage />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/work-orders/:id"
+        element={
+          <RequireAuth>
+            <WorkOrderDetailsPage />
           </RequireAuth>
         }
       />
@@ -38,15 +48,6 @@ export default function App() {
           </RequireAuth>
         }
       />
-
-          <Route
-      path="/work-orders/:id"
-      element={
-        <RequireAuth>
-          <WorkOrderDetailsPage />
-        </RequireAuth>
-      }
-    />
 
       <Route path="/" element={<Navigate to="/work-orders" replace />} />
       <Route path="*" element={<Navigate to="/work-orders" replace />} />

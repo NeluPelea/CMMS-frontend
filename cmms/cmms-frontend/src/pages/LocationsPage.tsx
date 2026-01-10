@@ -1,3 +1,4 @@
+﻿// src/pages/LocationsPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { createLoc, deleteLoc, getLocs, logout, type LocDto } from "../api";
@@ -18,11 +19,7 @@ export default function LocationsPage() {
     setLoading(true);
     setErr(null);
     try {
-      const data = await getLocs({
-        q: q.trim() || undefined,
-        take: 500,
-        ia: showDel,
-      });
+      const data = await getLocs({ q: q.trim() || undefined, take: 500, ia: showDel });
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setErr(e?.message || String(e));
@@ -45,10 +42,7 @@ export default function LocationsPage() {
   async function onCreate() {
     setErr(null);
     try {
-      await createLoc({
-        name: newName.trim(),
-        code: newCode.trim() ? newCode.trim() : null,
-      });
+      await createLoc({ name: newName.trim(), code: newCode.trim() ? newCode.trim() : null });
       setNewName("");
       setNewCode("");
       await load();
@@ -58,7 +52,7 @@ export default function LocationsPage() {
   }
 
   async function onDelete(id: string) {
-    if (!confirm("Soft delete location?")) return;
+    if (!confirm("Delete location?")) return;
     setErr(null);
     try {
       await deleteLoc(id);
@@ -75,55 +69,38 @@ export default function LocationsPage() {
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <Link to="/work-orders">Work Orders</Link>
           <Link to="/assets">Assets</Link>
-          <button onClick={() => { logout(); location.href = "/login"; }}>Logout</button>
+          <button
+            onClick={() => {
+              logout();
+              location.href = "/login";
+            }}
+          >
+            Logout
+          </button>
         </div>
       </div>
 
       <div style={{ display: "flex", gap: 12, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search (q)"
-          style={{ padding: 8, minWidth: 260 }}
-        />
-        <button onClick={load} disabled={loading}>
-          {loading ? "Loading..." : "Search"}
-        </button>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search (q)" style={{ padding: 8, minWidth: 260 }} />
+        <button onClick={load} disabled={loading}>{loading ? "Loading..." : "Search"}</button>
 
         <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <input
-            type="checkbox"
-            checked={showDel}
-            onChange={(e) => setShowDel(e.target.checked)}
-          />
+          <input type="checkbox" checked={showDel} onChange={(e) => setShowDel(e.target.checked)} />
           Show deleted
         </label>
       </div>
 
-      {err && (
-        <div style={{ marginTop: 12, color: "crimson", whiteSpace: "pre-wrap" }}>
-          {err}
-        </div>
-      )}
+      {err && <div style={{ marginTop: 12, color: "crimson", whiteSpace: "pre-wrap" }}>{err}</div>}
 
       <div style={{ marginTop: 16, padding: 12, border: "1px solid #ddd", borderRadius: 8 }}>
         <div style={{ fontWeight: 600, marginBottom: 10 }}>New Location</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Name"
-            style={{ padding: 8, minWidth: 240 }}
-          />
-          <input
-            value={newCode}
-            onChange={(e) => setNewCode(e.target.value)}
-            placeholder="Code (optional)"
-            style={{ padding: 8, minWidth: 160 }}
-          />
-          <button onClick={onCreate} disabled={!canCreate}>
-            Create
-          </button>
+          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name" style={{ padding: 8, minWidth: 240 }} />
+          <input value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Code (optional)" style={{ padding: 8, minWidth: 160 }} />
+          <button onClick={onCreate} disabled={!canCreate}>Create</button>
+        </div>
+        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
+          Notă: dacă backend nu suportă încă “Show deleted”, checkbox-ul nu va schimba rezultatul până ajustăm controller-ul.
         </div>
       </div>
 
@@ -145,13 +122,10 @@ export default function LocationsPage() {
                 {x.isAct === false ? "Deleted" : "Active"}
               </td>
               <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px", textAlign: "right" }}>
-                <button onClick={() => onDelete(x.id)} disabled={x.isAct === false}>
-                  Delete
-                </button>
+                <button onClick={() => onDelete(x.id)} disabled={x.isAct === false}>Delete</button>
               </td>
             </tr>
           ))}
-
           {items.length === 0 && (
             <tr>
               <td colSpan={4} style={{ padding: 12, opacity: 0.7 }}>
