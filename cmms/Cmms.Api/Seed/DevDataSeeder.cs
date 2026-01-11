@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -25,7 +24,6 @@ namespace Cmms.Api.Seed
             var env = sp.GetRequiredService<IHostEnvironment>();
             var log = sp.GetRequiredService<ILoggerFactory>().CreateLogger("DevDataSeeder");
 
-            // Ruleaza doar in Development (ca sa nu polueze productia)
             if (!env.IsDevelopment())
             {
                 log.LogInformation("DevDataSeeder skipped (env is not Development).");
@@ -33,14 +31,11 @@ namespace Cmms.Api.Seed
             }
 
             var db = sp.GetRequiredService<AppDbContext>();
-
-            // Asigura schema (nu strica daca e deja up-to-date)
             await db.Database.MigrateAsync();
 
-            // 1) Seed admin user + rol (optional)
             await TrySeedAdminUserAsync(sp, log);
 
-            // 2) Seed Locations / Assets / WorkOrders (prin metadata)
+            // --- discover entities by CLR/table ---
             var locEntity = FindEntity(db, log,
                 clrNames: new[] { "Loc", "Location", "LocEntity" },
                 tableNames: new[] { "locs", "locations", "Locs", "Locations" });
@@ -49,12 +44,17 @@ namespace Cmms.Api.Seed
                 clrNames: new[] { "Asset", "As", "AssetEntity" },
                 tableNames: new[] { "as", "assets", "As", "Assets" });
 
+            var peopleEntity = FindEntity(db, log,
+                clrNames: new[] { "Person", "People", "PersonEntity" },
+                tableNames: new[] { "people", "Persons", "People", "People" });
+
             var woEntity = FindEntity(db, log,
                 clrNames: new[] { "WorkOrder", "WorkOrders", "Wo", "WorkOrderEntity" },
-                tableNames: new[] { "work_orders", "workorders", "WorkOrders", "work_orders" });
+                tableNames: new[] { "work_orders", "workorders", "WorkOrders", "WorkOrders" });
 
-            // Seed Locations
+            // ---------------- Locations ----------------
             object? loc1 = null, loc2 = null, loc3 = null;
+
             if (locEntity != null)
             {
                 if (!await AnyAsync(db, locEntity))
@@ -64,41 +64,28 @@ namespace Cmms.Api.Seed
                     loc1 = CreateEntity(locEntity.ClrType, new Dictionary<string, object?>
                     {
                         ["Name"] = "Hala 1",
-                        ["Denumire"] = "Hala 1",
                         ["Code"] = "H1",
-                        ["Cod"] = "H1",
-                        ["IsAct"] = true,
-                        ["IsActive"] = true
+                        ["IsAct"] = true
                     });
 
                     loc2 = CreateEntity(locEntity.ClrType, new Dictionary<string, object?>
                     {
                         ["Name"] = "Hala 2",
-                        ["Denumire"] = "Hala 2",
                         ["Code"] = "H2",
-                        ["Cod"] = "H2",
-                        ["IsAct"] = true,
-                        ["IsActive"] = true
+                        ["IsAct"] = true
                     });
 
                     loc3 = CreateEntity(locEntity.ClrType, new Dictionary<string, object?>
                     {
                         ["Name"] = "Depozit",
-                        ["Denumire"] = "Depozit",
                         ["Code"] = "DEP",
-                        ["Cod"] = "DEP",
-                        ["IsAct"] = true,
-                        ["IsActive"] = true
+                        ["IsAct"] = true
                     });
 
                     db.Add(loc1);
                     db.Add(loc2);
                     db.Add(loc3);
                     await db.SaveChangesAsync();
-                }
-                else
-                {
-                    log.LogInformation("Locations already exist; skipping.");
                 }
 
                 var locs = await TakeAsync(db, locEntity, 3);
@@ -107,8 +94,9 @@ namespace Cmms.Api.Seed
                 loc3 = locs.ElementAtOrDefault(2);
             }
 
-            // Seed Assets
+            // ---------------- Assets ----------------
             object? as1 = null, as2 = null, as3 = null, as4 = null;
+
             if (assetEntity != null)
             {
                 if (!await AnyAsync(db, assetEntity))
@@ -121,49 +109,37 @@ namespace Cmms.Api.Seed
                     as1 = CreateEntity(assetEntity.ClrType, new Dictionary<string, object?>
                     {
                         ["Name"] = "Profilare Tabla",
-                        ["Denumire"] = "Profilare Tabla",
                         ["Code"] = "AS-PRF-01",
-                        ["Cod"] = "AS-PRF-01",
-                        ["LocId"] = loc1Id,
                         ["LocationId"] = loc1Id,
-                        ["IsAct"] = true,
-                        ["IsActive"] = true
+                        ["LocId"] = loc1Id,
+                        ["IsAct"] = true
                     });
 
                     as2 = CreateEntity(assetEntity.ClrType, new Dictionary<string, object?>
                     {
                         ["Name"] = "Debitare",
-                        ["Denumire"] = "Debitare",
                         ["Code"] = "AS-DEB-01",
-                        ["Cod"] = "AS-DEB-01",
-                        ["LocId"] = loc1Id,
                         ["LocationId"] = loc1Id,
-                        ["IsAct"] = true,
-                        ["IsActive"] = true
+                        ["LocId"] = loc1Id,
+                        ["IsAct"] = true
                     });
 
                     as3 = CreateEntity(assetEntity.ClrType, new Dictionary<string, object?>
                     {
                         ["Name"] = "Ambalare",
-                        ["Denumire"] = "Ambalare",
                         ["Code"] = "AS-AMB-01",
-                        ["Cod"] = "AS-AMB-01",
-                        ["LocId"] = loc2Id,
                         ["LocationId"] = loc2Id,
-                        ["IsAct"] = true,
-                        ["IsActive"] = true
+                        ["LocId"] = loc2Id,
+                        ["IsAct"] = true
                     });
 
                     as4 = CreateEntity(assetEntity.ClrType, new Dictionary<string, object?>
                     {
                         ["Name"] = "Stivuitor",
-                        ["Denumire"] = "Stivuitor",
                         ["Code"] = "AS-STV-01",
-                        ["Cod"] = "AS-STV-01",
-                        ["LocId"] = loc2Id,
                         ["LocationId"] = loc2Id,
-                        ["IsAct"] = true,
-                        ["IsActive"] = true
+                        ["LocId"] = loc2Id,
+                        ["IsAct"] = true
                     });
 
                     db.Add(as1);
@@ -171,10 +147,6 @@ namespace Cmms.Api.Seed
                     db.Add(as3);
                     db.Add(as4);
                     await db.SaveChangesAsync();
-                }
-                else
-                {
-                    log.LogInformation("Assets already exist; skipping.");
                 }
 
                 var assets = await TakeAsync(db, assetEntity, 4);
@@ -184,7 +156,57 @@ namespace Cmms.Api.Seed
                 as4 = assets.ElementAtOrDefault(3);
             }
 
-            // Seed Work Orders
+            // ---------------- People ----------------
+            object? p1 = null, p2 = null, p3 = null;
+
+            if (peopleEntity != null)
+            {
+                if (!await AnyAsync(db, peopleEntity))
+                {
+                    log.LogInformation("Seeding People...");
+
+                    // Ajusteaza campurile daca modelul tau are alte nume (seed-ul e best-effort).
+                    p1 = CreateEntity(peopleEntity.ClrType, new Dictionary<string, object?>
+                    {
+                        ["DisplayName"] = "Mihai Mentenanta",
+                        ["Name"] = "Mihai Mentenanta",
+                        ["Email"] = "mihai@cmms.local",
+                        ["IsAct"] = true
+                    });
+
+                    p2 = CreateEntity(peopleEntity.ClrType, new Dictionary<string, object?>
+                    {
+                        ["DisplayName"] = "Ion Electrician",
+                        ["Name"] = "Ion Electrician",
+                        ["Email"] = "ion@cmms.local",
+                        ["IsAct"] = true
+                    });
+
+                    p3 = CreateEntity(peopleEntity.ClrType, new Dictionary<string, object?>
+                    {
+                        ["DisplayName"] = "Andrei Mecanic",
+                        ["Name"] = "Andrei Mecanic",
+                        ["Email"] = "andrei@cmms.local",
+                        ["IsAct"] = true
+                    });
+
+                    db.Add(p1);
+                    db.Add(p2);
+                    db.Add(p3);
+                    await db.SaveChangesAsync();
+                }
+
+                var people = await TakeAsync(db, peopleEntity, 3);
+                p1 = people.ElementAtOrDefault(0);
+                p2 = people.ElementAtOrDefault(1);
+                p3 = people.ElementAtOrDefault(2);
+            }
+            else
+            {
+                log.LogWarning("People entity not found; skipping People seed.");
+            }
+
+            // ---------------- WorkOrders ----------------
             if (woEntity != null)
             {
                 if (!await AnyAsync(db, woEntity))
@@ -193,85 +215,99 @@ namespace Cmms.Api.Seed
 
                     var as1Id = GetPropValue(as1, "Id");
                     var as2Id = GetPropValue(as2, "Id");
+                    var personId = GetPropValue(p1 ?? p2 ?? p3, "Id"); // first available
 
-                    var now = DateTime.UtcNow;
+                    var now = DateTimeOffset.UtcNow;
 
-                    var wo1 = CreateEntity(woEntity.ClrType, new Dictionary<string, object?>
+                    // WO-OPEN (fara timpi)
+                    var woOpenValues = new Dictionary<string, object?>
                     {
-                        // titlu/denumire
-                        ["Title"] = "Verificare zgomot anormal",
-                        ["DenInt"] = "Verificare zgomot anormal",
-
-                        // descriere
-                        ["Description"] = "Inspectie rapida + lubrifiere, daca este cazul.",
-                        ["Descriere"] = "Inspectie rapida + lubrifiere, daca este cazul.",
-
-                        // tip/status (enum/int)
+                        ["Title"] = "WO Open - verificare vizuala",
+                        ["Description"] = "Test: work order fara start/stop.",
                         ["Type"] = 1,
-                        ["Tip"] = 1,
-                        ["Status"] = 1,
-
-                        // legatura asset/utilaj
                         ["AssetId"] = as1Id,
-                        ["AsId"] = as1Id,
-                        ["ID_Utilaj"] = as1Id,
+                        ["AssignedToPersonId"] = null,
+                        ["StartAt"] = null,
+                        ["StopAt"] = null
+                    };
+                    ApplyComputedFields(woEntity.ClrType, woOpenValues, null, null);
 
-                        // date/ore
-                        ["StartAt"] = now.AddMinutes(-45),
-                        ["StartDT"] = now.AddMinutes(-45),
-                        ["Start"] = now.AddMinutes(-45),
-
-                        ["StopAt"] = now.AddMinutes(-15),
-                        ["StopDT"] = now.AddMinutes(-15),
-                        ["Stop"] = now.AddMinutes(-15)
-                    });
-
-                    var wo2 = CreateEntity(woEntity.ClrType, new Dictionary<string, object?>
+                    // WO-INPROGRESS (start, fara stop)
+                    var startInProg = now.AddMinutes(-20);
+                    var woInProgValues = new Dictionary<string, object?>
                     {
-                        ["Title"] = "Preventiv saptamanal - debitare",
-                        ["DenInt"] = "Preventiv saptamanal - debitare",
-
-                        ["Description"] = "Curatare, verificare role, verificare senzor stop.",
-                        ["Descriere"] = "Curatare, verificare role, verificare senzor stop.",
-
-                        ["Type"] = 2,
-                        ["Tip"] = 2,
-                        ["Status"] = 1,
-
+                        ["Title"] = "WO InProgress - interventie in curs",
+                        ["Description"] = "Test: work order cu start, fara stop.",
+                        ["Type"] = 1,
                         ["AssetId"] = as2Id,
-                        ["AsId"] = as2Id,
-                        ["ID_Utilaj"] = as2Id,
+                        ["AssignedToPersonId"] = personId,
+                        ["StartAt"] = startInProg,
+                        ["StopAt"] = null
+                    };
+                    ApplyComputedFields(woEntity.ClrType, woInProgValues, startInProg, null);
 
-                        ["StartAt"] = now.AddDays(-1).AddMinutes(-30),
-                        ["StartDT"] = now.AddDays(-1).AddMinutes(-30),
-                        ["Start"] = now.AddDays(-1).AddMinutes(-30),
+                    // WO-DONE (start + stop)
+                    var startDone = now.AddMinutes(-45);
+                    var stopDone = now.AddMinutes(-15);
+                    var woDoneValues = new Dictionary<string, object?>
+                    {
+                        ["Title"] = "WO Done - preventiv finalizat",
+                        ["Description"] = "Test: work order cu start/stop.",
+                        ["Type"] = 2,
+                        ["AssetId"] = as2Id,
+                        ["AssignedToPersonId"] = personId,
+                        ["StartAt"] = startDone,
+                        ["StopAt"] = stopDone
+                    };
+                    ApplyComputedFields(woEntity.ClrType, woDoneValues, startDone, stopDone);
 
-                        ["StopAt"] = now.AddDays(-1),
-                        ["StopDT"] = now.AddDays(-1),
-                        ["Stop"] = now.AddDays(-1)
-                    });
+                    var woOpen = CreateEntity(woEntity.ClrType, woOpenValues);
+                    var woInProg = CreateEntity(woEntity.ClrType, woInProgValues);
+                    var woDone = CreateEntity(woEntity.ClrType, woDoneValues);
 
-                    db.Add(wo1);
-                    db.Add(wo2);
+                    db.Add(woOpen);
+                    db.Add(woInProg);
+                    db.Add(woDone);
+
                     await db.SaveChangesAsync();
-                }
-                else
-                {
-                    log.LogInformation("WorkOrders already exist; skipping.");
+
                 }
             }
 
             log.LogInformation("DevDataSeeder finished.");
         }
 
+        private static void ApplyComputedFields(Type woClrType, IDictionary<string, object?> values, DateTimeOffset? start, DateTimeOffset? stop)
+        {
+            // DurationMinutes (int?)
+            var durationProp = woClrType.GetProperty("DurationMinutes", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (durationProp != null)
+            {
+                int? minutes = null;
+                if (start.HasValue && stop.HasValue && stop.Value >= start.Value)
+                    minutes = (int)Math.Round((stop.Value - start.Value).TotalMinutes);
+
+                values["DurationMinutes"] = minutes;
+            }
+
+            // Status (enum WorkOrderStatus) - folosim string-uri: Open/InProgress/Done
+            var statusProp = woClrType.GetProperty("Status", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (statusProp != null)
+            {
+                object statusValue;
+                if (stop.HasValue) statusValue = "Done";
+                else if (start.HasValue) statusValue = "InProgress";
+                else statusValue = "Open";
+
+                values["Status"] = statusValue;
+            }
+        }
+
         private static async Task TrySeedAdminUserAsync(IServiceProvider sp, ILogger log)
         {
-            // Safe: daca nu exista Identity in DI sau e user type custom, nu blocam seed-ul.
             try
             {
                 var userManager = sp.GetService<UserManager<IdentityUser>>();
-                var roleManager = sp.GetService<RoleManager<IdentityRole>>();
-
                 if (userManager == null)
                 {
                     log.LogWarning("UserManager<IdentityUser> not registered. Skipping admin user seed.");
@@ -281,47 +317,25 @@ namespace Cmms.Api.Seed
                 const string adminEmail = "admin@cmms.local";
                 const string adminPassword = "Admin@12345";
 
-                IdentityUser? user = await userManager.FindByEmailAsync(adminEmail);
-                if (user == null)
-                {
-                    user = new IdentityUser
-                    {
-                        UserName = adminEmail,
-                        Email = adminEmail,
-                        EmailConfirmed = true
-                    };
+                var user = await userManager.FindByEmailAsync(adminEmail);
+                if (user != null) return;
 
-                    var res = await userManager.CreateAsync(user, adminPassword);
-                    if (!res.Succeeded)
-                    {
-                        var msg = string.Join("; ", res.Errors.Select(e => $"{e.Code}:{e.Description}"));
-                        log.LogWarning("Admin user creation failed: {Msg}", msg);
-                        return;
-                    }
-
-                    log.LogInformation("Admin user created: {Email}", adminEmail);
-                }
-                else
+                user = new IdentityUser
                 {
-                    log.LogInformation("Admin user already exists: {Email}", adminEmail);
+                    UserName = adminEmail,
+                    Email = adminEmail,
+                    EmailConfirmed = true
+                };
+
+                var res = await userManager.CreateAsync(user, adminPassword);
+                if (!res.Succeeded)
+                {
+                    var msg = string.Join("; ", res.Errors.Select(e => $"{e.Code}:{e.Description}"));
+                    log.LogWarning("Admin user creation failed: {Msg}", msg);
+                    return;
                 }
 
-                if (roleManager != null)
-                {
-                    const string adminRole = "Admin";
-                    if (!await roleManager.RoleExistsAsync(adminRole))
-                    {
-                        var r = await roleManager.CreateAsync(new IdentityRole(adminRole));
-                        if (!r.Succeeded)
-                        {
-                            var msg = string.Join("; ", r.Errors.Select(e => $"{e.Code}:{e.Description}"));
-                            log.LogWarning("Admin role create failed: {Msg}", msg);
-                        }
-                    }
-
-                    if (!await userManager.IsInRoleAsync(user, adminRole))
-                        await userManager.AddToRoleAsync(user, adminRole);
-                }
+                log.LogInformation("Admin user created: {Email}", adminEmail);
             }
             catch (Exception ex)
             {
@@ -388,7 +402,7 @@ namespace Cmms.Api.Seed
             {
                 if (targetType.IsEnum)
                 {
-                    if (value is string s) p.SetValue(obj, Enum.Parse(targetType, s, true));
+                    if (value is string s) p.SetValue(obj, Enum.Parse(targetType, s, ignoreCase: true));
                     else p.SetValue(obj, Enum.ToObject(targetType, value));
                     return;
                 }
@@ -397,6 +411,24 @@ namespace Cmms.Api.Seed
                 {
                     if (value is Guid) { p.SetValue(obj, value); return; }
                     if (value is string gs && Guid.TryParse(gs, out var g)) { p.SetValue(obj, g); return; }
+                }
+
+                if (targetType == typeof(DateTimeOffset))
+                {
+                    if (value is DateTimeOffset dto) { p.SetValue(obj, dto); return; }
+                    if (value is DateTime dt)
+                    {
+                        if (dt.Kind == DateTimeKind.Unspecified)
+                            dt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+
+                        p.SetValue(obj, new DateTimeOffset(dt.ToUniversalTime()));
+                        return;
+                    }
+                    if (value is string s && DateTimeOffset.TryParse(s, out var parsed))
+                    {
+                        p.SetValue(obj, parsed.ToUniversalTime());
+                        return;
+                    }
                 }
 
                 if (targetType.IsAssignableFrom(value.GetType()))
@@ -409,7 +441,7 @@ namespace Cmms.Api.Seed
             }
             catch
             {
-                // ignore (seed "best effort")
+                // silent
             }
         }
 
@@ -420,13 +452,10 @@ namespace Cmms.Api.Seed
             return p?.GetValue(obj);
         }
 
-        // -------------- IMPORTANT: fara DbContext.Set(Type) pentru Any (evitam complet ambiguitati) --------------
-
         private static async Task<bool> AnyAsync(AppDbContext db, IEntityType entity)
         {
             var table = entity.GetTableName();
-            if (string.IsNullOrWhiteSpace(table))
-                return false;
+            if (string.IsNullOrWhiteSpace(table)) return false;
 
             var schema = entity.GetSchema();
             var fq = string.IsNullOrWhiteSpace(schema)
@@ -449,7 +478,6 @@ namespace Cmms.Api.Seed
         {
             var clr = entity.ClrType;
 
-            // DbContext.Set<T>() fara parametri (nu poate ajunge la overload-ul cu string)
             var setMethod = typeof(DbContext).GetMethods(BindingFlags.Public | BindingFlags.Instance)
                 .First(m => m.Name == "Set" && m.IsGenericMethodDefinition && m.GetParameters().Length == 0)
                 .MakeGenericMethod(clr);
@@ -457,14 +485,26 @@ namespace Cmms.Api.Seed
             var setObj = setMethod.Invoke(db, null); // DbSet<T>
             var queryable = (IQueryable)setObj!;
 
-            // AsNoTracking<T>
             var asNoTracking = typeof(EntityFrameworkQueryableExtensions).GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .First(m => m.Name == "AsNoTracking" && m.GetParameters().Length == 1)
                 .MakeGenericMethod(clr);
 
             queryable = (IQueryable)asNoTracking.Invoke(null, new object[] { queryable })!;
 
-            // Take<T>
+            var idProp = clr.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (idProp != null)
+            {
+                var param = System.Linq.Expressions.Expression.Parameter(clr, "x");
+                var body = System.Linq.Expressions.Expression.Property(param, idProp);
+                var lambda = System.Linq.Expressions.Expression.Lambda(body, param);
+
+                var orderBy = typeof(Queryable).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .First(m => m.Name == "OrderBy" && m.GetParameters().Length == 2)
+                    .MakeGenericMethod(clr, idProp.PropertyType);
+
+                queryable = (IQueryable)orderBy.Invoke(null, new object[] { queryable, lambda })!;
+            }
+
             var takeMethod = typeof(Queryable).GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .First(m => m.Name == "Take" && m.GetParameters().Length == 2)
                 .MakeGenericMethod(clr);

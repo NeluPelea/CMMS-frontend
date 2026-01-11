@@ -25,13 +25,47 @@ public class WorkOrdersController : ControllerBase
         return (int)Math.Round(diff.TotalMinutes);
     }
 
-    // Derivam status numai din timpi, util pentru Create/Update + repair
+    // Derivam status numai din timpi
     private static WorkOrderStatus InferStatus(DateTimeOffset? startUtc, DateTimeOffset? stopUtc)
     {
         if (stopUtc.HasValue) return WorkOrderStatus.Done;
         if (startUtc.HasValue) return WorkOrderStatus.InProgress;
         return WorkOrderStatus.Open;
     }
+
+    // ---------------- DTOs ----------------
+
+    public sealed record LocationDto(Guid Id, string Name, string? Code, bool IsAct);
+
+    public sealed record AssetDto(
+        Guid Id,
+        string Name,
+        string Code,
+        Guid? LocationId,          // IMPORTANT: Guid? ca sa eviti CS1503
+        LocationDto? Location,
+        bool IsAct
+    );
+
+    public sealed record PersonDto(Guid Id, string DisplayName);
+
+    public sealed record WorkOrderListItemDto(
+        Guid Id,
+        WorkOrderType Type,
+        WorkOrderStatus Status,
+        string Title,
+        string? Description,
+        Guid? AssetId,
+        AssetDto? Asset,
+        Guid? AssignedToPersonId,
+        PersonDto? AssignedToPerson,
+        DateTimeOffset? StartAt,
+        DateTimeOffset? StopAt,
+        int? DurationMinutes,
+        Guid? PmPlanId,
+        Guid? ExtraRequestId
+    );
+
+    public sealed record PagedResp<T>(int Total, int Take, int Skip, IReadOnlyList<T> Items);
 
     // ---------------- LIST ----------------
     [HttpGet]
@@ -54,18 +88,15 @@ public class WorkOrdersController : ControllerBase
         var fromUtc = ToUtc(from);
         var toUtc = ToUtc(to);
 
-        var qry = _db.WorkOrders.AsNoTracking()
-            .Include(x => x.Asset)
-                .ThenInclude(a => a.Location)
-            .Include(x => x.AssignedToPerson)
-            .AsQueryable();
+        var qry = _db.WorkOrders.AsNoTracking().AsQueryable();
 
+        // Text search (PostgreSQL): ILIKE
         if (!string.IsNullOrWhiteSpace(q))
         {
-            var s = q.Trim().ToLower();
+            var s = q.Trim();
             qry = qry.Where(x =>
-                x.Title.ToLower().Contains(s) ||
-                (x.Description != null && x.Description.ToLower().Contains(s))
+                EF.Functions.ILike(x.Title, $"%{s}%") ||
+                (x.Description != null && EF.Functions.ILike(x.Description, $"%{s}%"))
             );
         }
 
@@ -76,21 +107,62 @@ public class WorkOrdersController : ControllerBase
         if (locId.HasValue)
             qry = qry.Where(x => x.Asset != null && x.Asset.LocationId == locId.Value);
 
-        if (fromUtc.HasValue)
-            qry = qry.Where(x => (x.StartAt ?? DateTimeOffset.MinValue) >= fromUtc.Value);
+        // Interval filtering: workorders care se intersecteaza cu [from,to]
+        if (fromUtc.HasValue || toUtc.HasValue)
+        {
+            var f = fromUtc ?? DateTimeOffset.MinValue;
+            var t = toUtc ?? DateTimeOffset.MaxValue;
 
-        if (toUtc.HasValue)
-            qry = qry.Where(x => (x.StartAt ?? DateTimeOffset.MinValue) <= toUtc.Value);
+            qry = qry.Where(x =>
+                (x.StartAt ?? DateTimeOffset.MinValue) <= t &&
+                ((x.StopAt ?? DateTimeOffset.MaxValue) >= f)
+            );
+        }
 
         var total = await qry.CountAsync();
 
         var items = await qry
             .OrderByDescending(x => x.StartAt ?? DateTimeOffset.MinValue)
+            .ThenByDescending(x => x.Id)
             .Skip(skip)
             .Take(take)
+            .Select(x => new WorkOrderListItemDto(
+                x.Id,
+                x.Type,
+                x.Status,
+                x.Title,
+                x.Description,
+                x.AssetId,
+                x.Asset == null
+                    ? null
+                    : new AssetDto(
+                        x.Asset.Id,
+                        x.Asset.Name,
+                        x.Asset.Code,
+                        x.Asset.LocationId,
+                        x.Asset.Location == null
+                            ? null
+                            : new LocationDto(
+                                x.Asset.Location.Id,
+                                x.Asset.Location.Name,
+                                x.Asset.Location.Code,
+                                x.Asset.Location.IsAct
+                            ),
+                        x.Asset.IsAct
+                    ),
+                x.AssignedToPersonId,
+                x.AssignedToPerson == null
+                    ? null
+                    : new PersonDto(x.AssignedToPerson.Id, x.AssignedToPerson.DisplayName),
+                x.StartAt,
+                x.StopAt,
+                x.DurationMinutes,
+                x.PmPlanId,
+                x.ExtraRequestId
+            ))
             .ToListAsync();
 
-        return Ok(new { total, take, skip, items });
+        return Ok(new PagedResp<WorkOrderListItemDto>(total, take, skip, items));
     }
 
     // ---------------- GET BY ID ----------------
@@ -98,32 +170,46 @@ public class WorkOrdersController : ControllerBase
     public async Task<IActionResult> GetById(Guid id)
     {
         var wo = await _db.WorkOrders.AsNoTracking()
-            .Include(x => x.Asset)
-                .ThenInclude(a => a.Location)
-            .Include(x => x.AssignedToPerson)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                id = x.Id,
+                type = x.Type,
+                status = x.Status,
+                title = x.Title,
+                description = x.Description,
+                assetId = x.AssetId,
+                asset = x.Asset == null ? null : new
+                {
+                    id = x.Asset.Id,
+                    name = x.Asset.Name,
+                    code = x.Asset.Code,
+                    locationId = x.Asset.LocationId,
+                    location = x.Asset.Location == null ? null : new
+                    {
+                        id = x.Asset.Location.Id,
+                        name = x.Asset.Location.Name,
+                        code = x.Asset.Location.Code,
+                        isAct = x.Asset.Location.IsAct
+                    },
+                    isAct = x.Asset.IsAct
+                },
+                assignedToPersonId = x.AssignedToPersonId,
+                assignedToPerson = x.AssignedToPerson == null ? null : new
+                {
+                    id = x.AssignedToPerson.Id,
+                    displayName = x.AssignedToPerson.DisplayName
+                },
+                startAt = x.StartAt,
+                stopAt = x.StopAt,
+                durationMinutes = x.DurationMinutes,
+                pmPlanId = x.PmPlanId,
+                extraRequestId = x.ExtraRequestId
+            })
+            .FirstOrDefaultAsync();
 
         if (wo == null) return NotFound();
-
-        return Ok(new
-        {
-            id = wo.Id,
-            type = wo.Type,
-            status = wo.Status,
-            title = wo.Title,
-            description = wo.Description,
-            assetId = wo.AssetId,
-            assetName = wo.Asset?.Name,
-            locId = wo.Asset?.LocationId,
-            locName = wo.Asset?.Location?.Name,
-            assignedToPersonId = wo.AssignedToPersonId,
-            assignedToPersonName = wo.AssignedToPerson?.DisplayName,
-            startAt = wo.StartAt,
-            stopAt = wo.StopAt,
-            durationMinutes = wo.DurationMinutes,
-            pmPlanId = wo.PmPlanId,
-            extraRequestId = wo.ExtraRequestId
-        });
+        return Ok(wo);
     }
 
     // ---------------- CREATE ----------------
@@ -149,11 +235,15 @@ public class WorkOrdersController : ControllerBase
         var startUtc = ToUtc(req.StartAt);
         var stopUtc = ToUtc(req.StopAt);
 
+        if (stopUtc.HasValue && startUtc.HasValue && stopUtc.Value < startUtc.Value)
+            return BadRequest("stopAt must be >= startAt");
+
         if (req.AssetId.HasValue)
         {
             var ok = await _db.Assets.AsNoTracking().AnyAsync(a => a.Id == req.AssetId.Value);
             if (!ok) return BadRequest("bad assetId");
         }
+
         if (req.AssignedToPersonId.HasValue)
         {
             var ok = await _db.People.AsNoTracking().AnyAsync(p => p.Id == req.AssignedToPersonId.Value);
@@ -168,7 +258,7 @@ public class WorkOrdersController : ControllerBase
             AssetId = req.AssetId,
             AssignedToPersonId = req.AssignedToPersonId,
             StartAt = startUtc,
-            StopAt = stopUtc,
+            StopAt = stopUtc
         };
 
         wo.DurationMinutes = CalcMinutes(startUtc, stopUtc);
@@ -189,7 +279,7 @@ public class WorkOrdersController : ControllerBase
     public record UpdateReq(
         string Title,
         string? Description,
-        WorkOrderStatus Status,
+        WorkOrderStatus Status, // folosit doar pt Cancelled cand WO e Open
         Guid? AssetId,
         Guid? AssignedToPersonId,
         DateTimeOffset? StartAt,
@@ -211,11 +301,15 @@ public class WorkOrdersController : ControllerBase
         var startUtc = ToUtc(req.StartAt);
         var stopUtc = ToUtc(req.StopAt);
 
+        if (stopUtc.HasValue && startUtc.HasValue && stopUtc.Value < startUtc.Value)
+            return BadRequest("stopAt must be >= startAt");
+
         if (req.AssetId.HasValue)
         {
             var ok = await _db.Assets.AsNoTracking().AnyAsync(a => a.Id == req.AssetId.Value);
             if (!ok) return BadRequest("bad assetId");
         }
+
         if (req.AssignedToPersonId.HasValue)
         {
             var ok = await _db.People.AsNoTracking().AnyAsync(p => p.Id == req.AssignedToPersonId.Value);
@@ -231,18 +325,11 @@ public class WorkOrdersController : ControllerBase
         wo.StopAt = stopUtc;
         wo.DurationMinutes = CalcMinutes(startUtc, stopUtc);
 
-        // Regula consistenta: timpii dicteaza statusul (Open/InProgress/Done).
-        // Daca nu exista timpi (Open), acceptam Status din request DOAR daca e Open/Cancelled.
         var inferred = InferStatus(startUtc, stopUtc);
         if (inferred == WorkOrderStatus.Open)
-        {
-            // daca user vrea sa marcheze Cancelled prin Update, acceptam; altfel Open
             wo.Status = req.Status == WorkOrderStatus.Cancelled ? WorkOrderStatus.Cancelled : WorkOrderStatus.Open;
-        }
         else
-        {
             wo.Status = inferred;
-        }
 
         await _db.SaveChangesAsync();
 
@@ -254,9 +341,8 @@ public class WorkOrdersController : ControllerBase
         return Ok(outWo);
     }
 
-    // ---------------- ACTIONS (STATE MACHINE) ----------------
+    // ---------------- ACTIONS ----------------
 
-    // Open -> InProgress
     [HttpPost("{id:guid}/start")]
     public async Task<IActionResult> Start(Guid id)
     {
@@ -272,23 +358,14 @@ public class WorkOrdersController : ControllerBase
         if (wo.StartAt == null)
             wo.StartAt = now;
 
-        // curatam orice "stop" existent
         wo.StopAt = null;
         wo.DurationMinutes = null;
 
         await _db.SaveChangesAsync();
 
-        return Ok(new
-        {
-            id = wo.Id,
-            status = wo.Status,
-            startAt = wo.StartAt,
-            stopAt = wo.StopAt,
-            durationMinutes = wo.DurationMinutes
-        });
+        return Ok(new { id = wo.Id, status = wo.Status, startAt = wo.StartAt, stopAt = wo.StopAt, durationMinutes = wo.DurationMinutes });
     }
 
-    // InProgress -> Done
     [HttpPost("{id:guid}/stop")]
     public async Task<IActionResult> Stop(Guid id)
     {
@@ -312,17 +389,9 @@ public class WorkOrdersController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        return Ok(new
-        {
-            id = wo.Id,
-            status = wo.Status,
-            startAt = wo.StartAt,
-            stopAt = wo.StopAt,
-            durationMinutes = wo.DurationMinutes
-        });
+        return Ok(new { id = wo.Id, status = wo.Status, startAt = wo.StartAt, stopAt = wo.StopAt, durationMinutes = wo.DurationMinutes });
     }
 
-    // Open/InProgress -> Cancelled
     [HttpPost("{id:guid}/cancel")]
     public async Task<IActionResult> Cancel(Guid id)
     {
@@ -333,13 +402,11 @@ public class WorkOrdersController : ControllerBase
             return BadRequest("Cancel allowed only when Status=Open or Status=InProgress.");
 
         wo.Status = WorkOrderStatus.Cancelled;
-
         await _db.SaveChangesAsync();
 
         return Ok(new { id = wo.Id, status = wo.Status });
     }
 
-    // Done/Cancelled -> Open
     [HttpPost("{id:guid}/reopen")]
     public async Task<IActionResult> Reopen(Guid id)
     {
@@ -350,26 +417,16 @@ public class WorkOrdersController : ControllerBase
             return BadRequest("Reopen allowed only when Status=Done or Status=Cancelled.");
 
         wo.Status = WorkOrderStatus.Open;
-
-        // resetam timpii
         wo.StartAt = null;
         wo.StopAt = null;
         wo.DurationMinutes = null;
 
         await _db.SaveChangesAsync();
 
-        return Ok(new
-        {
-            id = wo.Id,
-            status = wo.Status,
-            startAt = wo.StartAt,
-            stopAt = wo.StopAt,
-            durationMinutes = wo.DurationMinutes
-        });
+        return Ok(new { id = wo.Id, status = wo.Status, startAt = wo.StartAt, stopAt = wo.StopAt, durationMinutes = wo.DurationMinutes });
     }
 
-    // --------- ONE-TIME REPAIR (optional) ---------
-    // Rulezi o singura data din Swagger si apoi poti sterge metoda.
+    // One-time repair
     [HttpPost("repair-status")]
     public async Task<IActionResult> RepairStatus()
     {
@@ -385,19 +442,16 @@ public class WorkOrdersController : ControllerBase
 
             var inferred = InferStatus(startUtc, stopUtc);
 
-            // nu rescriem Cancelled daca e deja Cancelled si nu are stop
-            // (dar daca are stop, trebuie sa fie Done)
             if (wo.Status == WorkOrderStatus.Cancelled && !stopUtc.HasValue)
             {
-                // pastram Cancelled
+                // keep Cancelled
             }
             else
             {
                 wo.Status = inferred;
             }
 
-            var newDur = CalcMinutes(startUtc, stopUtc);
-            if (newDur.HasValue) wo.DurationMinutes = newDur;
+            wo.DurationMinutes = CalcMinutes(startUtc, stopUtc);
 
             if (wo.Status != old) changed++;
         }

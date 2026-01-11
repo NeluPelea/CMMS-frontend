@@ -1,3 +1,15 @@
+dotnet build .\Cmms.sln -c Debug
+
+$Env:ASPNETCORE_ENVIRONMENT="Development"
+dotnet run --project .\Cmms.Api\Cmms.Api.csproj
+
+
+
+admin@cmms.local
+
+Parola123
+
+
 dotnet run --project .\Cmms.Api\Cmms.Api.csproj
 
 
