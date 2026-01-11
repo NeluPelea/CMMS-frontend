@@ -12,11 +12,33 @@ builder.Services.AddEndpointsApiExplorer();
 //builder.Services.AddSwaggerGen();
 builder.Services.AddSwaggerGen(c =>
 {
-    // 1) evita conflicte intre tipuri cu acelasi nume (CreateReq, UpdateReq etc.)
     c.CustomSchemaIds(t => t.FullName);
-
-    // 2) evita crash daca exista conflicte de actiuni (route/method)
     c.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
+
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Enter: Bearer {your JWT token}"
+    });
+
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
 
@@ -61,6 +83,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// Seed dev data (Development only)
+await Cmms.Api.Seed.DevDataSeeder.SeedAsync(app.Services);
+
 
 app.UseCors("dev");
 

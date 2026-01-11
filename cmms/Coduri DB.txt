@@ -1,0 +1,12 @@
+Coduri DB
+
+SELECT * FROM "__EFMigrationsHistory" ORDER BY "MigrationId";
+
+SELECT
+  "Id",
+  "Title",
+  "StartAt",
+  "StopAt",
+  "DurationMinutes"
+FROM "WorkOrders"
+ORDER BY "Title";

@@ -1,3 +1,8 @@
+dotnet run --project .\Cmms.Api\Cmms.Api.csproj
+
+
+
+
 dotnet run --project .\Cmms.Api\Cmms.Api.csproj --urls "http://localhost:5026"
 
 Swagger: http://localhost:5026/swagger/index.html
