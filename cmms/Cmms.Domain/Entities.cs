@@ -1,16 +1,14 @@
 ﻿namespace Cmms.Domain;
 
-public class Location
+public sealed class Location
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
     public string? Code { get; set; }
-
-    // soft delete
     public bool IsAct { get; set; } = true;
 }
 
-public class Asset
+public sealed class Asset
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
@@ -19,11 +17,10 @@ public class Asset
     public Guid? LocationId { get; set; }
     public Location? Location { get; set; }
 
-    public bool IsAct { get; set; } = true; // soft delete
+    public bool IsAct { get; set; } = true;
 }
 
-
-public class Person
+public sealed class Person
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string DisplayName { get; set; } = "";
@@ -44,7 +41,7 @@ public enum WorkOrderStatus
     Cancelled = 4
 }
 
-public class WorkOrder
+public sealed class WorkOrder
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -76,26 +73,26 @@ public enum PmFrequency
     Monthly = 3
 }
 
-public class PmPlan
+public sealed class PmPlan
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+
     public Guid AssetId { get; set; }
     public Asset? Asset { get; set; }
 
     public string Name { get; set; } = "";
     public PmFrequency Frequency { get; set; } = PmFrequency.Monthly;
 
-    // urmatoarea scadenta (UTC)
     public DateTimeOffset NextDueAt { get; set; } = DateTimeOffset.UtcNow;
-
     public bool IsAct { get; set; } = true;
 
     public List<PmPlanItem> Items { get; set; } = new();
 }
 
-public class PmPlanItem
+public sealed class PmPlanItem
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+
     public Guid PmPlanId { get; set; }
     public PmPlan? PmPlan { get; set; }
 
@@ -103,28 +100,9 @@ public class PmPlanItem
     public int Sort { get; set; } = 0;
 }
 
-public class Part
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Name { get; set; } = "";
-    public string? Code { get; set; } // cod intern / cod extern
-    public string? Uom { get; set; }  // buc, m, kg etc.
+// Part si InventoryItem NU sunt aici (sunt in Part.cs si InventoryItem.cs)
 
-    public bool IsAct { get; set; } = true;
-}
-
-public class InventoryItem
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-
-    public Guid PartId { get; set; }
-    public Part? Part { get; set; }
-
-    public decimal QtyOnHand { get; set; } = 0m;
-    public decimal? MinQty { get; set; }
-}
-
-public class WorkOrderPart
+public sealed class WorkOrderPart
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -136,4 +114,3 @@ public class WorkOrderPart
 
     public decimal QtyUsed { get; set; } = 0m;
 }
-

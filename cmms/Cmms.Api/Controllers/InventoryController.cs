@@ -6,9 +6,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Cmms.Api.Controllers;
 
 [ApiController]
-[Route("api/inv")]
+[Route("api/inventory")]
 [Authorize]
-public class InventoryController : ControllerBase
+public sealed class InventoryController : ControllerBase
 {
     private readonly AppDbContext _db;
     public InventoryController(AppDbContext db) => _db = db;
@@ -25,30 +25,36 @@ public class InventoryController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(q))
         {
-            var s = q.Trim().ToLower();
-            qry = qry.Where(x => x.Part != null && (x.Part.Name.ToLower().Contains(s) || (x.Part.Code != null && x.Part.Code.ToLower().Contains(s))));
+            var s = q.Trim();
+            qry = qry.Where(x =>
+                x.Part != null &&
+                (EF.Functions.ILike(x.Part.Name, $"%{s}%") ||
+                 (x.Part.Code != null && EF.Functions.ILike(x.Part.Code, $"%{s}%")))
+            );
         }
 
-        var items = await qry.OrderBy(x => x.Part!.Name).Take(take).ToListAsync();
+        var items = await qry
+            .OrderBy(x => x.Part!.Name)
+            .Take(take)
+            .Select(x => new
+            {
+                id = x.Id,
+                partId = x.PartId,
+                partName = x.Part != null ? x.Part.Name : "",
+                partCode = x.Part != null ? x.Part.Code : null,
+                uom = x.Part != null ? x.Part.Uom : null,
+                qtyOnHand = x.QtyOnHand,
+                minQty = x.MinQty
+            })
+            .ToListAsync();
 
-        var dto = items.Select(x => new
-        {
-            id = x.Id,
-            partId = x.PartId,
-            partName = x.Part != null ? x.Part.Name : "",
-            partCode = x.Part != null ? x.Part.Code : null,
-            uom = x.Part != null ? x.Part.Uom : null,
-            qtyOnHand = x.QtyOnHand,
-            minQty = x.MinQty
-        });
-
-        return Ok(dto);
+        return Ok(items);
     }
 
-    public record AdjustReq(decimal Delta);
+    public sealed record AdjustReq(decimal Delta);
 
     [HttpPost("{id:guid}/adjust")]
-    public async Task<IActionResult> Adjust(Guid id, AdjustReq req)
+    public async Task<IActionResult> Adjust(Guid id, [FromBody] AdjustReq req)
     {
         var it = await _db.Inventory.FirstOrDefaultAsync(x => x.Id == id);
         if (it == null) return NotFound();

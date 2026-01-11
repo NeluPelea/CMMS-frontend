@@ -7,8 +7,6 @@ public sealed class InventoryItem
     public Guid PartId { get; set; }
     public Part? Part { get; set; }
 
-    public Guid? LocationId { get; set; }
-    public Location? Location { get; set; }
-
     public decimal QtyOnHand { get; set; } = 0m;
+    public decimal? MinQty { get; set; }
 }

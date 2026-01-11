@@ -29,11 +29,11 @@ public class AssetsController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(q))
         {
-            var s = q.Trim().ToLower();
+            var s = q.Trim();
             qry = qry.Where(x =>
-                x.Name.ToLower().Contains(s) ||
-                (x.Code != null && x.Code.ToLower().Contains(s)) ||
-                (x.Location != null && x.Location.Name.ToLower().Contains(s))
+                EF.Functions.ILike(x.Name, $"%{s}%") ||
+                (x.Code != null && EF.Functions.ILike(x.Code, $"%{s}%")) ||
+                (x.Location != null && EF.Functions.ILike(x.Location.Name, $"%{s}%"))
             );
         }
 
