@@ -230,6 +230,8 @@ export default function WorkOrdersPage() {
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <Link to="/assets">Assets</Link>
           <Link to="/locations">Locations</Link>
+          <Link to="/pm-plans">PM Plans</Link>
+
           <button onClick={() => logout()}>Logout</button>
         </div>
       </div>

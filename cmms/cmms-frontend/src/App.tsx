@@ -7,6 +7,8 @@ import WorkOrdersPage from "./pages/WorkOrdersPage";
 import WorkOrderDetailsPage from "./pages/WorkOrderDetailsPage";
 import AssetsPage from "./pages/AssetsPage";
 import LocationsPage from "./pages/LocationsPage";
+import PmPlansPage from "./pages/PmPlansPage";
+
 
 export default function App() {
   return (
@@ -48,6 +50,15 @@ export default function App() {
           </RequireAuth>
         }
       />
+
+      <Route 
+         path="/pm-plans" 
+         element={
+             <RequireAuth>
+                <PmPlansPage />
+             </RequireAuth>} 
+       />
+
 
       <Route path="/" element={<Navigate to="/work-orders" replace />} />
       <Route path="*" element={<Navigate to="/work-orders" replace />} />

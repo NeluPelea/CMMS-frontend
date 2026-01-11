@@ -69,6 +69,8 @@ export default function LocationsPage() {
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <Link to="/work-orders">Work Orders</Link>
           <Link to="/assets">Assets</Link>
+          <Link to="/pm-plans">PM Plans</Link>
+
           <button
             onClick={() => {
               logout();

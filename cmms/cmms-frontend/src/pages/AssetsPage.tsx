@@ -89,6 +89,8 @@ export default function AssetsPage() {
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <Link to="/work-orders">Work Orders</Link>
           <Link to="/locations">Locations</Link>
+          <Link to="/pm-plans">PM Plans</Link>
+
           <button
             onClick={() => {
               logout();
