@@ -3,16 +3,19 @@ using Cmms.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace Cmms.Api.Controllers;
 
 [ApiController]
 [Route("api/work-orders")]
 [Authorize]
-public class WorkOrdersController : ControllerBase
+public sealed class WorkOrdersController : ControllerBase
 {
     private readonly AppDbContext _db;
     public WorkOrdersController(AppDbContext db) => _db = db;
+
+    // ---------------- Helpers ----------------
 
     private static DateTimeOffset? ToUtc(DateTimeOffset? x)
         => x.HasValue ? x.Value.ToUniversalTime() : (DateTimeOffset?)null;
@@ -25,14 +28,6 @@ public class WorkOrdersController : ControllerBase
         return (int)Math.Round(diff.TotalMinutes);
     }
 
-    // Derivam status numai din timpi
-    private static WorkOrderStatus InferStatus(DateTimeOffset? startUtc, DateTimeOffset? stopUtc)
-    {
-        if (stopUtc.HasValue) return WorkOrderStatus.Done;
-        if (startUtc.HasValue) return WorkOrderStatus.InProgress;
-        return WorkOrderStatus.Open;
-    }
-
     // ---------------- DTOs ----------------
 
     public sealed record LocationDto(Guid Id, string Name, string? Code, bool IsAct);
@@ -40,15 +35,15 @@ public class WorkOrdersController : ControllerBase
     public sealed record AssetDto(
         Guid Id,
         string Name,
-        string Code,
-        Guid? LocationId,          // IMPORTANT: Guid? ca sa eviti CS1503
+        string? Code,
+        Guid? LocationId,
         LocationDto? Location,
         bool IsAct
     );
 
     public sealed record PersonDto(Guid Id, string DisplayName);
 
-    public sealed record WorkOrderListItemDto(
+    public sealed record WorkOrderDto(
         Guid Id,
         WorkOrderType Type,
         WorkOrderStatus Status,
@@ -66,6 +61,52 @@ public class WorkOrdersController : ControllerBase
     );
 
     public sealed record PagedResp<T>(int Total, int Take, int Skip, IReadOnlyList<T> Items);
+
+    // IMPORTANT: Proiecție EF-translatable (Expression), reutilizabilă peste tot.
+    private static readonly Expression<Func<WorkOrder, WorkOrderDto>> WorkOrderToDto =
+        x => new WorkOrderDto(
+            x.Id,
+            x.Type,
+            x.Status,
+            x.Title,
+            x.Description,
+            x.AssetId,
+            x.Asset == null
+                ? null
+                : new AssetDto(
+                    x.Asset.Id,
+                    x.Asset.Name,
+                    x.Asset.Code,
+                    x.Asset.LocationId,
+                    x.Asset.Location == null
+                        ? null
+                        : new LocationDto(
+                            x.Asset.Location.Id,
+                            x.Asset.Location.Name,
+                            x.Asset.Location.Code,
+                            x.Asset.Location.IsAct
+                        ),
+                    x.Asset.IsAct
+                ),
+            x.AssignedToPersonId,
+            x.AssignedToPerson == null
+                ? null
+                : new PersonDto(
+                    x.AssignedToPerson.Id,
+                    x.AssignedToPerson.DisplayName
+                ),
+            x.StartAt,
+            x.StopAt,
+            x.DurationMinutes,
+            x.PmPlanId,
+            x.ExtraRequestId
+        );
+
+    // Query de bază pe entity (include navigații pentru a evita surprize la lazy-loading / nulls).
+    private IQueryable<WorkOrder> BaseEntityQuery()
+        => _db.WorkOrders.AsNoTracking()
+            .Include(w => w.Asset)!.ThenInclude(a => a.Location)
+            .Include(w => w.AssignedToPerson);
 
     // ---------------- LIST ----------------
     [HttpGet]
@@ -88,9 +129,8 @@ public class WorkOrdersController : ControllerBase
         var fromUtc = ToUtc(from);
         var toUtc = ToUtc(to);
 
-        var qry = _db.WorkOrders.AsNoTracking().AsQueryable();
+        IQueryable<WorkOrder> qry = BaseEntityQuery();
 
-        // Text search (PostgreSQL): ILIKE
         if (!string.IsNullOrWhiteSpace(q))
         {
             var s = q.Trim();
@@ -107,7 +147,7 @@ public class WorkOrdersController : ControllerBase
         if (locId.HasValue)
             qry = qry.Where(x => x.Asset != null && x.Asset.LocationId == locId.Value);
 
-        // Interval filtering: workorders care se intersecteaza cu [from,to]
+        // interval intersection [from,to]
         if (fromUtc.HasValue || toUtc.HasValue)
         {
             var f = fromUtc ?? DateTimeOffset.MinValue;
@@ -115,97 +155,32 @@ public class WorkOrdersController : ControllerBase
 
             qry = qry.Where(x =>
                 (x.StartAt ?? DateTimeOffset.MinValue) <= t &&
-                ((x.StopAt ?? DateTimeOffset.MaxValue) >= f)
+                (x.StopAt ?? DateTimeOffset.MaxValue) >= f
             );
         }
 
         var total = await qry.CountAsync();
 
+        // IMPORTANT: sort/paging pe entity, apoi proiectie DTO
         var items = await qry
             .OrderByDescending(x => x.StartAt ?? DateTimeOffset.MinValue)
             .ThenByDescending(x => x.Id)
             .Skip(skip)
             .Take(take)
-            .Select(x => new WorkOrderListItemDto(
-                x.Id,
-                x.Type,
-                x.Status,
-                x.Title,
-                x.Description,
-                x.AssetId,
-                x.Asset == null
-                    ? null
-                    : new AssetDto(
-                        x.Asset.Id,
-                        x.Asset.Name,
-                        x.Asset.Code,
-                        x.Asset.LocationId,
-                        x.Asset.Location == null
-                            ? null
-                            : new LocationDto(
-                                x.Asset.Location.Id,
-                                x.Asset.Location.Name,
-                                x.Asset.Location.Code,
-                                x.Asset.Location.IsAct
-                            ),
-                        x.Asset.IsAct
-                    ),
-                x.AssignedToPersonId,
-                x.AssignedToPerson == null
-                    ? null
-                    : new PersonDto(x.AssignedToPerson.Id, x.AssignedToPerson.DisplayName),
-                x.StartAt,
-                x.StopAt,
-                x.DurationMinutes,
-                x.PmPlanId,
-                x.ExtraRequestId
-            ))
+            .Select(WorkOrderToDto)
             .ToListAsync();
 
-        return Ok(new PagedResp<WorkOrderListItemDto>(total, take, skip, items));
+        return Ok(new PagedResp<WorkOrderDto>(total, take, skip, items));
     }
 
     // ---------------- GET BY ID ----------------
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var wo = await _db.WorkOrders.AsNoTracking()
+        // IMPORTANT: filtrare pe entity, nu pe DTO
+        var wo = await BaseEntityQuery()
             .Where(x => x.Id == id)
-            .Select(x => new
-            {
-                id = x.Id,
-                type = x.Type,
-                status = x.Status,
-                title = x.Title,
-                description = x.Description,
-                assetId = x.AssetId,
-                asset = x.Asset == null ? null : new
-                {
-                    id = x.Asset.Id,
-                    name = x.Asset.Name,
-                    code = x.Asset.Code,
-                    locationId = x.Asset.LocationId,
-                    location = x.Asset.Location == null ? null : new
-                    {
-                        id = x.Asset.Location.Id,
-                        name = x.Asset.Location.Name,
-                        code = x.Asset.Location.Code,
-                        isAct = x.Asset.Location.IsAct
-                    },
-                    isAct = x.Asset.IsAct
-                },
-                assignedToPersonId = x.AssignedToPersonId,
-                assignedToPerson = x.AssignedToPerson == null ? null : new
-                {
-                    id = x.AssignedToPerson.Id,
-                    displayName = x.AssignedToPerson.DisplayName
-                },
-                startAt = x.StartAt,
-                stopAt = x.StopAt,
-                durationMinutes = x.DurationMinutes,
-                pmPlanId = x.PmPlanId,
-                extraRequestId = x.ExtraRequestId
-            })
+            .Select(WorkOrderToDto)
             .FirstOrDefaultAsync();
 
         if (wo == null) return NotFound();
@@ -213,7 +188,7 @@ public class WorkOrdersController : ControllerBase
     }
 
     // ---------------- CREATE ----------------
-    public record CreateReq(
+    public sealed record CreateReq(
         string Title,
         string? Description,
         WorkOrderType Type,
@@ -224,7 +199,7 @@ public class WorkOrdersController : ControllerBase
     );
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateReq req)
+    public async Task<IActionResult> Create([FromBody] CreateReq req)
     {
         if (req == null) return BadRequest("req null");
 
@@ -240,46 +215,51 @@ public class WorkOrdersController : ControllerBase
 
         if (req.AssetId.HasValue)
         {
-            var ok = await _db.Assets.AsNoTracking().AnyAsync(a => a.Id == req.AssetId.Value);
+            var ok = await _db.Assets.AsNoTracking()
+                .AnyAsync(a => a.Id == req.AssetId.Value && a.IsAct);
             if (!ok) return BadRequest("bad assetId");
         }
 
         if (req.AssignedToPersonId.HasValue)
         {
-            var ok = await _db.People.AsNoTracking().AnyAsync(p => p.Id == req.AssignedToPersonId.Value);
+            var ok = await _db.People.AsNoTracking()
+                .AnyAsync(p => p.Id == req.AssignedToPersonId.Value);
             if (!ok) return BadRequest("bad assignedToPersonId");
         }
 
         var wo = new WorkOrder
         {
             Title = title,
-            Description = req.Description,
+            Description = string.IsNullOrWhiteSpace(req.Description) ? null : req.Description.Trim(),
             Type = req.Type,
+
+            // la Create: status initial Open (state machine decide Start/Stop)
+            Status = WorkOrderStatus.Open,
+
             AssetId = req.AssetId,
             AssignedToPersonId = req.AssignedToPersonId,
-            StartAt = startUtc,
-            StopAt = stopUtc
-        };
 
-        wo.DurationMinutes = CalcMinutes(startUtc, stopUtc);
-        wo.Status = InferStatus(startUtc, stopUtc);
+            StartAt = startUtc,
+            StopAt = stopUtc,
+            DurationMinutes = CalcMinutes(startUtc, stopUtc)
+        };
 
         _db.WorkOrders.Add(wo);
         await _db.SaveChangesAsync();
 
-        var outWo = await _db.WorkOrders.AsNoTracking()
-            .Include(x => x.Asset).ThenInclude(a => a.Location)
-            .Include(x => x.AssignedToPerson)
-            .FirstAsync(x => x.Id == wo.Id);
+        var outWo = await BaseEntityQuery()
+            .Where(x => x.Id == wo.Id)
+            .Select(WorkOrderToDto)
+            .FirstAsync();
 
         return Ok(outWo);
     }
 
     // ---------------- UPDATE ----------------
-    public record UpdateReq(
+    public sealed record UpdateReq(
         string Title,
         string? Description,
-        WorkOrderStatus Status, // folosit doar pt Cancelled cand WO e Open
+        WorkOrderStatus Status,
         Guid? AssetId,
         Guid? AssignedToPersonId,
         DateTimeOffset? StartAt,
@@ -287,7 +267,7 @@ public class WorkOrdersController : ControllerBase
     );
 
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(Guid id, UpdateReq req)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateReq req)
     {
         if (req == null) return BadRequest("req null");
 
@@ -306,42 +286,59 @@ public class WorkOrdersController : ControllerBase
 
         if (req.AssetId.HasValue)
         {
-            var ok = await _db.Assets.AsNoTracking().AnyAsync(a => a.Id == req.AssetId.Value);
+            var ok = await _db.Assets.AsNoTracking()
+                .AnyAsync(a => a.Id == req.AssetId.Value && a.IsAct);
             if (!ok) return BadRequest("bad assetId");
         }
 
         if (req.AssignedToPersonId.HasValue)
         {
-            var ok = await _db.People.AsNoTracking().AnyAsync(p => p.Id == req.AssignedToPersonId.Value);
+            var ok = await _db.People.AsNoTracking()
+                .AnyAsync(p => p.Id == req.AssignedToPersonId.Value);
             if (!ok) return BadRequest("bad assignedToPersonId");
         }
 
+        // IMPORTANT: statusul trebuie sa fie coerent cu state-machine.
+        // Permitem update de campuri; statusul il lasam doar Open/Cancelled daca nu ai timpi,
+        // altfel timpii dicteaza:
+        // - start != null && stop == null -> InProgress
+        // - start != null && stop != null -> Done
+        // - start == null && stop == null -> Open sau Cancelled (din request)
+        WorkOrderStatus inferred;
+        if (startUtc == null && stopUtc == null) inferred = WorkOrderStatus.Open;
+        else if (startUtc != null && stopUtc == null) inferred = WorkOrderStatus.InProgress;
+        else inferred = WorkOrderStatus.Done;
+
         wo.Title = title;
-        wo.Description = req.Description;
+        wo.Description = string.IsNullOrWhiteSpace(req.Description) ? null : req.Description.Trim();
         wo.AssetId = req.AssetId;
         wo.AssignedToPersonId = req.AssignedToPersonId;
-
         wo.StartAt = startUtc;
         wo.StopAt = stopUtc;
         wo.DurationMinutes = CalcMinutes(startUtc, stopUtc);
 
-        var inferred = InferStatus(startUtc, stopUtc);
         if (inferred == WorkOrderStatus.Open)
+        {
+            // cand nu ai timpi, permit doar Open/Cancelled
             wo.Status = req.Status == WorkOrderStatus.Cancelled ? WorkOrderStatus.Cancelled : WorkOrderStatus.Open;
+        }
         else
+        {
+            // timpii dicteaza
             wo.Status = inferred;
+        }
 
         await _db.SaveChangesAsync();
 
-        var outWo = await _db.WorkOrders.AsNoTracking()
-            .Include(x => x.Asset).ThenInclude(a => a.Location)
-            .Include(x => x.AssignedToPerson)
-            .FirstAsync(x => x.Id == wo.Id);
+        var outWo = await BaseEntityQuery()
+            .Where(x => x.Id == wo.Id)
+            .Select(WorkOrderToDto)
+            .FirstAsync();
 
         return Ok(outWo);
     }
 
-    // ---------------- ACTIONS ----------------
+    // ---------------- ACTIONS (STATE MACHINE) ----------------
 
     [HttpPost("{id:guid}/start")]
     public async Task<IActionResult> Start(Guid id)
@@ -355,15 +352,19 @@ public class WorkOrdersController : ControllerBase
         var now = DateTimeOffset.UtcNow;
 
         wo.Status = WorkOrderStatus.InProgress;
-        if (wo.StartAt == null)
-            wo.StartAt = now;
+        if (!wo.StartAt.HasValue) wo.StartAt = now;
 
         wo.StopAt = null;
         wo.DurationMinutes = null;
 
         await _db.SaveChangesAsync();
 
-        return Ok(new { id = wo.Id, status = wo.Status, startAt = wo.StartAt, stopAt = wo.StopAt, durationMinutes = wo.DurationMinutes });
+        var outWo = await BaseEntityQuery()
+            .Where(x => x.Id == id)
+            .Select(WorkOrderToDto)
+            .FirstAsync();
+
+        return Ok(outWo);
     }
 
     [HttpPost("{id:guid}/stop")]
@@ -377,19 +378,20 @@ public class WorkOrdersController : ControllerBase
 
         var now = DateTimeOffset.UtcNow;
 
-        if (wo.StartAt == null)
-            wo.StartAt = now;
-
+        if (!wo.StartAt.HasValue) wo.StartAt = now; // fallback defensiv
         wo.StopAt = now;
-        wo.Status = WorkOrderStatus.Done;
 
-        var startUtc = ToUtc(wo.StartAt);
-        var stopUtc = ToUtc(wo.StopAt);
-        wo.DurationMinutes = CalcMinutes(startUtc, stopUtc);
+        wo.Status = WorkOrderStatus.Done;
+        wo.DurationMinutes = CalcMinutes(ToUtc(wo.StartAt), ToUtc(wo.StopAt));
 
         await _db.SaveChangesAsync();
 
-        return Ok(new { id = wo.Id, status = wo.Status, startAt = wo.StartAt, stopAt = wo.StopAt, durationMinutes = wo.DurationMinutes });
+        var outWo = await BaseEntityQuery()
+            .Where(x => x.Id == id)
+            .Select(WorkOrderToDto)
+            .FirstAsync();
+
+        return Ok(outWo);
     }
 
     [HttpPost("{id:guid}/cancel")]
@@ -402,9 +404,16 @@ public class WorkOrdersController : ControllerBase
             return BadRequest("Cancel allowed only when Status=Open or Status=InProgress.");
 
         wo.Status = WorkOrderStatus.Cancelled;
+
+        // recomandare: NU setam StopAt la cancel (ramane null)
         await _db.SaveChangesAsync();
 
-        return Ok(new { id = wo.Id, status = wo.Status });
+        var outWo = await BaseEntityQuery()
+            .Where(x => x.Id == id)
+            .Select(WorkOrderToDto)
+            .FirstAsync();
+
+        return Ok(outWo);
     }
 
     [HttpPost("{id:guid}/reopen")]
@@ -423,40 +432,11 @@ public class WorkOrdersController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        return Ok(new { id = wo.Id, status = wo.Status, startAt = wo.StartAt, stopAt = wo.StopAt, durationMinutes = wo.DurationMinutes });
-    }
+        var outWo = await BaseEntityQuery()
+            .Where(x => x.Id == id)
+            .Select(WorkOrderToDto)
+            .FirstAsync();
 
-    // One-time repair
-    [HttpPost("repair-status")]
-    public async Task<IActionResult> RepairStatus()
-    {
-        var list = await _db.WorkOrders.ToListAsync();
-        var changed = 0;
-
-        foreach (var wo in list)
-        {
-            var old = wo.Status;
-
-            var startUtc = ToUtc(wo.StartAt);
-            var stopUtc = ToUtc(wo.StopAt);
-
-            var inferred = InferStatus(startUtc, stopUtc);
-
-            if (wo.Status == WorkOrderStatus.Cancelled && !stopUtc.HasValue)
-            {
-                // keep Cancelled
-            }
-            else
-            {
-                wo.Status = inferred;
-            }
-
-            wo.DurationMinutes = CalcMinutes(startUtc, stopUtc);
-
-            if (wo.Status != old) changed++;
-        }
-
-        await _db.SaveChangesAsync();
-        return Ok(new { changed });
+        return Ok(outWo);
     }
 }

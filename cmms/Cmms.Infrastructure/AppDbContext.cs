@@ -21,6 +21,7 @@ public class AppDbContext : DbContext
     public DbSet<InventoryItem> Inventory => Set<InventoryItem>();
     public DbSet<WorkOrderPart> WorkOrderParts => Set<WorkOrderPart>();
 
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);

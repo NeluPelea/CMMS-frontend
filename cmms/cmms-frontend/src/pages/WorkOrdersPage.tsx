@@ -1,58 +1,95 @@
 ﻿// src/pages/WorkOrdersPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { createWorkOrder, getAssets, getWorkOrders, logout, type AssetDto, type WorkOrderDto } from "../api";
+import {
+  cancelWorkOrder,
+  createWorkOrder,
+  getAssets,
+  getLocs,
+  getPeople,
+  getWorkOrders,
+  logout,
+  reopenWorkOrder,
+  startWorkOrder,
+  stopWorkOrder,
+  updateWorkOrder,
+  type AssetDto,
+  type LocDto,
+  type PersonDto,
+  type WorkOrderDto,
+} from "../api";
+import { isoToLocalDisplay, isoToLocalInputValue, localInputToIso } from "../domain/datetime";
+import { WorkOrderStatus, WorkOrderType, woStatusBadgeStyle, woStatusLabel, woTypeLabel } from "../domain/enums";
 
-function fmt(dt?: string | null) {
-  if (!dt) return "";
-  try {
-    return new Date(dt).toLocaleString();
-  } catch {
-    return dt;
-  }
-}
-
-function typeLabel(t: number) {
-  if (t === 1) return "AdHoc";
-  if (t === 2) return "Preventive";
-  if (t === 3) return "Extra";
-  return String(t);
-}
-
-function statusLabel(s: number) {
-  // ajustează după enum-ul tău din backend dacă diferă
-  if (s === 1) return "Open";
-  if (s === 2) return "In Progress";
-  if (s === 3) return "Closed";
-  if (s === 4) return "Canceled";
-  return String(s);
+function safeArray<T>(x: any): T[] {
+  return Array.isArray(x) ? (x as T[]) : [];
 }
 
 export default function WorkOrdersPage() {
+  // list state
   const [items, setItems] = useState<WorkOrderDto[]>([]);
   const [total, setTotal] = useState(0);
-  const [assets, setAssets] = useState<AssetDto[]>([]);
-
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const [showNew, setShowNew] = useState(false);
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState<number>(1);
+  // filters
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<number | "">("");
+  const [type, setType] = useState<number | "">("");
+  const [locId, setLocId] = useState<string>("");
   const [assetId, setAssetId] = useState<string>("");
-  const [startAt, setStartAt] = useState<string>("");
-  const [stopAt, setStopAt] = useState<string>("");
+  const [take] = useState(50);
+  const [skip, setSkip] = useState(0);
 
-  const canCreate = useMemo(() => title.trim().length >= 2, [title]);
+  // aux lists
+  const [locs, setLocs] = useState<LocDto[]>([]);
+  const [assets, setAssets] = useState<AssetDto[]>([]);
+  const [people, setPeople] = useState<PersonDto[]>([]);
 
-  async function load() {
+  // selection + detail draft
+  const [selId, setSelId] = useState<string>("");
+  const selected = useMemo(() => items.find(x => x.id === selId) || null, [items, selId]);
+
+  const [dTitle, setDTitle] = useState("");
+  const [dDesc, setDDesc] = useState("");
+  const [dStatus, setDStatus] = useState<number>(WorkOrderStatus.Open);
+  const [dAssetId, setDAssetId] = useState<string>("");
+  const [dAssignedId, setDAssignedId] = useState<string>("");
+  const [dStartAt, setDStartAt] = useState<string>(""); // datetime-local
+  const [dStopAt, setDStopAt] = useState<string>("");  // datetime-local
+
+  // create form (compact)
+  const [newTitle, setNewTitle] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [newType, setNewType] = useState<number>(WorkOrderType.AdHoc);
+  const [newAssetId, setNewAssetId] = useState<string>("");
+
+  const canCreate = useMemo(() => newTitle.trim().length >= 2, [newTitle]);
+  const canSave = useMemo(() => dTitle.trim().length >= 2 && !!selected, [dTitle, selected]);
+
+  async function loadList(nextSkip?: number) {
+    const realSkip = typeof nextSkip === "number" ? nextSkip : skip;
     setLoading(true);
     setErr(null);
     try {
-      const resp = await getWorkOrders({ take: 200, skip: 0 });
-      const list = Array.isArray(resp.items) ? resp.items : [];
+      const resp = await getWorkOrders({
+        q: q.trim() || undefined,
+        status: status === "" ? undefined : status,
+        type: type === "" ? undefined : type,
+        locId: locId || undefined,
+        assetId: assetId || undefined,
+        take,
+        skip: realSkip,
+      });
+
+      const list = safeArray<WorkOrderDto>(resp?.items);
       setItems(list);
-      setTotal(typeof resp.total === "number" ? resp.total : list.length);
+      setTotal(typeof resp?.total === "number" ? resp.total : list.length);
+
+      // auto-select first item if nothing selected
+      if (!selId && list.length) setSelId(list[0].id);
+      // if selection disappeared due to filters, reselect
+      if (selId && !list.some(x => x.id === selId) && list.length) setSelId(list[0].id);
     } catch (e: any) {
       setErr(e?.message || String(e));
       setItems([]);
@@ -62,164 +99,430 @@ export default function WorkOrdersPage() {
     }
   }
 
-  async function loadAssets() {
+  async function loadAux() {
     try {
-      const data = await getAssets({ take: 500 });
-      setAssets(Array.isArray(data) ? data : []);
-    } catch (e: any) {
-      setErr(e?.message || String(e));
-      setAssets([]);
+      const [locData, assetData, peopleData] = await Promise.all([
+        getLocs({ take: 500, ia: true }),
+        getAssets({ take: 500, ia: true }),
+        getPeople(),
+      ]);
+      setLocs(safeArray<LocDto>(locData));
+      setAssets(safeArray<AssetDto>(assetData));
+      setPeople(safeArray<PersonDto>(peopleData));
+    } catch {
+      // nu blocam pagina daca aux fails
     }
   }
 
+  // sync detail form when selection changes
   useEffect(() => {
-    (async () => {
-      await loadAssets();
-      await load();
-    })();
+    if (!selected) {
+      setDTitle("");
+      setDDesc("");
+      setDStatus(WorkOrderStatus.Open);
+      setDAssetId("");
+      setDAssignedId("");
+      setDStartAt("");
+      setDStopAt("");
+      return;
+    }
+    setDTitle(selected.title || "");
+    setDDesc(selected.description || "");
+    setDStatus(selected.status);
+    setDAssetId(selected.assetId || "");
+    setDAssignedId(selected.assignedToPersonId || "");
+    setDStartAt(isoToLocalInputValue(selected.startAt));
+    setDStopAt(isoToLocalInputValue(selected.stopAt));
+  }, [selected]);
+
+  useEffect(() => {
+    loadAux();
+    loadList(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // filters reload
+  useEffect(() => {
+    setSkip(0);
+    loadList(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, type, locId, assetId]);
+
+  async function onSearch() {
+    setSkip(0);
+    await loadList(0);
+  }
+
   async function onCreate() {
+    if (!canCreate) return;
     setErr(null);
     try {
-      const startIso = startAt ? new Date(startAt).toISOString() : null;
-      const stopIso = stopAt ? new Date(stopAt).toISOString() : null;
-
-      await createWorkOrder({
-        title: title.trim(),
-        type,
-        assetId: assetId ? assetId : null,
-        startAt: startIso,
-        stopAt: stopIso,
+      const wo = await createWorkOrder({
+        title: newTitle.trim(),
+        description: newDesc.trim() || null,
+        type: newType,
+        assetId: newAssetId || null,
+        // start/stop se fac din quick actions sau in detalii
       });
 
-      setTitle("");
-      setType(1);
-      setAssetId("");
-      setStartAt("");
-      setStopAt("");
-      setShowNew(false);
-
-      await load();
+      setNewTitle("");
+      setNewDesc("");
+      setNewAssetId("");
+      // reload list and select created
+      await loadList(0);
+      setSelId(wo.id);
     } catch (e: any) {
       setErr(e?.message || String(e));
     }
   }
 
-  return (
-    <div style={{ padding: 16, maxWidth: 1100, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-        <div>
-          <h2 style={{ margin: 0 }}>Work Orders</h2>
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>Total: {total}</div>
-        </div>
+  async function onSave() {
+    if (!selected || !canSave) return;
+    setErr(null);
+    try {
+      const updated = await updateWorkOrder(selected.id, {
+        title: dTitle.trim(),
+        description: dDesc.trim() || null,
+        status: dStatus,
+        assetId: dAssetId || null,
+        assignedToPersonId: dAssignedId || null,
+        startAt: localInputToIso(dStartAt),
+        stopAt: localInputToIso(dStopAt),
+      });
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      setItems(prev => prev.map(x => (x.id === updated.id ? updated : x)));
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    }
+  }
+
+  async function applyAction(action: "start" | "stop" | "cancel" | "reopen") {
+    if (!selected) return;
+    setErr(null);
+    try {
+      let updated: WorkOrderDto;
+      if (action === "start") updated = await startWorkOrder(selected.id);
+      else if (action === "stop") updated = await stopWorkOrder(selected.id);
+      else if (action === "cancel") updated = await cancelWorkOrder(selected.id);
+      else updated = await reopenWorkOrder(selected.id);
+
+      setItems(prev => prev.map(x => (x.id === updated.id ? updated : x)));
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    }
+  }
+
+  const pageInfo = useMemo(() => {
+    const from = total === 0 ? 0 : skip + 1;
+    const to = Math.min(skip + take, total);
+    return `${from}-${to} of ${total}`;
+  }, [skip, take, total]);
+
+  const filteredAssets = useMemo(() => {
+    if (!locId) return assets;
+    return assets.filter(a => (a.locId || "") === locId);
+  }, [assets, locId]);
+
+  return (
+    <div style={{ padding: 16, maxWidth: 1400, margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <h2 style={{ margin: 0 }}>Work Orders</h2>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <Link to="/assets">Assets</Link>
           <Link to="/locations">Locations</Link>
+          <button onClick={() => logout()}>Logout</button>
+        </div>
+      </div>
+
+      {err && (
+        <div style={{ marginTop: 10, padding: 10, border: "1px solid #999", borderRadius: 8 }}>
+          {err}
+        </div>
+      )}
+
+      {/* Filters + create */}
+      <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
+        <div>
+          <label style={{ display: "block", fontSize: 12 }}>Search</label>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title/description..." style={{ width: "100%" }} />
+        </div>
+
+        <div>
+          <label style={{ display: "block", fontSize: 12 }}>Status</label>
+          <select value={status} onChange={(e) => setStatus(e.target.value === "" ? "" : Number(e.target.value))} style={{ width: "100%" }}>
+            <option value="">All</option>
+            <option value={WorkOrderStatus.Open}>Open</option>
+            <option value={WorkOrderStatus.InProgress}>In progress</option>
+            <option value={WorkOrderStatus.Done}>Done</option>
+            <option value={WorkOrderStatus.Cancelled}>Cancelled</option>
+          </select>
+        </div>
+
+        <div>
+          <label style={{ display: "block", fontSize: 12 }}>Type</label>
+          <select value={type} onChange={(e) => setType(e.target.value === "" ? "" : Number(e.target.value))} style={{ width: "100%" }}>
+            <option value="">All</option>
+            <option value={WorkOrderType.AdHoc}>AdHoc</option>
+            <option value={WorkOrderType.Preventive}>Preventive</option>
+            <option value={WorkOrderType.Extra}>Extra</option>
+          </select>
+        </div>
+
+        <div>
+          <label style={{ display: "block", fontSize: 12 }}>Location</label>
+          <select value={locId} onChange={(e) => setLocId(e.target.value)} style={{ width: "100%" }}>
+            <option value="">All</option>
+            {locs.map(l => (
+              <option key={l.id} value={l.id}>
+                {l.name} {l.code ? `(${l.code})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label style={{ display: "block", fontSize: 12 }}>Asset</label>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} style={{ width: "100%" }}>
+            <option value="">All</option>
+            {filteredAssets.map(a => (
+              <option key={a.id} value={a.id}>
+                {a.name} {a.code ? `(${a.code})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onSearch} disabled={loading}>Search</button>
           <button
             onClick={() => {
-              logout();
-              location.href = "/login";
+              const next = Math.max(0, skip - take);
+              setSkip(next);
+              loadList(next);
             }}
+            disabled={loading || skip === 0}
           >
-            Logout
+            Prev
+          </button>
+          <button
+            onClick={() => {
+              const next = skip + take;
+              if (next >= total) return;
+              setSkip(next);
+              loadList(next);
+            }}
+            disabled={loading || skip + take >= total}
+          >
+            Next
           </button>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "center" }}>
-        <button onClick={() => setShowNew(true)}>New WO</button>
-        <button onClick={load} disabled={loading}>
-          {loading ? "Loading..." : "Refresh"}
-        </button>
-      </div>
-
-      {err && <div style={{ marginTop: 12, color: "crimson", whiteSpace: "pre-wrap" }}>{err}</div>}
-
-      {showNew && (
-        <div style={{ marginTop: 16, padding: 12, border: "1px solid #ddd", borderRadius: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontWeight: 600 }}>New Work Order</div>
-            <button onClick={() => setShowNew(false)}>Close</button>
+      {/* Compact create */}
+      <div style={{ marginTop: 12, padding: 12, border: "1px solid #ddd", borderRadius: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1.2fr auto", gap: 8, alignItems: "end" }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12 }}>New work order title</label>
+            <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} style={{ width: "100%" }} />
           </div>
-
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Title"
-              style={{ padding: 8, minWidth: 320 }}
-            />
-
-            <select value={type} onChange={(e) => setType(Number(e.target.value))} style={{ padding: 8, minWidth: 160 }}>
-              <option value={1}>AdHoc</option>
-              <option value={2}>Preventive</option>
-              <option value={3}>Extra</option>
+          <div>
+            <label style={{ display: "block", fontSize: 12 }}>Type</label>
+            <select value={newType} onChange={(e) => setNewType(Number(e.target.value))} style={{ width: "100%" }}>
+              <option value={WorkOrderType.AdHoc}>AdHoc</option>
+              <option value={WorkOrderType.Preventive}>Preventive</option>
+              <option value={WorkOrderType.Extra}>Extra</option>
             </select>
-
-            <select value={assetId} onChange={(e) => setAssetId(e.target.value)} style={{ padding: 8, minWidth: 260 }}>
-              <option value="">(No asset)</option>
-              {assets.map((a) => (
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12 }}>Asset</label>
+            <select value={newAssetId} onChange={(e) => setNewAssetId(e.target.value)} style={{ width: "100%" }}>
+              <option value="">(none)</option>
+              {filteredAssets.map(a => (
                 <option key={a.id} value={a.id}>
-                  {a.name}
-                  {a.code ? ` (${a.code})` : ""}
-                  {a.locName ? ` - ${a.locName}` : ""}
+                  {a.name} {a.code ? `(${a.code})` : ""}
                 </option>
               ))}
             </select>
-
-            <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 8 }} />
-            <input type="datetime-local" value={stopAt} onChange={(e) => setStopAt(e.target.value)} style={{ padding: 8 }} />
-
-            <button onClick={onCreate} disabled={!canCreate}>
-              Create
-            </button>
           </div>
-
-          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-            Start/Stop sunt opționale. Dacă sunt completate, backend calculează DurationMinutes (UTC).
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button onClick={onCreate} disabled={!canCreate}>Create</button>
           </div>
         </div>
-      )}
 
-      <table style={{ width: "100%", marginTop: 16, borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Title</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Type</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Status</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Asset</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Start</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Stop</th>
-            <th style={{ textAlign: "right", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Min</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((w) => (
-            <tr key={w.id}>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>
-                <Link to={`/work-orders/${w.id}`}>{w.title}</Link>
-              </td>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{typeLabel(w.type)}</td>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{statusLabel(w.status)}</td>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{(w as any).asset?.name || ""}</td>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{fmt(w.startAt)}</td>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{fmt(w.stopAt)}</td>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px", textAlign: "right" }}>{w.durationMinutes ?? ""}</td>
-            </tr>
-          ))}
+        <div style={{ marginTop: 8 }}>
+          <label style={{ display: "block", fontSize: 12 }}>Description</label>
+          <textarea value={newDesc} onChange={(e) => setNewDesc(e.target.value)} rows={2} style={{ width: "100%" }} />
+        </div>
+      </div>
 
-          {items.length === 0 && (
-            <tr>
-              <td colSpan={7} style={{ padding: 12, opacity: 0.7 }}>
-                No work orders.
-              </td>
-            </tr>
+      {/* Main master-detail */}
+      <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "440px 1fr", gap: 12, minHeight: 520 }}>
+        {/* LEFT: list */}
+        <div style={{ border: "1px solid #ddd", borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ padding: 10, borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontWeight: 600 }}>Work orders</div>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>{pageInfo}</div>
+          </div>
+
+          {loading ? (
+            <div style={{ padding: 12 }}>Loading...</div>
+          ) : items.length === 0 ? (
+            <div style={{ padding: 12 }}>No items.</div>
+          ) : (
+            <div style={{ maxHeight: 520, overflowY: "auto" }}>
+              {items.map(w => {
+                const isSel = w.id === selId;
+                return (
+                  <div
+                    key={w.id}
+                    onClick={() => setSelId(w.id)}
+                    style={{
+                      padding: 12,
+                      cursor: "pointer",
+                      borderBottom: "1px solid #f0f0f0",
+                      background: isSel ? "#f7f7f7" : "transparent",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {w.title}
+                      </div>
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          fontSize: 12,
+                          ...woStatusBadgeStyle(w.status),
+                        }}
+                        title={woStatusLabel(w.status)}
+                      >
+                        {woStatusLabel(w.status)}
+                      </span>
+                    </div>
+
+                    <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85, display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {woTypeLabel(w.type)} • {w.asset?.name ?? "No asset"} • {w.asset?.location?.name ?? "No location"}
+                      </div>
+                      <div style={{ whiteSpace: "nowrap" }}>
+                        {w.assignedToPerson?.displayName ?? ""}
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
+                      {w.status === WorkOrderStatus.Done && w.durationMinutes != null
+                        ? `Duration: ${w.durationMinutes} min`
+                        : `Start: ${isoToLocalDisplay(w.startAt)}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
-        </tbody>
-      </table>
+        </div>
+
+        {/* RIGHT: details */}
+        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
+          {!selected ? (
+            <div>Select a work order.</div>
+          ) : (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 12, opacity: 0.8 }}>Selected</div>
+                  <div style={{ fontWeight: 700 }}>{selected.title}</div>
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>
+                    {selected.asset?.name ?? "No asset"} • {selected.asset?.location?.name ?? "No location"}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <Link to={`/work-orders/${selected.id}`} style={{ fontSize: 12 }}>Open page</Link>
+                  <button onClick={() => applyAction("start")} disabled={selected.status !== WorkOrderStatus.Open}>
+                    Start
+                  </button>
+                  <button onClick={() => applyAction("stop")} disabled={selected.status !== WorkOrderStatus.InProgress}>
+                    Stop
+                  </button>
+                  <button onClick={() => applyAction("cancel")} disabled={selected.status === WorkOrderStatus.Done}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => applyAction("reopen")}
+                    disabled={!(selected.status === WorkOrderStatus.Done || selected.status === WorkOrderStatus.Cancelled)}
+                  >
+                    Reopen
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 12 }}>Title</label>
+                  <input value={dTitle} onChange={(e) => setDTitle(e.target.value)} style={{ width: "100%" }} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: 12 }}>Status</label>
+                  <select value={dStatus} onChange={(e) => setDStatus(Number(e.target.value))} style={{ width: "100%" }}>
+                    <option value={WorkOrderStatus.Open}>Open</option>
+                    <option value={WorkOrderStatus.InProgress}>In progress</option>
+                    <option value={WorkOrderStatus.Done}>Done</option>
+                    <option value={WorkOrderStatus.Cancelled}>Cancelled</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: 12 }}>Asset</label>
+                  <select value={dAssetId} onChange={(e) => setDAssetId(e.target.value)} style={{ width: "100%" }}>
+                    <option value="">(none)</option>
+                    {assets.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} {a.code ? `(${a.code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: 12 }}>Assigned</label>
+                  <select value={dAssignedId} onChange={(e) => setDAssignedId(e.target.value)} style={{ width: "100%" }}>
+                    <option value="">(none)</option>
+                    {people.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: 12 }}>Start (local)</label>
+                  <input type="datetime-local" value={dStartAt} onChange={(e) => setDStartAt(e.target.value)} style={{ width: "100%" }} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: 12 }}>Stop (local)</label>
+                  <input type="datetime-local" value={dStopAt} onChange={(e) => setDStopAt(e.target.value)} style={{ width: "100%" }} />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 10 }}>
+                <label style={{ display: "block", fontSize: 12 }}>Description</label>
+                <textarea value={dDesc} onChange={(e) => setDDesc(e.target.value)} rows={5} style={{ width: "100%" }} />
+              </div>
+
+              <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>
+                  Start: {isoToLocalDisplay(selected.startAt)} • Stop: {isoToLocalDisplay(selected.stopAt)} • Duration:{" "}
+                  {selected.durationMinutes != null ? `${selected.durationMinutes} min` : "-"}
+                </div>
+                <button onClick={onSave} disabled={!canSave}>Save</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

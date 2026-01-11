@@ -1,162 +1,122 @@
-﻿using Cmms.Infrastructure;
-using Cmms.Domain;
+﻿using Cmms.Domain;
+using Cmms.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace Cmms.Api.Controllers
+namespace Cmms.Api.Controllers;
+
+[ApiController]
+[Route("api/locs")]
+[Authorize]
+public sealed class LocsController : ControllerBase
 {
-    [ApiController]
-    [Route("api/locs")]
-    [Authorize]
-    public class LocsController : ControllerBase
+    private readonly AppDbContext _db;
+    public LocsController(AppDbContext db) => _db = db;
+
+    public sealed record LocDto(Guid Id, string Name, string? Code, bool IsAct);
+    public sealed record CreateReq(string Name, string? Code);
+    public sealed record UpdateReq(string Name, string? Code);
+
+    // GET /api/locs?q=...&take=200&ia=true|false
+    [HttpGet]
+    public async Task<IActionResult> List(
+        [FromQuery] string? q = null,
+        [FromQuery] int take = 200,
+        [FromQuery] bool ia = false
+    )
     {
-        private readonly AppDbContext _db;
+        if (take <= 0) take = 200;
+        if (take > 500) take = 500;
 
-        public LocsController(AppDbContext db)
+        var qry = _db.Locations.AsNoTracking().AsQueryable();
+
+        if (!ia)
+            qry = qry.Where(x => x.IsAct);
+
+        if (!string.IsNullOrWhiteSpace(q))
         {
-            _db = db;
+            var s = q.Trim();
+            qry = qry.Where(x =>
+                (x.Name != null && EF.Functions.ILike(x.Name, $"%{s}%")) ||
+                (x.Code != null && EF.Functions.ILike(x.Code, $"%{s}%"))
+            );
         }
 
-        // DTO-uri scurte
-        public class LocDto
+        var items = await qry
+            .OrderBy(x => x.Name)
+            .Take(take)
+            .Select(x => new LocDto(x.Id, x.Name, x.Code, x.IsAct))
+            .ToListAsync();
+
+        return Ok(items);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateReq req)
+    {
+        var name = (req.Name ?? "").Trim();
+        if (name.Length < 2) return BadRequest("name too short");
+
+        var code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code.Trim();
+        if (code != null && code.Length > 40) return BadRequest("code too long");
+
+        if (code != null)
         {
-            public System.Guid Id { get; set; }
-            public string Name { get; set; }
-            public string Code { get; set; }
+            var exists = await _db.Locations.AsNoTracking().AnyAsync(x => x.Code == code);
+            if (exists) return Conflict("code exists");
         }
 
-        public class LocReq
+        var loc = new Location
         {
-            public string Name { get; set; }
-            public string Code { get; set; }
+            Name = name,
+            Code = code,
+            IsAct = true
+        };
+
+        _db.Locations.Add(loc);
+        await _db.SaveChangesAsync();
+
+        return Ok(new LocDto(loc.Id, loc.Name, loc.Code, loc.IsAct));
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateReq req)
+    {
+        var loc = await _db.Locations.FirstOrDefaultAsync(x => x.Id == id);
+        if (loc == null) return NotFound();
+
+        var name = (req.Name ?? "").Trim();
+        if (name.Length < 2) return BadRequest("name too short");
+
+        var code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code.Trim();
+        if (code != null && code.Length > 40) return BadRequest("code too long");
+
+        if (code != null)
+        {
+            var exists = await _db.Locations.AsNoTracking()
+                .AnyAsync(x => x.Id != id && x.Code == code);
+            if (exists) return Conflict("code exists");
         }
 
-        // GET /api/locs?q=...&take=100
-        [HttpGet]
-        public async System.Threading.Tasks.Task<IActionResult> List([FromQuery] string q = null, [FromQuery] int take = 100)
-        {
-            if (take <= 0) take = 100;
-            if (take > 500) take = 500;
+        loc.Name = name;
+        loc.Code = code;
 
-            var qry = _db.Locations.AsNoTracking().AsQueryable();
+        await _db.SaveChangesAsync();
 
-            if (!string.IsNullOrWhiteSpace(q))
-            {
-                q = q.Trim().ToLower();
-                qry = qry.Where(x =>
-                    (x.Name != null && x.Name.ToLower().Contains(q)) ||
-                    (x.Code != null && x.Code.ToLower().Contains(q))
-                );
-            }
+        return Ok(new LocDto(loc.Id, loc.Name, loc.Code, loc.IsAct));
+    }
 
-            var items = await qry
-                .OrderBy(x => x.Name)
-                .Take(take)
-                .Select(x => new LocDto
-                {
-                    Id = x.Id,
-                    Name = x.Name,
-                    Code = x.Code
-                })
-                .ToListAsync();
+    // soft delete
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> SoftDelete(Guid id)
+    {
+        var loc = await _db.Locations.FirstOrDefaultAsync(x => x.Id == id);
+        if (loc == null) return NotFound();
 
-            return Ok(items);
-        }
+        loc.IsAct = false;
+        await _db.SaveChangesAsync();
 
-        // GET /api/locs/{id}
-        [HttpGet("{id}")]
-        public async System.Threading.Tasks.Task<IActionResult> Get(string id)
-        {
-            System.Guid gid;
-            if (!System.Guid.TryParse(id, out gid)) return BadRequest("bad id");
-
-            var x = await _db.Locations.AsNoTracking().FirstOrDefaultAsync(a => a.Id == gid);
-            if (x == null) return NotFound();
-
-            return Ok(new LocDto { Id = x.Id, Name = x.Name, Code = x.Code });
-        }
-
-        // POST /api/locs
-        [HttpPost]
-        public async System.Threading.Tasks.Task<IActionResult> Create([FromBody] LocReq req)
-        {
-            if (req == null) return BadRequest("req null");
-
-            var name = (req.Name ?? "").Trim();
-            var code = (req.Code ?? "").Trim();
-
-            if (name.Length < 2) return BadRequest("name too short");
-            if (name.Length > 120) return BadRequest("name too long");
-            if (code.Length > 40) return BadRequest("code too long");
-
-            // optional: unicitate Code daca e completat
-            if (!string.IsNullOrWhiteSpace(code))
-            {
-                var exists = await _db.Locations.AsNoTracking().AnyAsync(x => x.Code == code);
-                if (exists) return Conflict("code exists");
-            }
-
-            var loc = new Location
-            {
-                Name = name,
-                Code = string.IsNullOrWhiteSpace(code) ? null : code
-            };
-
-            _db.Locations.Add(loc);
-            await _db.SaveChangesAsync();
-
-            return Ok(new LocDto { Id = loc.Id, Name = loc.Name, Code = loc.Code });
-        }
-
-        // PUT /api/locs/{id}
-        [HttpPut("{id}")]
-        public async System.Threading.Tasks.Task<IActionResult> Update(string id, [FromBody] LocReq req)
-        {
-            System.Guid gid;
-            if (!System.Guid.TryParse(id, out gid)) return BadRequest("bad id");
-            if (req == null) return BadRequest("req null");
-
-            var loc = await _db.Locations.FirstOrDefaultAsync(x => x.Id == gid);
-            if (loc == null) return NotFound();
-
-            var name = (req.Name ?? "").Trim();
-            var code = (req.Code ?? "").Trim();
-
-            if (name.Length < 2) return BadRequest("name too short");
-            if (name.Length > 120) return BadRequest("name too long");
-            if (code.Length > 40) return BadRequest("code too long");
-
-            if (!string.IsNullOrWhiteSpace(code))
-            {
-                var exists = await _db.Locations.AsNoTracking()
-                    .AnyAsync(x => x.Code == code && x.Id != gid);
-                if (exists) return Conflict("code exists");
-            }
-
-            loc.Name = name;
-            loc.Code = string.IsNullOrWhiteSpace(code) ? null : code;
-
-            await _db.SaveChangesAsync();
-
-            return Ok(new LocDto { Id = loc.Id, Name = loc.Name, Code = loc.Code });
-        }
-
-        // DELETE /api/locs/{id}  (soft delete)
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(string id)
-        {
-            if (!Guid.TryParse(id, out var gid))
-                return BadRequest("bad id");
-
-            var loc = await _db.Locations.FirstOrDefaultAsync(x => x.Id == gid);
-            if (loc == null)
-                return NotFound();
-
-            loc.IsAct = false;
-            await _db.SaveChangesAsync();
-
-            return Ok(new { ok = true });
-        }
+        return NoContent();
     }
 }

@@ -20,38 +20,49 @@ export type WoListParams = {
   skip?: number;
 };
 
+export type WoLocationDto = {
+  id: string;
+  name: string;
+  code?: string | null;
+  isAct: boolean;
+};
+
+export type WoAssetDto = {
+  id: string;
+  name: string;
+  code?: string | null;
+  locationId?: string | null;
+  location?: WoLocationDto | null;
+  isAct: boolean;
+};
+
+export type WoPersonDto = {
+  id: string;
+  displayName: string;
+};
+
 export type WorkOrderDto = {
   id: string;
   type: number;
   status: number;
   title: string;
   description?: string | null;
+
   assetId?: string | null;
-  asset?: any | null;
+  asset?: WoAssetDto | null;
+
   assignedToPersonId?: string | null;
+  assignedToPerson?: WoPersonDto | null;
+
   startAt?: string | null;
   stopAt?: string | null;
   durationMinutes?: number | null;
+
+  pmPlanId?: string | null;
+  extraRequestId?: string | null;
 };
 
-export type WorkOrderDetailsDto = {
-  id: string;
-  type: number;
-  status: number;
-  title: string;
-  description?: string | null;
-  assetId?: string | null;
-  assetName?: string | null;
-  locId?: string | null;
-  locName?: string | null;
-  assignedToPersonId?: string | null;
-  assignedToPersonName?: string | null;
-  startAt?: string | null;
-  stopAt?: string | null;
-  durationMinutes?: number | null;
-};
-
-export async function getWorkOrders(p: WoListParams = {}): Promise<Paged<WorkOrderDto>> {
+export async function getWorkOrders(p: WoListParams = {}) {
   const qs = new URLSearchParams();
   if (p.q) qs.set("q", p.q);
   if (p.status != null) qs.set("status", String(p.status));
@@ -66,6 +77,10 @@ export async function getWorkOrders(p: WoListParams = {}): Promise<Paged<WorkOrd
   return apiFetch<Paged<WorkOrderDto>>(`/api/work-orders?${qs.toString()}`, { method: "GET" });
 }
 
+export async function getWorkOrderById(id: string) {
+  return apiFetch<WorkOrderDto>(`/api/work-orders/${id}`, { method: "GET" });
+}
+
 export async function createWorkOrder(req: {
   title: string;
   description?: string | null;
@@ -74,12 +89,11 @@ export async function createWorkOrder(req: {
   assignedToPersonId?: string | null;
   startAt?: string | null;
   stopAt?: string | null;
-}): Promise<WorkOrderDto> {
-  return apiFetch<WorkOrderDto>(`/api/work-orders`, { method: "POST", body: JSON.stringify(req) });
-}
-
-export async function getWorkOrderById(id: string): Promise<WorkOrderDetailsDto> {
-  return apiFetch<WorkOrderDetailsDto>(`/api/work-orders/${id}`, { method: "GET" });
+}) {
+  return apiFetch<WorkOrderDto>(`/api/work-orders`, {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
 }
 
 export async function updateWorkOrder(
@@ -94,21 +108,24 @@ export async function updateWorkOrder(
     stopAt?: string | null;
   }
 ) {
-  return apiFetch(`/api/work-orders/${id}`, { method: "PUT", body: JSON.stringify(req) });
+  return apiFetch<WorkOrderDto>(`/api/work-orders/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(req),
+  });
 }
 
 export async function startWorkOrder(id: string) {
-  return apiFetch(`/api/work-orders/${id}/start`, { method: "POST" });
+  return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/start`, { method: "POST" });
 }
 
 export async function stopWorkOrder(id: string) {
-  return apiFetch(`/api/work-orders/${id}/stop`, { method: "POST" });
+  return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/stop`, { method: "POST" });
 }
 
 export async function cancelWorkOrder(id: string) {
-  return apiFetch(`/api/work-orders/${id}/cancel`, { method: "POST" });
+  return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/cancel`, { method: "POST" });
 }
 
 export async function reopenWorkOrder(id: string) {
-  return apiFetch(`/api/work-orders/${id}/reopen`, { method: "POST" });
+  return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/reopen`, { method: "POST" });
 }

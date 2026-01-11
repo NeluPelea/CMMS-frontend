@@ -5,27 +5,36 @@ export type LocDto = {
   id: string;
   name: string;
   code?: string | null;
-  // backend may or may not return this; keep optional
-  isAct?: boolean;
+  isAct: boolean;
 };
 
-export async function getLocs(params?: { q?: string; take?: number; ia?: boolean }): Promise<LocDto[]> {
-  // NOTE: if backend doesn't support ia yet, it will simply ignore it.
+export async function getLocs(p?: {
+  q?: string;
+  take?: number;
+  ia?: boolean;
+}): Promise<LocDto[]> {
   const qs = new URLSearchParams();
-  if (params?.q) qs.set("q", params.q);
-  if (params?.take != null) qs.set("take", String(params.take));
-  if (params?.ia) qs.set("ia", "true");
-  const tail = qs.toString() ? `?${qs.toString()}` : "";
-  return apiFetch<LocDto[]>(`/api/locs${tail}`, { method: "GET" });
+  if (p?.q) qs.set("q", p.q);
+  if (p?.take != null) qs.set("take", String(p.take));
+  if (p?.ia) qs.set("ia", "true");
+  return apiFetch(`/api/locs?${qs.toString()}`);
 }
 
-export async function createLoc(req: { name: string; code?: string | null }): Promise<LocDto> {
+export async function createLoc(req: { name: string; code?: string | null }) {
   return apiFetch<LocDto>(`/api/locs`, {
     method: "POST",
-    body: JSON.stringify({ name: req.name, code: req.code ?? null }),
+    body: JSON.stringify(req),
   });
 }
 
-export async function deleteLoc(id: string): Promise<any> {
-  return apiFetch(`/api/locs/${id}`, { method: "DELETE" });
+export async function updateLoc(id: string, req: { name: string; code?: string | null }) {
+  return apiFetch<LocDto>(`/api/locs/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(req),
+  });
+}
+
+export async function deleteLoc(id: string) {
+  // backend: 204 NoContent
+  return apiFetch<null>(`/api/locs/${id}`, { method: "DELETE" });
 }

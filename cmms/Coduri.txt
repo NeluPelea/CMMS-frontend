@@ -5,9 +5,14 @@ dotnet run --project .\Cmms.Api\Cmms.Api.csproj
 
 
 
-admin@cmms.local
+{
+  "email": "admin@cmms.local",
+  "password": "Parola123"
+}
 
-Parola123
+
+frontend
+npm.cmd run dev
 
 
 dotnet run --project .\Cmms.Api\Cmms.Api.csproj
