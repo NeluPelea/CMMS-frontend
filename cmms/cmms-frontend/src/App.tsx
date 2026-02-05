@@ -8,7 +8,9 @@ import WorkOrderDetailsPage from "./pages/WorkOrderDetailsPage";
 import AssetsPage from "./pages/AssetsPage";
 import LocationsPage from "./pages/LocationsPage";
 import PmPlansPage from "./pages/PmPlansPage";
-
+import PartsPage from "./pages/PartsPage";
+import InventoryPage from "./pages/InventoryPage";
+import DashboardPage from "./pages/DashboardPage";
 
 export default function App() {
   return (
@@ -59,9 +61,38 @@ export default function App() {
              </RequireAuth>} 
        />
 
+      <Route
+          path="/parts"
+          element={
+            <RequireAuth>
+              <PartsPage />
+            </RequireAuth>
+          }
+        />
+
+       <Route
+       path="/inventory"
+          element={
+             <RequireAuth>
+              <InventoryPage />
+            </RequireAuth>
+          }
+        /> 
+
+        <Route
+        path="/dashboard"
+            element={
+                <RequireAuth>
+                <DashboardPage />
+                </RequireAuth>
+            }
+/>
 
       <Route path="/" element={<Navigate to="/work-orders" replace />} />
-      <Route path="*" element={<Navigate to="/work-orders" replace />} />
+     
+
+      
+
     </Routes>
   );
 }

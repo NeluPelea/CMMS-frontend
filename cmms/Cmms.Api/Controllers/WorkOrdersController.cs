@@ -62,7 +62,7 @@ public sealed class WorkOrdersController : ControllerBase
 
     public sealed record PagedResp<T>(int Total, int Take, int Skip, IReadOnlyList<T> Items);
 
-    // IMPORTANT: Proiecție EF-translatable (Expression), reutilizabilă peste tot.
+    // IMPORTANT: Proiecție EF-translatable (Expression)
     private static readonly Expression<Func<WorkOrder, WorkOrderDto>> WorkOrderToDto =
         x => new WorkOrderDto(
             x.Id,
@@ -102,7 +102,6 @@ public sealed class WorkOrdersController : ControllerBase
             x.ExtraRequestId
         );
 
-    // Query de bază pe entity (include navigații pentru a evita surprize la lazy-loading / nulls).
     private IQueryable<WorkOrder> BaseEntityQuery()
         => _db.WorkOrders.AsNoTracking()
             .Include(w => w.Asset)!.ThenInclude(a => a.Location)
@@ -161,7 +160,6 @@ public sealed class WorkOrdersController : ControllerBase
 
         var total = await qry.CountAsync();
 
-        // IMPORTANT: sort/paging pe entity, apoi proiectie DTO
         var items = await qry
             .OrderByDescending(x => x.StartAt ?? DateTimeOffset.MinValue)
             .ThenByDescending(x => x.Id)
@@ -177,7 +175,6 @@ public sealed class WorkOrdersController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        // IMPORTANT: filtrare pe entity, nu pe DTO
         var wo = await BaseEntityQuery()
             .Where(x => x.Id == id)
             .Select(WorkOrderToDto)
@@ -232,13 +229,9 @@ public sealed class WorkOrdersController : ControllerBase
             Title = title,
             Description = string.IsNullOrWhiteSpace(req.Description) ? null : req.Description.Trim(),
             Type = req.Type,
-
-            // la Create: status initial Open (state machine decide Start/Stop)
             Status = WorkOrderStatus.Open,
-
             AssetId = req.AssetId,
             AssignedToPersonId = req.AssignedToPersonId,
-
             StartAt = startUtc,
             StopAt = stopUtc,
             DurationMinutes = CalcMinutes(startUtc, stopUtc)
@@ -298,12 +291,7 @@ public sealed class WorkOrdersController : ControllerBase
             if (!ok) return BadRequest("bad assignedToPersonId");
         }
 
-        // IMPORTANT: statusul trebuie sa fie coerent cu state-machine.
-        // Permitem update de campuri; statusul il lasam doar Open/Cancelled daca nu ai timpi,
-        // altfel timpii dicteaza:
-        // - start != null && stop == null -> InProgress
-        // - start != null && stop != null -> Done
-        // - start == null && stop == null -> Open sau Cancelled (din request)
+        // Status inferred by time fields
         WorkOrderStatus inferred;
         if (startUtc == null && stopUtc == null) inferred = WorkOrderStatus.Open;
         else if (startUtc != null && stopUtc == null) inferred = WorkOrderStatus.InProgress;
@@ -319,12 +307,10 @@ public sealed class WorkOrdersController : ControllerBase
 
         if (inferred == WorkOrderStatus.Open)
         {
-            // cand nu ai timpi, permit doar Open/Cancelled
             wo.Status = req.Status == WorkOrderStatus.Cancelled ? WorkOrderStatus.Cancelled : WorkOrderStatus.Open;
         }
         else
         {
-            // timpii dicteaza
             wo.Status = inferred;
         }
 
@@ -378,7 +364,7 @@ public sealed class WorkOrdersController : ControllerBase
 
         var now = DateTimeOffset.UtcNow;
 
-        if (!wo.StartAt.HasValue) wo.StartAt = now; // fallback defensiv
+        if (!wo.StartAt.HasValue) wo.StartAt = now;
         wo.StopAt = now;
 
         wo.Status = WorkOrderStatus.Done;
@@ -405,7 +391,6 @@ public sealed class WorkOrdersController : ControllerBase
 
         wo.Status = WorkOrderStatus.Cancelled;
 
-        // recomandare: NU setam StopAt la cancel (ramane null)
         await _db.SaveChangesAsync();
 
         var outWo = await BaseEntityQuery()

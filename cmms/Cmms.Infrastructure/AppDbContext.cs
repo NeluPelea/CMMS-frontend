@@ -21,6 +21,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<InventoryItem> Inventory => Set<InventoryItem>();
     public DbSet<WorkOrderPart> WorkOrderParts => Set<WorkOrderPart>();
 
+    public DbSet<AssetPart> AssetParts => Set<AssetPart>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -106,5 +108,26 @@ public sealed class AppDbContext : DbContext
 
             e.HasIndex(x => new { x.WorkOrderId, x.PartId });
         });
+
+        b.Entity<AssetPart>(e =>
+        {
+            e.ToTable("asset_parts");
+            e.HasKey(x => x.Id);
+
+            e.HasOne(x => x.Asset)
+                .WithMany()
+                .HasForeignKey(x => x.AssetId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Part)
+                .WithMany()
+                .HasForeignKey(x => x.PartId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // un singur rand activ per (Asset, Part)
+            e.HasIndex(x => new { x.AssetId, x.PartId }).IsUnique();
+            e.HasIndex(x => new { x.AssetId, x.IsAct });
+        });
+
     }
 }

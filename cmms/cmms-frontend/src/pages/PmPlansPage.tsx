@@ -1,8 +1,27 @@
+// src/pages/PmPlansPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { getAssets, getLocs, logout, type AssetDto, type LocDto } from "../api";
-import { createPmPlan, generateDuePmPlans, getPmPlans, PmFrequency, type PmPlanDto } from "../api/pmPlans";
+import AppShell from "../components/AppShell";
+import { getAssets, getLocs, type AssetDto, type LocDto } from "../api";
+import {
+  createPmPlan,
+  generateDuePmPlans,
+  getPmPlans,
+  PmFrequency,
+  type PmPlanDto,
+} from "../api/pmPlans";
 import { isoToLocalDisplay, localInputToIso } from "../domain/datetime";
+import {
+  Button,
+  Card,
+  EmptyRow,
+  ErrorBox,
+  Input,
+  PageToolbar,
+  Pill,
+  Select,
+  TableShell,
+  cx,
+} from "../components/ui";
 
 function safeArray<T>(x: any): T[] {
   return Array.isArray(x) ? (x as T[]) : [];
@@ -10,11 +29,76 @@ function safeArray<T>(x: any): T[] {
 
 function freqLabel(v: number) {
   switch (v) {
-    case PmFrequency.Daily: return "Daily";
-    case PmFrequency.Weekly: return "Weekly";
-    case PmFrequency.Monthly: return "Monthly";
-    default: return `Freq ${v}`;
+    case PmFrequency.Daily:
+      return "Daily";
+    case PmFrequency.Weekly:
+      return "Weekly";
+    case PmFrequency.Monthly:
+      return "Monthly";
+    default:
+      return `Freq ${v}`;
   }
+}
+
+function FreqPill({ freq }: { freq: number }) {
+  const tone =
+    freq === PmFrequency.Daily
+      ? "rose"
+      : freq === PmFrequency.Weekly
+      ? "amber"
+      : "teal";
+  return <Pill tone={tone as any}>{freqLabel(freq)}</Pill>;
+}
+
+function FieldLabel(props: { children: React.ReactNode }) {
+  return (
+    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+      {props.children}
+    </div>
+  );
+}
+
+function DateTimeLocalInput(props: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <input
+      type="datetime-local"
+      value={props.value}
+      onChange={props.onChange}
+      className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
+    />
+  );
+}
+
+function TextArea(props: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  rows?: number;
+  placeholder?: string;
+}) {
+  return (
+    <textarea
+      value={props.value}
+      onChange={props.onChange}
+      rows={props.rows ?? 4}
+      placeholder={props.placeholder}
+      className="w-full resize-y rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:ring-2 focus:ring-teal-400/40"
+    />
+  );
+}
+
+function checklistPreview(items: Array<{ text: string }> | null | undefined) {
+  if (!items || items.length === 0) return "—";
+  const texts = items
+    .slice()
+    .sort((a: any, b: any) => (a.sort ?? 0) - (b.sort ?? 0))
+    .map((x) => x.text);
+
+  const head = texts.slice(0, 3);
+  const rest = texts.length - head.length;
+  return rest > 0 ? `${head.join(", ")} (+${rest})` : head.join(", ");
 }
 
 export default function PmPlansPage() {
@@ -38,7 +122,7 @@ export default function PmPlansPage() {
 
   const filteredAssets = useMemo(() => {
     if (!locId) return assets;
-    return assets.filter(a => (a.locId || "") === locId);
+    return assets.filter((a) => (a.locId || "") === locId);
   }, [assets, locId]);
 
   const assetNameById = useMemo(() => {
@@ -60,7 +144,10 @@ export default function PmPlansPage() {
     setLoading(true);
     setErr(null);
     try {
-      const data = await getPmPlans({ assetId: assetId || undefined, take: 500 });
+      const data = await getPmPlans({
+        assetId: assetId || undefined,
+        take: 500,
+      });
       setItems(safeArray(data));
     } catch (e: any) {
       setErr(e?.message || String(e));
@@ -91,7 +178,7 @@ export default function PmPlansPage() {
 
       const lines = cChecklist
         .split("\n")
-        .map(s => s.trim())
+        .map((s) => s.trim())
         .filter(Boolean);
 
       await createPmPlan({
@@ -102,6 +189,7 @@ export default function PmPlansPage() {
         items: lines.length ? lines : null,
       });
 
+      setCAssetId("");
       setCName("");
       setCFreq(PmFrequency.Weekly);
       setCNextDueLocal("");
@@ -113,6 +201,8 @@ export default function PmPlansPage() {
   }
 
   async function onGenerateDue() {
+    if (!confirm("Generate due PM work orders now?")) return;
+
     setErr(null);
     try {
       const res = await generateDuePmPlans(200);
@@ -124,150 +214,158 @@ export default function PmPlansPage() {
   }
 
   return (
-    <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>PM Plans</h2>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Link to="/work-orders">Work Orders</Link>
-          <Link to="/assets">Assets</Link>
-          <Link to="/locations">Locations</Link>
-          <button onClick={() => logout()}>Logout</button>
-        </div>
-      </div>
+    <AppShell title="PM Plans">
+      <PageToolbar
+        left={
+          <div className="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <FieldLabel>Location</FieldLabel>
+              <Select
+                value={locId}
+                onChange={(e) => {
+                  setLocId(e.target.value);
+                  setAssetId("");
+                }}
+              >
+                <option value="">All locations</option>
+                {locs.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name} {l.code ? `(${l.code})` : ""}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-      {err && (
-        <div style={{ marginTop: 10, padding: 10, border: "1px solid #999", borderRadius: 8 }}>
-          {err}
-        </div>
-      )}
+            <div>
+              <FieldLabel>Asset</FieldLabel>
+              <Select value={assetId} onChange={(e) => setAssetId(e.target.value)}>
+                <option value="">All assets</option>
+                {filteredAssets.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} {a.code ? `(${a.code})` : ""}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+        }
+        right={
+          <div className="flex items-center gap-2">
+            <Button onClick={load} disabled={loading} variant="ghost">
+              Refresh
+            </Button>
+            <Button onClick={onGenerateDue} disabled={loading} variant="ghost">
+              Generate due
+            </Button>
+          </div>
+        }
+      />
 
-      {/* Filters */}
-      <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 8, alignItems: "end" }}>
-        <div>
-          <label style={{ display: "block", fontSize: 12 }}>Location</label>
-          <select value={locId} onChange={(e) => { setLocId(e.target.value); setAssetId(""); }} style={{ width: "100%" }}>
-            <option value="">All</option>
-            {locs.map(l => (
-              <option key={l.id} value={l.id}>
-                {l.name} {l.code ? `(${l.code})` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
+      {err ? <ErrorBox message={err} /> : null}
 
-        <div>
-          <label style={{ display: "block", fontSize: 12 }}>Asset</label>
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} style={{ width: "100%" }}>
-            <option value="">All</option>
-            {filteredAssets.map(a => (
-              <option key={a.id} value={a.id}>
-                {a.name} {a.code ? `(${a.code})` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button onClick={load} disabled={loading}>Refresh</button>
-        <button onClick={onGenerateDue} disabled={loading}>Generate due</button>
-      </div>
-
-      {/* Create */}
-      <div style={{ marginTop: 12, padding: 12, border: "1px solid #ddd", borderRadius: 10 }}>
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Create PM Plan</div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 1fr", gap: 8, alignItems: "end" }}>
-          <div>
-            <label style={{ display: "block", fontSize: 12 }}>Asset</label>
-            <select value={cAssetId} onChange={(e) => setCAssetId(e.target.value)} style={{ width: "100%" }}>
+      <Card title="Create PM Plan">
+        <div className="grid gap-3 lg:grid-cols-4">
+          <div className="lg:col-span-2">
+            <FieldLabel>Asset</FieldLabel>
+            <Select value={cAssetId} onChange={(e) => setCAssetId(e.target.value)}>
               <option value="">Select asset...</option>
-              {assets.map(a => (
+              {assets.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name} {a.code ? `(${a.code})` : ""}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: 12 }}>Name</label>
-            <input value={cName} onChange={(e) => setCName(e.target.value)} style={{ width: "100%" }} />
-          </div>
-
-          <div>
-            <label style={{ display: "block", fontSize: 12 }}>Frequency</label>
-            <select value={cFreq} onChange={(e) => setCFreq(Number(e.target.value))} style={{ width: "100%" }}>
+            <FieldLabel>Frequency</FieldLabel>
+            <Select value={cFreq} onChange={(e) => setCFreq(Number(e.target.value))}>
               <option value={PmFrequency.Daily}>Daily</option>
               <option value={PmFrequency.Weekly}>Weekly</option>
               <option value={PmFrequency.Monthly}>Monthly</option>
-            </select>
+            </Select>
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: 12 }}>Next due (local)</label>
-            <input
-              type="datetime-local"
+            <FieldLabel>Next due</FieldLabel>
+            <DateTimeLocalInput
               value={cNextDueLocal}
               onChange={(e) => setCNextDueLocal(e.target.value)}
-              style={{ width: "100%" }}
             />
+          </div>
+
+          <div className="lg:col-span-4">
+            <FieldLabel>Name</FieldLabel>
+            <Input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Plan name" />
           </div>
         </div>
 
-        <div style={{ marginTop: 8 }}>
-          <label style={{ display: "block", fontSize: 12 }}>Checklist items (one per line)</label>
-          <textarea
+        <div className="mt-3">
+          <FieldLabel>Checklist</FieldLabel>
+          <TextArea
             value={cChecklist}
             onChange={(e) => setCChecklist(e.target.value)}
             rows={4}
-            style={{ width: "100%" }}
+            placeholder={"One item per line\nExample:\n- Check oil level\n- Inspect belts\n- Clean filters"}
           />
         </div>
 
-        <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-          <button onClick={onCreate} disabled={loading}>Create</button>
+        <div className="mt-3 flex justify-end">
+          <Button
+            onClick={onCreate}
+            disabled={loading || cName.trim().length < 2 || !cAssetId}
+            variant="primary"
+          >
+            Create
+          </Button>
         </div>
-      </div>
 
-      {/* List */}
-      <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 10, overflow: "hidden" }}>
-        <div style={{ padding: 10, borderBottom: "1px solid #eee", fontWeight: 700 }}>
-          Plans ({items.length})
+        <div className="mt-2 text-xs text-zinc-500">
+          Tip: Checklist is stored as separate items; order is preserved by sort.
         </div>
+      </Card>
 
-        {loading ? (
-          <div style={{ padding: 12 }}>Loading...</div>
-        ) : items.length === 0 ? (
-          <div style={{ padding: 12 }}>No plans.</div>
-        ) : (
-          <div style={{ maxHeight: 520, overflowY: "auto" }}>
-            {items.map(p => (
-              <div key={p.id} style={{ padding: 12, borderBottom: "1px solid #f0f0f0" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ fontWeight: 700 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>Next due: {isoToLocalDisplay(p.nextDueAt)}</div>
-                </div>
+      <div className="mt-6" />
 
-                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>
-                  Asset: {assetNameById.get(p.assetId) ?? p.assetId} • {freqLabel(p.frequency)} • Active: {String(p.isAct)}
-                </div>
+      <TableShell minWidth={900}>
+        <table className="w-full border-collapse text-sm">
+          <thead className="bg-white/5 text-zinc-300">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold">Name</th>
+              <th className="px-4 py-3 text-left font-semibold">Asset</th>
+              <th className="px-4 py-3 text-left font-semibold">Frequency</th>
+              <th className="px-4 py-3 text-left font-semibold">Next due</th>
+              <th className="px-4 py-3 text-left font-semibold">Checklist</th>
+            </tr>
+          </thead>
 
-                {p.items && p.items.length > 0 ? (
-                  <div style={{ marginTop: 8, fontSize: 12 }}>
-                    {p.items
-                      .slice()
-                      .sort((a, b) => a.sort - b.sort)
-                      .map(i => (
-                        <div key={i.id} style={{ opacity: 0.95 }}>- {i.text}</div>
-                      ))}
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>No checklist items.</div>
-                )}
-              </div>
+          <tbody className="divide-y divide-white/10">
+            {items.map((p) => (
+              <tr key={p.id} className="hover:bg-white/5">
+                <td className="px-4 py-3 text-zinc-100 font-medium">{p.name}</td>
+                <td className="px-4 py-3 text-zinc-300">
+                  {assetNameById.get(p.assetId) ?? p.assetId}
+                </td>
+                <td className="px-4 py-3">
+                  <FreqPill freq={p.frequency} />
+                </td>
+                <td className="px-4 py-3 text-zinc-300">
+                  {isoToLocalDisplay(p.nextDueAt)}
+                </td>
+                <td className="px-4 py-3 text-zinc-300">
+                  <span className={cx("block max-w-[520px] truncate")} title={checklistPreview(p.items as any)}>
+                    {checklistPreview(p.items as any)}
+                  </span>
+                </td>
+              </tr>
             ))}
-          </div>
-        )}
-      </div>
-    </div>
+
+            {!loading && items.length === 0 ? (
+              <EmptyRow colSpan={5} text="No PM plans." />
+            ) : null}
+          </tbody>
+        </table>
+      </TableShell>
+    </AppShell>
   );
 }

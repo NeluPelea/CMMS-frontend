@@ -8,7 +8,6 @@ import {
   getLocs,
   getPeople,
   getWorkOrders,
-  logout,
   reopenWorkOrder,
   startWorkOrder,
   stopWorkOrder,
@@ -18,11 +17,56 @@ import {
   type PersonDto,
   type WorkOrderDto,
 } from "../api";
-import { isoToLocalDisplay, isoToLocalInputValue, localInputToIso } from "../domain/datetime";
-import { WorkOrderStatus, WorkOrderType, woStatusBadgeStyle, woStatusLabel, woTypeLabel } from "../domain/enums";
+import {
+  isoToLocalDisplay,
+  isoToLocalInputValue,
+  localInputToIso,
+} from "../domain/datetime";
+import {
+  WorkOrderStatus,
+  WorkOrderType,
+  woStatusLabel,
+  woTypeLabel,
+} from "../domain/enums";
+import AppShell from "../components/AppShell";
+import {
+  Button,
+  Card,
+  ErrorBox,
+  Input,
+  PageToolbar,
+  Pill,
+  Select,
+  cx,
+} from "../components/ui";
 
 function safeArray<T>(x: any): T[] {
   return Array.isArray(x) ? (x as T[]) : [];
+}
+
+function StatusPill({ status }: { status: number }) {
+  const label = woStatusLabel(status);
+  const tone =
+    status === WorkOrderStatus.Done
+      ? "emerald"
+      : status === WorkOrderStatus.InProgress
+      ? "teal"
+      : status === WorkOrderStatus.Cancelled
+      ? "rose"
+      : "zinc";
+  return <Pill tone={tone as any}>{label}</Pill>;
+}
+
+function TypePill({ type }: { type: number }) {
+  // AdHoc / Preventive / Extra
+  const label = woTypeLabel(type);
+  const tone =
+    type === WorkOrderType.Preventive
+      ? "amber"
+      : type === WorkOrderType.Extra
+      ? "teal"
+      : "zinc";
+  return <Pill tone={tone as any}>{label}</Pill>;
 }
 
 export default function WorkOrdersPage() {
@@ -48,7 +92,10 @@ export default function WorkOrdersPage() {
 
   // selection + detail draft
   const [selId, setSelId] = useState<string>("");
-  const selected = useMemo(() => items.find(x => x.id === selId) || null, [items, selId]);
+  const selected = useMemo(
+    () => items.find((x) => x.id === selId) || null,
+    [items, selId]
+  );
 
   const [dTitle, setDTitle] = useState("");
   const [dDesc, setDDesc] = useState("");
@@ -56,16 +103,19 @@ export default function WorkOrdersPage() {
   const [dAssetId, setDAssetId] = useState<string>("");
   const [dAssignedId, setDAssignedId] = useState<string>("");
   const [dStartAt, setDStartAt] = useState<string>(""); // datetime-local
-  const [dStopAt, setDStopAt] = useState<string>("");  // datetime-local
+  const [dStopAt, setDStopAt] = useState<string>(""); // datetime-local
 
-  // create form (compact)
+  // create form
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newType, setNewType] = useState<number>(WorkOrderType.AdHoc);
   const [newAssetId, setNewAssetId] = useState<string>("");
 
   const canCreate = useMemo(() => newTitle.trim().length >= 2, [newTitle]);
-  const canSave = useMemo(() => dTitle.trim().length >= 2 && !!selected, [dTitle, selected]);
+  const canSave = useMemo(
+    () => dTitle.trim().length >= 2 && !!selected,
+    [dTitle, selected]
+  );
 
   async function loadList(nextSkip?: number) {
     const realSkip = typeof nextSkip === "number" ? nextSkip : skip;
@@ -89,7 +139,8 @@ export default function WorkOrdersPage() {
       // auto-select first item if nothing selected
       if (!selId && list.length) setSelId(list[0].id);
       // if selection disappeared due to filters, reselect
-      if (selId && !list.some(x => x.id === selId) && list.length) setSelId(list[0].id);
+      if (selId && !list.some((x) => x.id === selId) && list.length)
+        setSelId(list[0].id);
     } catch (e: any) {
       setErr(e?.message || String(e));
       setItems([]);
@@ -162,13 +213,12 @@ export default function WorkOrdersPage() {
         description: newDesc.trim() || null,
         type: newType,
         assetId: newAssetId || null,
-        // start/stop se fac din quick actions sau in detalii
       });
 
       setNewTitle("");
       setNewDesc("");
       setNewAssetId("");
-      // reload list and select created
+
       await loadList(0);
       setSelId(wo.id);
     } catch (e: any) {
@@ -190,7 +240,7 @@ export default function WorkOrdersPage() {
         stopAt: localInputToIso(dStopAt),
       });
 
-      setItems(prev => prev.map(x => (x.id === updated.id ? updated : x)));
+      setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
     } catch (e: any) {
       setErr(e?.message || String(e));
     }
@@ -206,7 +256,7 @@ export default function WorkOrdersPage() {
       else if (action === "cancel") updated = await cancelWorkOrder(selected.id);
       else updated = await reopenWorkOrder(selected.id);
 
-      setItems(prev => prev.map(x => (x.id === updated.id ? updated : x)));
+      setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
     } catch (e: any) {
       setErr(e?.message || String(e));
     }
@@ -220,203 +270,220 @@ export default function WorkOrdersPage() {
 
   const filteredAssets = useMemo(() => {
     if (!locId) return assets;
-    return assets.filter(a => (a.locId || "") === locId);
+    return assets.filter((a) => (a.locId || "") === locId);
   }, [assets, locId]);
 
+  const canPrev = !loading && skip > 0;
+  const canNext = !loading && skip + take < total;
+
   return (
-    <div style={{ padding: 16, maxWidth: 1400, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>Work Orders</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <Link to="/assets">Assets</Link>
-          <Link to="/locations">Locations</Link>
-          <Link to="/pm-plans">PM Plans</Link>
+    <AppShell title="Work Orders">
+      {/* Toolbar: search + filters + pagination */}
+      <PageToolbar
+        left={
+          <div className="grid gap-3 lg:grid-cols-6">
+            <div className="lg:col-span-2">
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onSearch();
+                }}
+                placeholder="Search title/description..."
+              />
+            </div>
 
-          <button onClick={() => logout()}>Logout</button>
-        </div>
-      </div>
+            <Select
+              value={status}
+              onChange={(e) =>
+                setStatus(e.target.value === "" ? "" : Number(e.target.value))
+              }
+            >
+              <option value="">All status</option>
+              <option value={WorkOrderStatus.Open}>Open</option>
+              <option value={WorkOrderStatus.InProgress}>In progress</option>
+              <option value={WorkOrderStatus.Done}>Done</option>
+              <option value={WorkOrderStatus.Cancelled}>Cancelled</option>
+            </Select>
 
-      {err && (
-        <div style={{ marginTop: 10, padding: 10, border: "1px solid #999", borderRadius: 8 }}>
-          {err}
-        </div>
-      )}
-
-      {/* Filters + create */}
-      <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
-        <div>
-          <label style={{ display: "block", fontSize: 12 }}>Search</label>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title/description..." style={{ width: "100%" }} />
-        </div>
-
-        <div>
-          <label style={{ display: "block", fontSize: 12 }}>Status</label>
-          <select value={status} onChange={(e) => setStatus(e.target.value === "" ? "" : Number(e.target.value))} style={{ width: "100%" }}>
-            <option value="">All</option>
-            <option value={WorkOrderStatus.Open}>Open</option>
-            <option value={WorkOrderStatus.InProgress}>In progress</option>
-            <option value={WorkOrderStatus.Done}>Done</option>
-            <option value={WorkOrderStatus.Cancelled}>Cancelled</option>
-          </select>
-        </div>
-
-        <div>
-          <label style={{ display: "block", fontSize: 12 }}>Type</label>
-          <select value={type} onChange={(e) => setType(e.target.value === "" ? "" : Number(e.target.value))} style={{ width: "100%" }}>
-            <option value="">All</option>
-            <option value={WorkOrderType.AdHoc}>AdHoc</option>
-            <option value={WorkOrderType.Preventive}>Preventive</option>
-            <option value={WorkOrderType.Extra}>Extra</option>
-          </select>
-        </div>
-
-        <div>
-          <label style={{ display: "block", fontSize: 12 }}>Location</label>
-          <select value={locId} onChange={(e) => setLocId(e.target.value)} style={{ width: "100%" }}>
-            <option value="">All</option>
-            {locs.map(l => (
-              <option key={l.id} value={l.id}>
-                {l.name} {l.code ? `(${l.code})` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label style={{ display: "block", fontSize: 12 }}>Asset</label>
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} style={{ width: "100%" }}>
-            <option value="">All</option>
-            {filteredAssets.map(a => (
-              <option key={a.id} value={a.id}>
-                {a.name} {a.code ? `(${a.code})` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onSearch} disabled={loading}>Search</button>
-          <button
-            onClick={() => {
-              const next = Math.max(0, skip - take);
-              setSkip(next);
-              loadList(next);
-            }}
-            disabled={loading || skip === 0}
-          >
-            Prev
-          </button>
-          <button
-            onClick={() => {
-              const next = skip + take;
-              if (next >= total) return;
-              setSkip(next);
-              loadList(next);
-            }}
-            disabled={loading || skip + take >= total}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-
-      {/* Compact create */}
-      <div style={{ marginTop: 12, padding: 12, border: "1px solid #ddd", borderRadius: 10 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1.2fr auto", gap: 8, alignItems: "end" }}>
-          <div>
-            <label style={{ display: "block", fontSize: 12 }}>New work order title</label>
-            <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} style={{ width: "100%" }} />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12 }}>Type</label>
-            <select value={newType} onChange={(e) => setNewType(Number(e.target.value))} style={{ width: "100%" }}>
+            <Select
+              value={type}
+              onChange={(e) =>
+                setType(e.target.value === "" ? "" : Number(e.target.value))
+              }
+            >
+              <option value="">All type</option>
               <option value={WorkOrderType.AdHoc}>AdHoc</option>
               <option value={WorkOrderType.Preventive}>Preventive</option>
               <option value={WorkOrderType.Extra}>Extra</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12 }}>Asset</label>
-            <select value={newAssetId} onChange={(e) => setNewAssetId(e.target.value)} style={{ width: "100%" }}>
-              <option value="">(none)</option>
-              {filteredAssets.map(a => (
+            </Select>
+
+            <Select value={locId} onChange={(e) => setLocId(e.target.value)}>
+              <option value="">All locations</option>
+              {locs.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name} {l.code ? `(${l.code})` : ""}
+                </option>
+              ))}
+            </Select>
+
+            <Select value={assetId} onChange={(e) => setAssetId(e.target.value)}>
+              <option value="">All assets</option>
+              {filteredAssets.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name} {a.code ? `(${a.code})` : ""}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button onClick={onCreate} disabled={!canCreate}>Create</button>
+        }
+        right={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button onClick={onSearch} disabled={loading} variant="ghost">
+              {loading ? "Loading..." : "Search"}
+            </Button>
+
+            <Button
+              onClick={() => {
+                const next = Math.max(0, skip - take);
+                setSkip(next);
+                loadList(next);
+              }}
+              disabled={!canPrev}
+              variant="ghost"
+            >
+              Prev
+            </Button>
+
+            <Button
+              onClick={() => {
+                const next = skip + take;
+                if (next >= total) return;
+                setSkip(next);
+                loadList(next);
+              }}
+              disabled={!canNext}
+              variant="ghost"
+            >
+              Next
+            </Button>
+
+            <div className="ml-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-300">
+              {pageInfo}
+            </div>
           </div>
+        }
+      />
+
+      {err ? <ErrorBox message={err} /> : null}
+
+      {/* Create card */}
+      <Card title="Create work order">
+        <div className="grid gap-3 lg:grid-cols-4">
+          <div className="lg:col-span-2">
+            <Input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="Title"
+            />
+          </div>
+
+          <Select
+            value={newType}
+            onChange={(e) => setNewType(Number(e.target.value))}
+          >
+            <option value={WorkOrderType.AdHoc}>AdHoc</option>
+            <option value={WorkOrderType.Preventive}>Preventive</option>
+            <option value={WorkOrderType.Extra}>Extra</option>
+          </Select>
+
+          <Select
+            value={newAssetId}
+            onChange={(e) => setNewAssetId(e.target.value)}
+          >
+            <option value="">(none)</option>
+            {filteredAssets.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} {a.code ? `(${a.code})` : ""}
+              </option>
+            ))}
+          </Select>
         </div>
 
-        <div style={{ marginTop: 8 }}>
-          <label style={{ display: "block", fontSize: 12 }}>Description</label>
-          <textarea value={newDesc} onChange={(e) => setNewDesc(e.target.value)} rows={2} style={{ width: "100%" }} />
+        <div className="mt-3">
+          <textarea
+            value={newDesc}
+            onChange={(e) => setNewDesc(e.target.value)}
+            rows={2}
+            placeholder="Description (optional)"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:ring-2 focus:ring-teal-400/40"
+          />
         </div>
-      </div>
 
-      {/* Main master-detail */}
-      <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "440px 1fr", gap: 12, minHeight: 520 }}>
+        <div className="mt-3 flex justify-end">
+          <Button onClick={onCreate} disabled={!canCreate} variant="primary">
+            Create
+          </Button>
+        </div>
+      </Card>
+
+      {/* Master-detail */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
         {/* LEFT: list */}
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ padding: 10, borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontWeight: 600 }}>Work orders</div>
-            <div style={{ fontSize: 12, opacity: 0.8 }}>{pageInfo}</div>
+        <div className="rounded-2xl border border-white/10 bg-zinc-950/30 overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-3">
+            <div className="text-sm font-semibold text-zinc-200">Work orders</div>
+            <div className="text-sm text-zinc-400">{pageInfo}</div>
           </div>
 
           {loading ? (
-            <div style={{ padding: 12 }}>Loading...</div>
+            <div className="px-4 py-4 text-sm text-zinc-300">Loading...</div>
           ) : items.length === 0 ? (
-            <div style={{ padding: 12 }}>No items.</div>
+            <div className="px-4 py-4 text-sm text-zinc-300">No items.</div>
           ) : (
-            <div style={{ maxHeight: 520, overflowY: "auto" }}>
-              {items.map(w => {
+            <div className="max-h-[60vh] overflow-y-auto">
+              {items.map((w) => {
                 const isSel = w.id === selId;
                 return (
-                  <div
+                  <button
                     key={w.id}
+                    type="button"
                     onClick={() => setSelId(w.id)}
-                    style={{
-                      padding: 12,
-                      cursor: "pointer",
-                      borderBottom: "1px solid #f0f0f0",
-                      background: isSel ? "#f7f7f7" : "transparent",
-                    }}
+                    className={cx(
+                      "w-full text-left px-4 py-3 border-b border-white/5 transition",
+                      isSel ? "bg-white/5" : "hover:bg-white/5"
+                    )}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                      <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {w.title}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-zinc-100">
+                          {w.title}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                          <TypePill type={w.type} />
+                          <span className="truncate">
+                            {w.asset?.name ?? "No asset"}
+                            {" • "}
+                            {w.asset?.location?.name ?? "No location"}
+                          </span>
+                        </div>
                       </div>
-                      <span
-                        style={{
-                          padding: "2px 8px",
-                          borderRadius: 999,
-                          fontSize: 12,
-                          ...woStatusBadgeStyle(w.status),
-                        }}
-                        title={woStatusLabel(w.status)}
-                      >
-                        {woStatusLabel(w.status)}
+
+                      <StatusPill status={w.status} />
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between gap-3 text-xs text-zinc-500">
+                      <span className="truncate">
+                        {w.assignedToPerson?.displayName ?? ""}
+                      </span>
+                      <span className="whitespace-nowrap">
+                        {w.status === WorkOrderStatus.Done &&
+                        w.durationMinutes != null
+                          ? `Duration: ${w.durationMinutes} min`
+                          : `Start: ${isoToLocalDisplay(w.startAt)}`}
                       </span>
                     </div>
-
-                    <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85, display: "flex", justifyContent: "space-between", gap: 10 }}>
-                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {woTypeLabel(w.type)} • {w.asset?.name ?? "No asset"} • {w.asset?.location?.name ?? "No location"}
-                      </div>
-                      <div style={{ whiteSpace: "nowrap" }}>
-                        {w.assignedToPerson?.displayName ?? ""}
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
-                      {w.status === WorkOrderStatus.Done && w.durationMinutes != null
-                        ? `Duration: ${w.durationMinutes} min`
-                        : `Start: ${isoToLocalDisplay(w.startAt)}`}
-                    </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -424,107 +491,165 @@ export default function WorkOrdersPage() {
         </div>
 
         {/* RIGHT: details */}
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           {!selected ? (
-            <div>Select a work order.</div>
+            <div className="text-sm text-zinc-300">Select a work order.</div>
           ) : (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>Selected</div>
-                  <div style={{ fontWeight: 700 }}>{selected.title}</div>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>
-                    {selected.asset?.name ?? "No asset"} • {selected.asset?.location?.name ?? "No location"}
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="min-w-0">
+                  <div className="text-xs text-zinc-500">Selected</div>
+                  <div className="mt-0.5 truncate text-base font-semibold text-zinc-100">
+                    {selected.title}
+                  </div>
+                  <div className="mt-1 text-sm text-zinc-400">
+                    {selected.asset?.name ?? "No asset"}
+                    {" • "}
+                    {selected.asset?.location?.name ?? "No location"}
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <Link to={`/work-orders/${selected.id}`} style={{ fontSize: 12 }}>Open page</Link>
-                  <button onClick={() => applyAction("start")} disabled={selected.status !== WorkOrderStatus.Open}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    to={`/work-orders/${selected.id}`}
+                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 hover:bg-white/10"
+                  >
+                    Open page
+                  </Link>
+
+                  <Button
+                    onClick={() => applyAction("start")}
+                    disabled={selected.status !== WorkOrderStatus.Open}
+                    variant="ghost"
+                  >
                     Start
-                  </button>
-                  <button onClick={() => applyAction("stop")} disabled={selected.status !== WorkOrderStatus.InProgress}>
+                  </Button>
+                  <Button
+                    onClick={() => applyAction("stop")}
+                    disabled={selected.status !== WorkOrderStatus.InProgress}
+                    variant="ghost"
+                  >
                     Stop
-                  </button>
-                  <button onClick={() => applyAction("cancel")} disabled={selected.status === WorkOrderStatus.Done}>
+                  </Button>
+                  <Button
+                    onClick={() => applyAction("cancel")}
+                    disabled={selected.status === WorkOrderStatus.Done}
+                    variant="ghost"
+                  >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => applyAction("reopen")}
-                    disabled={!(selected.status === WorkOrderStatus.Done || selected.status === WorkOrderStatus.Cancelled)}
+                    disabled={
+                      !(
+                        selected.status === WorkOrderStatus.Done ||
+                        selected.status === WorkOrderStatus.Cancelled
+                      )
+                    }
+                    variant="ghost"
                   >
                     Reopen
-                  </button>
+                  </Button>
                 </div>
               </div>
 
-              <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <div>
-                  <label style={{ display: "block", fontSize: 12 }}>Title</label>
-                  <input value={dTitle} onChange={(e) => setDTitle(e.target.value)} style={{ width: "100%" }} />
+                  <div className="mb-1 text-xs text-zinc-500">Title</div>
+                  <Input value={dTitle} onChange={(e) => setDTitle(e.target.value)} />
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 12 }}>Status</label>
-                  <select value={dStatus} onChange={(e) => setDStatus(Number(e.target.value))} style={{ width: "100%" }}>
+                  <div className="mb-1 text-xs text-zinc-500">Status</div>
+                  <Select
+                    value={dStatus}
+                    onChange={(e) => setDStatus(Number(e.target.value))}
+                  >
                     <option value={WorkOrderStatus.Open}>Open</option>
                     <option value={WorkOrderStatus.InProgress}>In progress</option>
                     <option value={WorkOrderStatus.Done}>Done</option>
                     <option value={WorkOrderStatus.Cancelled}>Cancelled</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 12 }}>Asset</label>
-                  <select value={dAssetId} onChange={(e) => setDAssetId(e.target.value)} style={{ width: "100%" }}>
+                  <div className="mb-1 text-xs text-zinc-500">Asset</div>
+                  <Select
+                    value={dAssetId}
+                    onChange={(e) => setDAssetId(e.target.value)}
+                  >
                     <option value="">(none)</option>
-                    {assets.map(a => (
+                    {assets.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name} {a.code ? `(${a.code})` : ""}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 12 }}>Assigned</label>
-                  <select value={dAssignedId} onChange={(e) => setDAssignedId(e.target.value)} style={{ width: "100%" }}>
+                  <div className="mb-1 text-xs text-zinc-500">Assigned</div>
+                  <Select
+                    value={dAssignedId}
+                    onChange={(e) => setDAssignedId(e.target.value)}
+                  >
                     <option value="">(none)</option>
-                    {people.map(p => (
+                    {people.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.displayName}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 12 }}>Start (local)</label>
-                  <input type="datetime-local" value={dStartAt} onChange={(e) => setDStartAt(e.target.value)} style={{ width: "100%" }} />
+                  <div className="mb-1 text-xs text-zinc-500">Start (local)</div>
+                  <input
+                    type="datetime-local"
+                    value={dStartAt}
+                    onChange={(e) => setDStartAt(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
+                  />
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 12 }}>Stop (local)</label>
-                  <input type="datetime-local" value={dStopAt} onChange={(e) => setDStopAt(e.target.value)} style={{ width: "100%" }} />
+                  <div className="mb-1 text-xs text-zinc-500">Stop (local)</div>
+                  <input
+                    type="datetime-local"
+                    value={dStopAt}
+                    onChange={(e) => setDStopAt(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
+                  />
                 </div>
               </div>
 
-              <div style={{ marginTop: 10 }}>
-                <label style={{ display: "block", fontSize: 12 }}>Description</label>
-                <textarea value={dDesc} onChange={(e) => setDDesc(e.target.value)} rows={5} style={{ width: "100%" }} />
+              <div className="mt-3">
+                <div className="mb-1 text-xs text-zinc-500">Description</div>
+                <textarea
+                  value={dDesc}
+                  onChange={(e) => setDDesc(e.target.value)}
+                  rows={5}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:ring-2 focus:ring-teal-400/40"
+                />
               </div>
 
-              <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>
-                  Start: {isoToLocalDisplay(selected.startAt)} • Stop: {isoToLocalDisplay(selected.stopAt)} • Duration:{" "}
-                  {selected.durationMinutes != null ? `${selected.durationMinutes} min` : "-"}
+              <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="text-xs text-zinc-500">
+                  Start: {isoToLocalDisplay(selected.startAt)} • Stop:{" "}
+                  {isoToLocalDisplay(selected.stopAt)} • Duration:{" "}
+                  {selected.durationMinutes != null
+                    ? `${selected.durationMinutes} min`
+                    : "-"}
                 </div>
-                <button onClick={onSave} disabled={!canSave}>Save</button>
+
+                <Button onClick={onSave} disabled={!canSave} variant="primary">
+                  Save
+                </Button>
               </div>
             </>
           )}
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

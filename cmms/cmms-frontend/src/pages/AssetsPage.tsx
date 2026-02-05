@@ -1,13 +1,38 @@
 // src/pages/AssetsPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { createAsset, deleteAsset, getAssets, getLocs, logout, type AssetDto, type LocDto } from "../api";
+import AppShell from "../components/AppShell";
+import {
+  createAsset,
+  deleteAsset,
+  getAssets,
+  getLocs,
+  type AssetDto,
+  type LocDto,
+} from "../api";
+import {
+  Button,
+  Card,
+  EmptyRow,
+  ErrorBox,
+  Input,
+  PageToolbar,
+  Pill,
+  Select,
+  TableShell,
+  cx,
+} from "../components/ui";
+
+function StatusPill({ isActive }: { isActive: boolean }) {
+  return <Pill tone={isActive ? "emerald" : "zinc"}>{isActive ? "Active" : "Deleted"}</Pill>;
+}
 
 export default function AssetsPage() {
   const [items, setItems] = useState<AssetDto[]>([]);
   const [locs, setLocs] = useState<LocDto[]>([]);
+
   const [q, setQ] = useState("");
   const [showDel, setShowDel] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -21,7 +46,11 @@ export default function AssetsPage() {
     setLoading(true);
     setErr(null);
     try {
-      const data = await getAssets({ q: q.trim() || undefined, take: 200, ia: showDel });
+      const data = await getAssets({
+        q: q.trim() || undefined,
+        take: 200,
+        ia: showDel,
+      });
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setErr(e?.message || String(e));
@@ -55,6 +84,7 @@ export default function AssetsPage() {
   }, [showDel]);
 
   async function onCreate() {
+    if (!canCreate) return;
     setErr(null);
     try {
       await createAsset({
@@ -71,7 +101,8 @@ export default function AssetsPage() {
     }
   }
 
-  async function onDelete(id: string) {
+  async function onDelete(id: string, isActive: boolean) {
+    if (!isActive) return;
     if (!confirm("Soft delete asset?")) return;
     setErr(null);
     try {
@@ -83,109 +114,121 @@ export default function AssetsPage() {
   }
 
   return (
-    <div style={{ padding: 16, maxWidth: 1100, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-        <h2 style={{ margin: 0 }}>Assets</h2>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Link to="/work-orders">Work Orders</Link>
-          <Link to="/locations">Locations</Link>
-          <Link to="/pm-plans">PM Plans</Link>
+    <AppShell title="Assets">
+      <PageToolbar
+        left={
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex-1">
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") load();
+                }}
+                placeholder="Search assets..."
+              />
+            </div>
 
-          <button
-            onClick={() => {
-              logout();
-              location.href = "/login";
-            }}
-          >
-            Logout
-          </button>
-        </div>
-      </div>
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                checked={showDel}
+                onChange={(e) => setShowDel(e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-white/10"
+              />
+              Show deleted
+            </label>
+          </div>
+        }
+        right={
+          <div className="flex items-center gap-2">
+            <Button onClick={load} disabled={loading} variant="ghost">
+              {loading ? "Loading..." : "Refresh"}
+            </Button>
+          </div>
+        }
+      />
 
-      <div style={{ display: "flex", gap: 12, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search (q)"
-          style={{ padding: 8, minWidth: 260 }}
-        />
-        <button onClick={load} disabled={loading}>
-          {loading ? "Loading..." : "Search"}
-        </button>
+      {err ? <ErrorBox message={err} /> : null}
 
-        <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <input type="checkbox" checked={showDel} onChange={(e) => setShowDel(e.target.checked)} />
-          Show deleted
-        </label>
-      </div>
-
-      {err && <div style={{ marginTop: 12, color: "crimson", whiteSpace: "pre-wrap" }}>{err}</div>}
-
-      <div style={{ marginTop: 16, padding: 12, border: "1px solid #ddd", borderRadius: 8 }}>
-        <div style={{ fontWeight: 600, marginBottom: 10 }}>New Asset</div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <input
+      <Card title="New Asset">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Name"
-            style={{ padding: 8, minWidth: 240 }}
           />
-          <input
+
+          <Input
             value={newCode}
             onChange={(e) => setNewCode(e.target.value)}
             placeholder="Code (optional)"
-            style={{ padding: 8, minWidth: 160 }}
           />
-          <select value={locId} onChange={(e) => setLocId(e.target.value)} style={{ padding: 8, minWidth: 260 }}>
+
+          <Select value={locId} onChange={(e) => setLocId(e.target.value)}>
             <option value="">(No location)</option>
             {locs.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
               </option>
             ))}
-          </select>
-          <button onClick={onCreate} disabled={!canCreate}>
+          </Select>
+
+          <Button onClick={onCreate} disabled={!canCreate} variant="primary">
             Create
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
-      <table style={{ width: "100%", marginTop: 16, borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Name</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Code</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Location</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Status</th>
-            <th style={{ textAlign: "right", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((x) => (
-            <tr key={x.id}>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{x.name}</td>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{x.code || ""}</td>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>{x.locName || ""}</td>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px" }}>
-                {x.isAct === false ? "Deleted" : "Active"}
-              </td>
-              <td style={{ borderBottom: "1px solid #f0f0f0", padding: "8px 6px", textAlign: "right" }}>
-                <button onClick={() => onDelete(x.id)} disabled={x.isAct === false}>
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
+      <div className="mt-6" />
 
-          {items.length === 0 && (
+      <TableShell minWidth={900}>
+        <table className="w-full border-collapse text-sm">
+          <thead className="bg-white/5 text-zinc-300">
             <tr>
-              <td colSpan={5} style={{ padding: 12, opacity: 0.7 }}>
-                No assets.
-              </td>
+              <th className="px-4 py-3 text-left font-semibold">Name</th>
+              <th className="px-4 py-3 text-left font-semibold">Code</th>
+              <th className="px-4 py-3 text-left font-semibold">Location</th>
+              <th className="px-4 py-3 text-left font-semibold">Status</th>
+              <th className="px-4 py-3 text-right font-semibold">Actions</th>
             </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+
+          <tbody className="divide-y divide-white/10">
+            {items.map((x) => {
+              const isActive = x.isAct !== false;
+              return (
+                <tr key={x.id} className="hover:bg-white/5">
+                  <td className="px-4 py-3 text-zinc-100">{x.name}</td>
+                  <td className="px-4 py-3 text-zinc-300">{x.code ?? "-"}</td>
+                  <td className="px-4 py-3 text-zinc-300">{x.locName ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    <StatusPill isActive={isActive} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => onDelete(x.id, isActive)}
+                      disabled={!isActive}
+                      className={cx(
+                        "rounded-lg px-3 py-1.5 text-xs font-semibold ring-1",
+                        isActive
+                          ? "bg-white/10 text-zinc-200 ring-white/15 hover:bg-white/15"
+                          : "bg-white/5 text-zinc-500 ring-white/10"
+                      )}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+
+            {!loading && items.length === 0 ? (
+              <EmptyRow colSpan={5} text="No assets." />
+            ) : null}
+          </tbody>
+        </table>
+      </TableShell>
+    </AppShell>
   );
 }

@@ -113,4 +113,21 @@ public sealed class WorkOrderPart
     public Part? Part { get; set; }
 
     public decimal QtyUsed { get; set; } = 0m;
+
+    public bool IsUniversal { get; set; } = false; // compatibil cu toate utilajele
+
 }
+
+public sealed class AssetPart
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid AssetId { get; set; }
+    public Asset? Asset { get; set; }
+
+    public Guid PartId { get; set; }
+    public Part? Part { get; set; }
+
+    public bool IsAct { get; set; } = true; // soft delete pentru compatibilitate
+}
+
