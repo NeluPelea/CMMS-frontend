@@ -1,3 +1,5 @@
+// src/api/laborLogs.ts
+// UTF-8, fara diacritice
 import { apiFetch } from "./http";
 
 export interface LaborLogDto {
@@ -17,8 +19,17 @@ export interface CreateLaborLogRequest {
 }
 
 /**
- * Adaugă un log de manoperă.
- * ATENȚIE: Primește workOrderId separat pentru a construi URL-ul corect.
+ * Returneaza lista de pontaje pentru un Work Order.
+ * Numele trebuie sa fie exact getWorkOrderLaborLogs pentru componenta.
+ */
+export async function getWorkOrderLaborLogs(workOrderId: string): Promise<LaborLogDto[]> {
+    return apiFetch<LaborLogDto[]>(`/api/work-orders/${workOrderId}/labor`, {
+        method: "GET",
+    });
+}
+
+/**
+ * Adauga un log de manopera.
  */
 export async function addLaborLog(workOrderId: string, req: CreateLaborLogRequest): Promise<LaborLogDto> {
     return apiFetch<LaborLogDto>(`/api/work-orders/${workOrderId}/labor`, {
@@ -27,12 +38,9 @@ export async function addLaborLog(workOrderId: string, req: CreateLaborLogReques
     });
 }
 
-export async function getLaborLogs(workOrderId: string): Promise<LaborLogDto[]> {
-    return apiFetch<LaborLogDto[]>(`/api/work-orders/${workOrderId}/labor`, {
-        method: "GET",
-    });
-}
-
+/**
+ * Sterge un log de manopera.
+ */
 export async function deleteLaborLog(workOrderId: string, logId: string): Promise<void> {
     return apiFetch<void>(`/api/work-orders/${workOrderId}/labor/${logId}`, {
         method: "DELETE",

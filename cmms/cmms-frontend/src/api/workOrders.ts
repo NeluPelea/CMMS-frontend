@@ -84,3 +84,7 @@ export async function stopWorkOrder(id: string): Promise<WorkOrderDto | void> {
 export async function reopenWorkOrder(id: string): Promise<WorkOrderDto | void> {
     return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}/reopen`, { method: "POST" });
 }
+
+export async function getWorkOrderById(id: string): Promise<WorkOrderDto> {
+    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}`, { method: "GET" });
+}

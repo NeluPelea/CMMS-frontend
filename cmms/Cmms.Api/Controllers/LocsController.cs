@@ -19,6 +19,7 @@ public sealed class LocsController : ControllerBase
     public sealed record UpdateReq(string Name, string? Code);
 
     // GET /api/locs?q=...&take=200&ia=true|false
+    // GET /api/locs?q=...&take=200&ia=true|false
     [HttpGet]
     public async Task<IActionResult> List(
         [FromQuery] string? q = null,
@@ -29,6 +30,7 @@ public sealed class LocsController : ControllerBase
         if (take <= 0) take = 200;
         if (take > 500) take = 500;
 
+        // Folosim _db (așa cum l-ai definit în constructor)
         var qry = _db.Locations.AsNoTracking().AsQueryable();
 
         if (!ia)
@@ -46,6 +48,7 @@ public sealed class LocsController : ControllerBase
         var items = await qry
             .OrderBy(x => x.Name)
             .Take(take)
+            // Constructorul de record folosește paranteze rotunde, nu acolade
             .Select(x => new LocDto(x.Id, x.Name, x.Code, x.IsAct))
             .ToListAsync();
 

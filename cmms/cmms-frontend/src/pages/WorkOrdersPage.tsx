@@ -248,7 +248,7 @@ export default function WorkOrdersPage() {
 
     const filteredAssets = useMemo(() => {
         if (!locId) return assets;
-        return assets.filter(a => a.locationId === locId);
+        return assets.filter(a => a.locId === locId);
     }, [assets, locId]);
 
     const pageInfo = `${total === 0 ? 0 : skip + 1}-${Math.min(skip + take, total)} of ${total}`;
