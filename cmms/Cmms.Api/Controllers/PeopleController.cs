@@ -14,13 +14,13 @@ public sealed class PeopleController : ControllerBase
     private readonly AppDbContext _db;
     public PeopleController(AppDbContext db) => _db = db;
 
-    // Paged list + search + include inactive
+    // Listare paginata + cautare + filtru inactivi
     [HttpGet]
     public async Task<ActionResult<Paged<PersonDto>>> List(
         [FromQuery] int take = 50,
         [FromQuery] int skip = 0,
         [FromQuery] string? q = null,
-        [FromQuery] int includeInactive = 0,
+        [FromQuery] bool includeInactive = false, // Am schimbat din int in bool
         CancellationToken ct = default)
     {
         take = Math.Clamp(take, 1, 200);
@@ -29,7 +29,8 @@ public sealed class PeopleController : ControllerBase
 
         var query = _db.People.AsNoTracking();
 
-        if (includeInactive == 0)
+        // Aplicare filtru inactivi
+        if (!includeInactive)
             query = query.Where(p => p.IsActive);
 
         if (q.Length > 0)
@@ -67,7 +68,7 @@ public sealed class PeopleController : ControllerBase
         return new Paged<PersonDto> { Total = total, Take = take, Skip = skip, Items = items };
     }
 
-    // Details (includes schedule + status)
+    // Detalii persoana (include program + status)
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PersonDetailsDto>> Get(Guid id, CancellationToken ct)
     {
@@ -106,7 +107,7 @@ public sealed class PeopleController : ControllerBase
     public async Task<ActionResult<PersonDto>> Create([FromBody] CreatePersonReq req, CancellationToken ct)
     {
         var fullName = (req.FullName ?? "").Trim();
-        if (fullName.Length < 3) return BadRequest("fullName too short.");
+        if (fullName.Length < 3) return BadRequest("Numele este prea scurt.");
 
         var display = (req.DisplayName ?? fullName).Trim();
         if (display.Length < 2) display = fullName;
@@ -125,7 +126,7 @@ public sealed class PeopleController : ControllerBase
 
         _db.People.Add(p);
 
-        // default schedule (L-V 08:00-16:30, no Saturday)
+        // Program implicit (L-V 08:00-16:30)
         _db.PersonWorkSchedules.Add(new PersonWorkSchedule
         {
             PersonId = p.Id,
@@ -160,7 +161,7 @@ public sealed class PeopleController : ControllerBase
         if (p == null) return NotFound();
 
         var fullName = (req.FullName ?? "").Trim();
-        if (fullName.Length < 3) return BadRequest("fullName too short.");
+        if (fullName.Length < 3) return BadRequest("Numele este prea scurt.");
 
         p.FullName = fullName;
 
@@ -208,19 +209,18 @@ public sealed class PeopleController : ControllerBase
         return NoContent();
     }
 
-    // ---------- helpers ----------
+    // ---------- Helpers ----------
 
     private async Task<string> GetCurrentStatusAsync(Guid personId, DateTime dayUtc, CancellationToken ct)
     {
         var d = DateTime.SpecifyKind(dayUtc.Date, DateTimeKind.Utc);
 
-        var leaveType = await _db.PersonLeaves.AsNoTracking()
+        var leave = await _db.PersonLeaves.AsNoTracking()
             .Where(x => x.PersonId == personId && x.StartDate <= d && x.EndDate >= d)
-            .Select(x => x.Type)
             .FirstOrDefaultAsync(ct);
 
-        if ((int)leaveType == 0) return "ACTIVE";
-        return leaveType == LeaveType.CO ? "CO" : "CM";
+        if (leave == null) return "ACTIVE";
+        return leave.Type == LeaveType.CO ? "CO" : "CM";
     }
 
     // ---------- DTOs ----------
