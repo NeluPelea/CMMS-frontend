@@ -1,4 +1,8 @@
-﻿using Cmms.Domain;
+﻿using System.Linq.Expressions;
+using Cmms.Api.Contracts.Common;
+using Cmms.Api.Contracts.People;
+using Cmms.Api.Services;
+using Cmms.Domain;
 using Cmms.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,265 +15,441 @@ namespace Cmms.Api.Controllers;
 [Authorize]
 public sealed class PeopleController : ControllerBase
 {
-    private readonly AppDbContext _db;
-    public PeopleController(AppDbContext db) => _db = db;
+    private const int MinTake = 1;
+    private const int MaxTake = 200;
 
-    // Listare paginata + cautare + filtru inactivi
+    private static readonly TimeSpan DefaultMonFriStart = new(8, 0, 0);
+    private static readonly TimeSpan DefaultMonFriEnd = new(16, 30, 0);
+    private const string DefaultTimezone = "Europe/Bucharest";
+
+    private readonly AppDbContext _db;
+    private readonly PeopleAvailability _availability;
+
+    public PeopleController(AppDbContext db, PeopleAvailability availability)
+    {
+        _db = db;
+        _availability = availability;
+    }
+
+    // GET /api/people?take=50&skip=0&q=...&includeInactive=false
     [HttpGet]
     public async Task<ActionResult<Paged<PersonDto>>> List(
         [FromQuery] int take = 50,
         [FromQuery] int skip = 0,
         [FromQuery] string? q = null,
-        [FromQuery] bool includeInactive = false, // Am schimbat din int in bool
+        [FromQuery] bool includeInactive = false,
         CancellationToken ct = default)
     {
-        take = Math.Clamp(take, 1, 200);
+        take = Math.Clamp(take, MinTake, MaxTake);
         skip = Math.Max(0, skip);
-        q = (q ?? "").Trim();
 
-        var query = _db.People.AsNoTracking();
+        IQueryable<Person> query = _db.People.AsNoTracking();
 
-        // Aplicare filtru inactivi
         if (!includeInactive)
             query = query.Where(p => p.IsActive);
 
+        q = (q ?? "").Trim();
         if (q.Length > 0)
         {
-            var qq = q.ToLower();
-
+            var pattern = $"%{q}%";
             query = query.Where(p =>
-                (p.FullName ?? "").ToLower().Contains(qq) ||
-                (p.DisplayName ?? "").ToLower().Contains(qq) ||
-                (p.JobTitle ?? "").ToLower().Contains(qq) ||
-                (p.Specialization ?? "").ToLower().Contains(qq) ||
-                (p.Phone ?? "").ToLower().Contains(qq) ||
-                ((p.Email ?? "").ToLower().Contains(qq)));
+                EF.Functions.ILike(p.FullName ?? "", pattern) ||
+                EF.Functions.ILike(p.DisplayName ?? "", pattern) ||
+                EF.Functions.ILike(p.JobTitle ?? "", pattern) ||
+                EF.Functions.ILike(p.Specialization ?? "", pattern) ||
+                EF.Functions.ILike(p.Phone ?? "", pattern) ||
+                EF.Functions.ILike(p.Email ?? "", pattern));
         }
 
         var total = await query.CountAsync(ct);
 
         var items = await query
             .OrderBy(p => p.FullName)
+            .ThenBy(p => p.DisplayName)
             .Skip(skip)
             .Take(take)
-            .Select(p => new PersonDto
-            {
-                Id = p.Id,
-                FullName = p.FullName,
-                DisplayName = p.DisplayName,
-                JobTitle = p.JobTitle,
-                Specialization = p.Specialization,
-                Phone = p.Phone,
-                Email = p.Email,
-                IsActive = p.IsActive
-            })
+            .Select(ToPersonDtoExpr)
             .ToListAsync(ct);
 
-        return new Paged<PersonDto> { Total = total, Take = take, Skip = skip, Items = items };
+        return Ok(new Paged<PersonDto>
+        {
+            Total = total,
+            Take = take,
+            Skip = skip,
+            Items = items
+        });
     }
 
-    // Detalii persoana (include program + status)
+    // GET /api/people/{id}
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<PersonDetailsDto>> Get(Guid id, CancellationToken ct)
+    public async Task<ActionResult<PersonDetailsDto>> Get(Guid id, CancellationToken ct = default)
     {
         var p = await _db.People
             .Include(x => x.WorkSchedule)
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
-        if (p == null) return NotFound();
+        if (p is null) return NotFound("Person not found.");
 
-        var status = await GetCurrentStatusAsync(id, DateTime.UtcNow.Date, ct);
+        var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
+        var status = await GetCurrentStatusAsync(id, todayUtc, ct);
 
-        return new PersonDetailsDto
-        {
-            Id = p.Id,
-            FullName = p.FullName,
-            DisplayName = p.DisplayName,
-            JobTitle = p.JobTitle,
-            Specialization = p.Specialization,
-            Phone = p.Phone,
-            Email = p.Email,
-            IsActive = p.IsActive,
-            CurrentStatus = status,
-            Schedule = p.WorkSchedule == null ? null : new PersonScheduleDto
-            {
-                MonFriStartMinutes = (int)p.WorkSchedule.MonFriStart.TotalMinutes,
-                MonFriEndMinutes = (int)p.WorkSchedule.MonFriEnd.TotalMinutes,
-                SatStartMinutes = p.WorkSchedule.SatStart.HasValue ? (int)p.WorkSchedule.SatStart.Value.TotalMinutes : (int?)null,
-                SatEndMinutes = p.WorkSchedule.SatEnd.HasValue ? (int)p.WorkSchedule.SatEnd.Value.TotalMinutes : (int?)null,
-                Timezone = p.WorkSchedule.Timezone
-            }
-        };
+        return Ok(ToDetailsDto(p, status));
     }
 
-    [HttpPost]
-    public async Task<ActionResult<PersonDto>> Create([FromBody] CreatePersonReq req, CancellationToken ct)
+    // GET /api/people/availability?fromUtc=...&toUtc=...
+    // Returneaza DOAR persoanele asignabile (active pe interval).
+    [HttpGet("availability")]
+    public async Task<ActionResult<List<PersonLiteDto>>> Availability(
+        [FromQuery] DateTimeOffset fromUtc,
+        [FromQuery] DateTimeOffset toUtc,
+        CancellationToken ct = default)
     {
-        var fullName = (req.FullName ?? "").Trim();
-        if (fullName.Length < 3) return BadRequest("Numele este prea scurt.");
+        if (!TryValidateSameUtcDay(fromUtc, toUtc, out var error))
+            return BadRequest(error);
 
-        var display = (req.DisplayName ?? fullName).Trim();
-        if (display.Length < 2) display = fullName;
+        var people = await _availability.ListAvailableAsync(fromUtc, toUtc, ct);
+
+        var result = people
+            .OrderBy(p => p.FullName)
+            .ThenBy(p => p.DisplayName)
+            .Select(ToLiteDto)
+            .ToList();
+
+        return Ok(result);
+    }
+
+    // GET /api/people/availability/details?fromUtc=...&toUtc=...&includeInactive=true
+    // Returneaza TOTI oamenii (optional includeInactive), cu:
+    // - HrIsActive (manual)
+    // - IsActive = TRUE DOAR daca poate fi alocat in interval
+    // - Status/Reason (derivate din CanAssignAsync)
+    [HttpGet("availability/details")]
+    public async Task<ActionResult<List<PersonAvailabilityDto>>> AvailabilityDetails(
+        [FromQuery] DateTimeOffset fromUtc,
+        [FromQuery] DateTimeOffset toUtc,
+        [FromQuery] bool includeInactive = true,
+        CancellationToken ct = default)
+    {
+        if (!TryValidateSameUtcDay(fromUtc, toUtc, out var error))
+            return BadRequest(error);
+
+        IQueryable<Person> peopleQ = _db.People.AsNoTracking();
+        if (!includeInactive)
+            peopleQ = peopleQ.Where(p => p.IsActive);
+
+        var people = await peopleQ
+            .OrderBy(p => p.FullName)
+            .ThenBy(p => p.DisplayName)
+            .ToListAsync(ct);
+
+        if (people.Count == 0)
+            return Ok(new List<PersonAvailabilityDto>());
+
+        var result = new List<PersonAvailabilityDto>(people.Count);
+
+        foreach (var p in people)
+        {
+            if (!p.IsActive)
+            {
+                result.Add(ToAvailabilityDto(
+                    p,
+                    hrIsActive: false,
+                    isAssignable: false,
+                    status: "INACTIVE",
+                    reason: "Person is inactive."));
+                continue;
+            }
+
+            var can = await _availability.CanAssignAsync(p.Id, fromUtc, toUtc, ct);
+
+            if (can.IsOk)
+            {
+                result.Add(ToAvailabilityDto(
+                    p,
+                    hrIsActive: true,
+                    isAssignable: true,
+                    status: "ACTIVE",
+                    reason: null));
+                continue;
+            }
+
+            result.Add(ToAvailabilityDto(
+                p,
+                hrIsActive: true,
+                isAssignable: false,
+                status: MapAvailabilityStatus(can.Reason),
+                reason: can.Reason));
+        }
+
+        return Ok(result);
+    }
+
+    // POST /api/people
+    [HttpPost]
+    public async Task<ActionResult<PersonDto>> Create([FromBody] CreatePersonReq req, CancellationToken ct = default)
+    {
+        if (!NormalizeAndValidate(req, out var fullName, out var displayName, out var jobTitle,
+                out var specialization, out var phone, out var email, out var isActive, out var error))
+            return BadRequest(error);
 
         var p = new Person
         {
             Id = Guid.NewGuid(),
             FullName = fullName,
-            DisplayName = display,
-            JobTitle = (req.JobTitle ?? "").Trim(),
-            Specialization = (req.Specialization ?? "").Trim(),
-            Phone = (req.Phone ?? "").Trim(),
-            Email = string.IsNullOrWhiteSpace(req.Email) ? null : req.Email.Trim(),
-            IsActive = req.IsActive
+            DisplayName = displayName,
+            JobTitle = jobTitle,
+            Specialization = specialization,
+            Phone = phone,
+            Email = email,
+            IsActive = isActive
         };
 
         _db.People.Add(p);
 
-        // Program implicit (L-V 08:00-16:30)
         _db.PersonWorkSchedules.Add(new PersonWorkSchedule
         {
             PersonId = p.Id,
-            MonFriStart = new TimeSpan(8, 0, 0),
-            MonFriEnd = new TimeSpan(16, 30, 0),
+            MonFriStart = DefaultMonFriStart,
+            MonFriEnd = DefaultMonFriEnd,
             SatStart = null,
             SatEnd = null,
-            Timezone = "Europe/Bucharest"
+            SunStart = null,
+            SunEnd = null,
+            Timezone = DefaultTimezone
         });
 
         await _db.SaveChangesAsync(ct);
 
-        var dto = new PersonDto
-        {
-            Id = p.Id,
-            FullName = p.FullName,
-            DisplayName = p.DisplayName,
-            JobTitle = p.JobTitle,
-            Specialization = p.Specialization,
-            Phone = p.Phone,
-            Email = p.Email,
-            IsActive = p.IsActive
-        };
-
-        return CreatedAtAction(nameof(Get), new { id = p.Id }, dto);
+        return CreatedAtAction(nameof(Get), new { id = p.Id }, ToPersonDto(p));
     }
 
+    // PUT /api/people/{id}
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<PersonDto>> Update(Guid id, [FromBody] UpdatePersonReq req, CancellationToken ct)
+    public async Task<ActionResult<PersonDto>> Update(Guid id, [FromBody] UpdatePersonReq req, CancellationToken ct = default)
     {
         var p = await _db.People.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (p == null) return NotFound();
+        if (p is null) return NotFound("Person not found.");
 
-        var fullName = (req.FullName ?? "").Trim();
-        if (fullName.Length < 3) return BadRequest("Numele este prea scurt.");
+        if (!NormalizeAndValidate(req, out var fullName, out var displayName, out var jobTitle,
+                out var specialization, out var phone, out var email, out var isActive, out var error))
+            return BadRequest(error);
 
         p.FullName = fullName;
-
-        var display = (req.DisplayName ?? fullName).Trim();
-        p.DisplayName = display.Length >= 2 ? display : fullName;
-
-        p.JobTitle = (req.JobTitle ?? "").Trim();
-        p.Specialization = (req.Specialization ?? "").Trim();
-        p.Phone = (req.Phone ?? "").Trim();
-        p.Email = string.IsNullOrWhiteSpace(req.Email) ? null : req.Email.Trim();
-        p.IsActive = req.IsActive;
+        p.DisplayName = displayName;
+        p.JobTitle = jobTitle;
+        p.Specialization = specialization;
+        p.Phone = phone;
+        p.Email = email;
+        p.IsActive = isActive;
 
         await _db.SaveChangesAsync(ct);
 
-        return new PersonDto
-        {
-            Id = p.Id,
-            FullName = p.FullName,
-            DisplayName = p.DisplayName,
-            JobTitle = p.JobTitle,
-            Specialization = p.Specialization,
-            Phone = p.Phone,
-            Email = p.Email,
-            IsActive = p.IsActive
-        };
+        return Ok(ToPersonDto(p));
     }
 
     [HttpPost("{id:guid}/activate")]
-    public async Task<IActionResult> Activate(Guid id, CancellationToken ct)
+    public async Task<IActionResult> Activate(Guid id, CancellationToken ct = default)
     {
         var p = await _db.People.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (p == null) return NotFound();
-        p.IsActive = true;
-        await _db.SaveChangesAsync(ct);
+        if (p is null) return NotFound("Person not found.");
+
+        if (!p.IsActive)
+        {
+            p.IsActive = true;
+            await _db.SaveChangesAsync(ct);
+        }
+
         return NoContent();
     }
 
     [HttpPost("{id:guid}/deactivate")]
-    public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct = default)
     {
         var p = await _db.People.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (p == null) return NotFound();
-        p.IsActive = false;
-        await _db.SaveChangesAsync(ct);
+        if (p is null) return NotFound("Person not found.");
+
+        if (p.IsActive)
+        {
+            p.IsActive = false;
+            await _db.SaveChangesAsync(ct);
+        }
+
         return NoContent();
     }
 
-    // ---------- Helpers ----------
+    // ---------------- Helpers ----------------
 
-    private async Task<string> GetCurrentStatusAsync(Guid personId, DateTime dayUtc, CancellationToken ct)
+    private static bool TryValidateSameUtcDay(DateTimeOffset fromUtc, DateTimeOffset toUtc, out string? error)
     {
-        var d = DateTime.SpecifyKind(dayUtc.Date, DateTimeKind.Utc);
+        error = null;
 
+        if (toUtc <= fromUtc)
+        {
+            error = "toUtc must be after fromUtc.";
+            return false;
+        }
+
+        if (fromUtc.UtcDateTime.Date != toUtc.UtcDateTime.Date)
+        {
+            error = "Interval must be within the same UTC day (v1).";
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task<string> GetCurrentStatusAsync(Guid personId, DateOnly day, CancellationToken ct)
+    {
         var leave = await _db.PersonLeaves.AsNoTracking()
-            .Where(x => x.PersonId == personId && x.StartDate <= d && x.EndDate >= d)
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefaultAsync(x => x.PersonId == personId && x.StartDate <= day && x.EndDate >= day, ct);
 
-        if (leave == null) return "ACTIVE";
+        if (leave is null) return "ACTIVE";
         return leave.Type == LeaveType.CO ? "CO" : "CM";
     }
 
-    // ---------- DTOs ----------
-
-    public sealed class Paged<T>
+    private static bool NormalizeAndValidate(
+        CreatePersonReq req,
+        out string fullName,
+        out string displayName,
+        out string jobTitle,
+        out string specialization,
+        out string phone,
+        out string? email,
+        out bool isActive,
+        out string? error)
     {
-        public int Total { get; set; }
-        public int Take { get; set; }
-        public int Skip { get; set; }
-        public List<T> Items { get; set; } = new();
+        error = null;
+
+        fullName = (req.FullName ?? "").Trim();
+        if (fullName.Length < 3)
+        {
+            displayName = jobTitle = specialization = phone = "";
+            email = null;
+            isActive = req.IsActive;
+            error = "Numele este prea scurt.";
+            return false;
+        }
+
+        displayName = (req.DisplayName ?? fullName).Trim();
+        if (displayName.Length < 2) displayName = fullName;
+
+        jobTitle = (req.JobTitle ?? "").Trim();
+        specialization = (req.Specialization ?? "").Trim();
+        phone = (req.Phone ?? "").Trim();
+
+        email = string.IsNullOrWhiteSpace(req.Email) ? null : req.Email.Trim();
+        isActive = req.IsActive;
+
+        if (email != null && email.Length > 200)
+        {
+            error = "Email prea lung.";
+            return false;
+        }
+
+        return true;
     }
 
-    public class PersonDto
+    private static PersonDto ToPersonDto(Person p) => new()
     {
-        public Guid Id { get; set; }
-        public string FullName { get; set; } = "";
-        public string DisplayName { get; set; } = "";
-        public string JobTitle { get; set; } = "";
-        public string Specialization { get; set; } = "";
-        public string Phone { get; set; } = "";
-        public string? Email { get; set; }
-        public bool IsActive { get; set; }
+        Id = p.Id,
+        FullName = p.FullName,
+        DisplayName = p.DisplayName,
+        JobTitle = p.JobTitle,
+        Specialization = p.Specialization,
+        Phone = p.Phone,
+        Email = p.Email,
+        IsActive = p.IsActive
+    };
+
+    private static PersonLiteDto ToLiteDto(Person p) => new()
+    {
+        Id = p.Id,
+        FullName = p.FullName,
+        DisplayName = p.DisplayName
+    };
+
+    private static PersonAvailabilityDto ToAvailabilityDto(
+        Person p,
+        bool hrIsActive,
+        bool isAssignable,
+        string status,
+        string? reason) => new()
+        {
+            Id = p.Id,
+            FullName = p.FullName,
+            DisplayName = p.DisplayName,
+            JobTitle = p.JobTitle,
+            Specialization = p.Specialization,
+            Phone = p.Phone,
+            Email = p.Email,
+            HrIsActive = hrIsActive,
+            IsActive = isAssignable,
+            Status = status,
+            Reason = reason
+        };
+
+    private static PersonDetailsDto ToDetailsDto(Person p, string status) => new()
+    {
+        Id = p.Id,
+        FullName = p.FullName,
+        DisplayName = p.DisplayName,
+        JobTitle = p.JobTitle,
+        Specialization = p.Specialization,
+        Phone = p.Phone,
+        Email = p.Email,
+        IsActive = p.IsActive,
+        CurrentStatus = status,
+        Schedule = p.WorkSchedule == null ? null : ToScheduleDto(p.WorkSchedule)
+    };
+
+    private static PersonScheduleDto ToScheduleDto(PersonWorkSchedule s) => new()
+    {
+        MonFriStartMinutes = (int)s.MonFriStart.TotalMinutes,
+        MonFriEndMinutes = (int)s.MonFriEnd.TotalMinutes,
+        SatStartMinutes = s.SatStart.HasValue ? (int)s.SatStart.Value.TotalMinutes : (int?)null,
+        SatEndMinutes = s.SatEnd.HasValue ? (int)s.SatEnd.Value.TotalMinutes : (int?)null,
+        SunStartMinutes = s.SunStart.HasValue ? (int)s.SunStart.Value.TotalMinutes : (int?)null,
+        SunEndMinutes = s.SunEnd.HasValue ? (int)s.SunEnd.Value.TotalMinutes : (int?)null,
+        Timezone = s.Timezone
+    };
+
+    // Mapping STRICT pe string-urile din PeopleAvailability (as-is)
+    private static string MapAvailabilityStatus(string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) return "UNAVAILABLE";
+
+        if (reason.Equals("Person not found.", StringComparison.OrdinalIgnoreCase)) return "NOT_FOUND";
+        if (reason.Equals("Person is inactive.", StringComparison.OrdinalIgnoreCase)) return "INACTIVE";
+        if (reason.Equals("Person has no work schedule.", StringComparison.OrdinalIgnoreCase)) return "NO_SCHEDULE";
+
+        if (reason.StartsWith("Invalid timezone", StringComparison.OrdinalIgnoreCase)) return "BAD_TIMEZONE";
+
+        if (reason.Equals("Interval must be within the same local day (v1).", StringComparison.OrdinalIgnoreCase)) return "CROSS_DAY";
+        if (reason.Equals("plannedTo must be after plannedFrom.", StringComparison.OrdinalIgnoreCase)) return "BAD_INTERVAL";
+
+        if (reason.Equals("Date is a national holiday or company blackout day.", StringComparison.OrdinalIgnoreCase)) return "COMPANY_CLOSED";
+
+        if (reason.Equals("Person is on leave (CO/CM).", StringComparison.OrdinalIgnoreCase)) return "LEAVE";
+
+        if (reason.Equals("Outside working hours.", StringComparison.OrdinalIgnoreCase)) return "OUTSIDE_HOURS";
+
+        if (reason.Equals("No Saturday schedule.", StringComparison.OrdinalIgnoreCase)) return "NO_SATURDAY";
+        if (reason.Equals("No Sunday schedule.", StringComparison.OrdinalIgnoreCase)) return "NO_SUNDAY";
+
+        return "UNAVAILABLE";
     }
 
-    public sealed class PersonDetailsDto : PersonDto
-    {
-        public string CurrentStatus { get; set; } = "ACTIVE";
-        public PersonScheduleDto? Schedule { get; set; }
-    }
-
-    public sealed class PersonScheduleDto
-    {
-        public int MonFriStartMinutes { get; set; }
-        public int MonFriEndMinutes { get; set; }
-        public int? SatStartMinutes { get; set; }
-        public int? SatEndMinutes { get; set; }
-        public string Timezone { get; set; } = "Europe/Bucharest";
-    }
-
-    public class CreatePersonReq
-    {
-        public string? FullName { get; set; }
-        public string? DisplayName { get; set; }
-        public string? JobTitle { get; set; }
-        public string? Specialization { get; set; }
-        public string? Phone { get; set; }
-        public string? Email { get; set; }
-        public bool IsActive { get; set; } = true;
-    }
-
-    public sealed class UpdatePersonReq : CreatePersonReq { }
+    private static readonly Expression<Func<Person, PersonDto>> ToPersonDtoExpr =
+        p => new PersonDto
+        {
+            Id = p.Id,
+            FullName = p.FullName,
+            DisplayName = p.DisplayName,
+            JobTitle = p.JobTitle,
+            Specialization = p.Specialization,
+            Phone = p.Phone,
+            Email = p.Email,
+            IsActive = p.IsActive
+        };
 }

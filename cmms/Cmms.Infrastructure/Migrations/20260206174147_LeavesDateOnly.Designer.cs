@@ -3,6 +3,7 @@ using System;
 using Cmms.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Cmms.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260206174147_LeavesDateOnly")]
+    partial class LeavesDateOnly
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -286,12 +289,6 @@ namespace Cmms.Infrastructure.Migrations
                         .HasColumnType("interval");
 
                     b.Property<TimeSpan?>("SatStart")
-                        .HasColumnType("interval");
-
-                    b.Property<TimeSpan?>("SunEnd")
-                        .HasColumnType("interval");
-
-                    b.Property<TimeSpan?>("SunStart")
                         .HasColumnType("interval");
 
                     b.Property<string>("Timezone")

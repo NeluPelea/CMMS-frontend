@@ -18,8 +18,8 @@ public sealed class PeopleLeavesController : ControllerBase
     [HttpGet("{id:guid}/leaves")]
     public async Task<ActionResult<List<LeaveDto>>> List(
         Guid id,
-        [FromQuery] DateTime? from = null,
-        [FromQuery] DateTime? to = null,
+        [FromQuery] DateOnly? from = null,
+        [FromQuery] DateOnly? to = null,
         CancellationToken ct = default)
     {
         var personExists = await _db.People.AnyAsync(x => x.Id == id, ct);
@@ -27,17 +27,14 @@ public sealed class PeopleLeavesController : ControllerBase
 
         var q = _db.PersonLeaves.AsNoTracking().Where(x => x.PersonId == id);
 
+        // intersectie interval (inclusive):
+        // include orice concediu cu EndDate >= from
         if (from.HasValue)
-        {
-            var f = DateTime.SpecifyKind(from.Value.Date, DateTimeKind.Utc);
-            q = q.Where(x => x.EndDate >= f);
-        }
+            q = q.Where(x => x.EndDate >= from.Value);
 
+        // include orice concediu cu StartDate <= to
         if (to.HasValue)
-        {
-            var t = DateTime.SpecifyKind(to.Value.Date, DateTimeKind.Utc);
-            q = q.Where(x => x.StartDate <= t);
-        }
+            q = q.Where(x => x.StartDate <= to.Value);
 
         var items = await q
             .OrderByDescending(x => x.StartDate)
@@ -51,12 +48,15 @@ public sealed class PeopleLeavesController : ControllerBase
             })
             .ToListAsync(ct);
 
-        return items;
+        return Ok(items);
     }
 
     // POST /api/people/{id}/leaves
     [HttpPost("{id:guid}/leaves")]
-    public async Task<ActionResult<LeaveDto>> Create(Guid id, [FromBody] CreateLeaveReq req, CancellationToken ct)
+    public async Task<ActionResult<LeaveDto>> Create(
+        Guid id,
+        [FromBody] CreateLeaveReq req,
+        CancellationToken ct = default)
     {
         var personExists = await _db.People.AnyAsync(x => x.Id == id, ct);
         if (!personExists) return NotFound("Person not found.");
@@ -67,17 +67,20 @@ public sealed class PeopleLeavesController : ControllerBase
         if (type != LeaveType.CO && type != LeaveType.CM)
             return BadRequest("Invalid type. Allowed: CO, CM.");
 
-        var start = DateTime.SpecifyKind(req.StartDate.Date, DateTimeKind.Utc);
-        var end = DateTime.SpecifyKind(req.EndDate.Date, DateTimeKind.Utc);
-        if (end < start) return BadRequest("endDate must be >= startDate.");
+        var start = req.StartDate;
+        var end = req.EndDate;
 
-        // prevent overlaps for same person
+        if (end < start)
+            return BadRequest("endDate must be >= startDate.");
+
+        // prevent overlaps for same person (inclusive overlap)
         var overlap = await _db.PersonLeaves.AnyAsync(x =>
             x.PersonId == id &&
             x.StartDate <= end &&
             x.EndDate >= start, ct);
 
-        if (overlap) return Conflict("Overlapping leave already exists for this person.");
+        if (overlap)
+            return Conflict("Overlapping leave already exists for this person.");
 
         var e = new PersonLeave
         {
@@ -106,10 +109,10 @@ public sealed class PeopleLeavesController : ControllerBase
 
     // DELETE /api/people/{personId}/leaves/{leaveId}
     [HttpDelete("{personId:guid}/leaves/{leaveId:guid}")]
-    public async Task<IActionResult> Delete(Guid personId, Guid leaveId, CancellationToken ct)
+    public async Task<IActionResult> Delete(Guid personId, Guid leaveId, CancellationToken ct = default)
     {
         var e = await _db.PersonLeaves.FirstOrDefaultAsync(x => x.Id == leaveId && x.PersonId == personId, ct);
-        if (e == null) return NotFound();
+        if (e is null) return NotFound();
 
         _db.PersonLeaves.Remove(e);
         await _db.SaveChangesAsync(ct);
@@ -121,16 +124,16 @@ public sealed class PeopleLeavesController : ControllerBase
     {
         public Guid Id { get; set; }
         public string Type { get; set; } = "CO";
-        public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; }
+        public DateOnly StartDate { get; set; }
+        public DateOnly EndDate { get; set; }
         public string? Notes { get; set; }
     }
 
     public sealed class CreateLeaveReq
     {
         public string? Type { get; set; } // "CO" or "CM"
-        public DateTime StartDate { get; set; } // date-only
-        public DateTime EndDate { get; set; }   // date-only
+        public DateOnly StartDate { get; set; } // date-only
+        public DateOnly EndDate { get; set; }   // date-only
         public string? Notes { get; set; }
     }
 }

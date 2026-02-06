@@ -41,7 +41,7 @@ public sealed class AppDbContext : DbContext
         b.Entity<Location>().HasIndex(x => x.Name);
         b.Entity<Asset>().HasIndex(x => x.Name);
 
-        // optional: daca vrei soft delete global pe Location/Asset (ai IsAct)
+        // optional: soft delete global pe Location/Asset
         b.Entity<Location>().HasQueryFilter(x => x.IsAct);
         // b.Entity<Asset>().HasQueryFilter(x => x.IsAct);
 
@@ -100,15 +100,27 @@ public sealed class AppDbContext : DbContext
             .HasForeignKey<PersonWorkSchedule>(x => x.PersonId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Leaves 1:N
-        b.Entity<PersonLeave>()
-            .HasOne(x => x.Person)
-            .WithMany(p => p.Leaves)
-            .HasForeignKey(x => x.PersonId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // Leaves 1:N + DateOnly mapping
+        b.Entity<PersonLeave>(e =>
+        {
+            e.ToTable("person_leaves");
+            e.HasKey(x => x.Id);
 
-        b.Entity<PersonLeave>()
-            .HasIndex(x => new { x.PersonId, x.StartDate, x.EndDate });
+            e.Property(x => x.Type).HasConversion<int>();
+
+            // DateOnly -> SQL date
+            e.Property(x => x.StartDate).HasColumnType("date");
+            e.Property(x => x.EndDate).HasColumnType("date");
+
+            e.Property(x => x.Notes).HasMaxLength(500);
+
+            e.HasOne(x => x.Person)
+                .WithMany(p => p.Leaves)
+                .HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.PersonId, x.StartDate, x.EndDate });
+        });
 
         // ---------------- NEW: Calendar ----------------
         b.Entity<NationalHoliday>()
@@ -154,11 +166,11 @@ public sealed class AppDbContext : DbContext
             .HasIndex(x => new { x.WorkOrderId, x.PersonId, x.RoleId })
             .IsUnique();
 
+        // Domain are: public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         b.Entity<WorkOrderAssignment>()
             .Property(x => x.CreatedAt)
             .HasColumnType("timestamptz")
             .HasDefaultValueSql("now()");
-
 
         // ---------------- PM (existing) ----------------
         b.Entity<PmPlan>()
