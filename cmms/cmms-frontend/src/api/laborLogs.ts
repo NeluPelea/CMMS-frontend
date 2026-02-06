@@ -1,31 +1,40 @@
-// src/api/laborLogs.ts
-import { fetchApi } from "./http";
+import { apiFetch } from "./http";
 
 export interface LaborLogDto {
     id: string;
+    workOrderId: string;
     personId: string;
-    personName: string;
+    personName?: string;
     minutes: number;
-    description: string | null;
+    description?: string;
     createdAt: string;
 }
 
-export async function getWorkOrderLaborLogs(workOrderId: string): Promise<LaborLogDto[]> {
-    return fetchApi(`/work-orders/${workOrderId}/labor`);
+export interface CreateLaborLogRequest {
+    personId: string;
+    minutes: number;
+    description?: string;
 }
 
-export async function addLaborLog(
-    workOrderId: string,
-    data: { personId: string; minutes: number; description: string | null }
-) {
-    return fetchApi(`/work-orders/${workOrderId}/labor`, {
+/**
+ * Adaugă un log de manoperă.
+ * ATENȚIE: Primește workOrderId separat pentru a construi URL-ul corect.
+ */
+export async function addLaborLog(workOrderId: string, req: CreateLaborLogRequest): Promise<LaborLogDto> {
+    return apiFetch<LaborLogDto>(`/api/work-orders/${workOrderId}/labor`, {
         method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify(req),
     });
 }
 
-export async function deleteLaborLog(workOrderId: string, logId: string) {
-    return fetchApi(`/work-orders/${workOrderId}/labor/${logId}`, {
+export async function getLaborLogs(workOrderId: string): Promise<LaborLogDto[]> {
+    return apiFetch<LaborLogDto[]>(`/api/work-orders/${workOrderId}/labor`, {
+        method: "GET",
+    });
+}
+
+export async function deleteLaborLog(workOrderId: string, logId: string): Promise<void> {
+    return apiFetch<void>(`/api/work-orders/${workOrderId}/labor/${logId}`, {
         method: "DELETE",
     });
 }

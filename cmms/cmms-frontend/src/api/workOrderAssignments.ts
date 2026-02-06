@@ -1,5 +1,4 @@
-// src/api/workOrderAssignments.ts
-import { apiFetch } from "./http"; // sau fetchApi, depinde ce ai in http.ts
+import { apiFetch } from "./http";
 
 export type AssignmentDto = {
     id: string;
@@ -22,13 +21,7 @@ export type CreateAssignmentReq = {
     notes?: string;
 };
 
-// Adaugam acest tip pentru a rezolva eroarea din WoAssignmentsPanel
-export type PersonLiteDto = {
-    id: string;
-    fullName: string;
-    jobTitle?: string;
-    specialization?: string;
-};
+// Am eliminat PersonLiteDto de aici deoarece exista deja in people.ts
 
 export async function getWoAssignments(workOrderId: string): Promise<AssignmentDto[]> {
     return await apiFetch<AssignmentDto[]>(`/api/work-orders/${workOrderId}/assignments`, { method: "GET" });
@@ -45,8 +38,4 @@ export async function deleteWoAssignment(workOrderId: string, assignmentId: stri
     await apiFetch<void>(`/api/work-orders/${workOrderId}/assignments/${assignmentId}`, { method: "DELETE" });
 }
 
-// Functia care probabil iti dadea eroare (lipsa din API)
-export async function getAvailablePeople(params: { fromUtc: string; toUtc: string; q?: string }): Promise<PersonLiteDto[]> {
-    const query = new URLSearchParams(params as any).toString();
-    return await apiFetch<PersonLiteDto[]>(`/api/people/available?${query}`, { method: "GET" });
-}
+// Am eliminat getAvailablePeople de aici deoarece exista deja in people.ts

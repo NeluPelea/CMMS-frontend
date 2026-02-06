@@ -1,149 +1,86 @@
-// src/api/workOrders.ts
 import { apiFetch } from "./http";
+// Importam enums din domain pentru a avea aceleasi valori peste tot
+import { WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
-// --- ENUMS (Sincronizate cu Cmms.Domain) ---
-export enum WorkOrderType {
-    Corrective = 0,
-    Preventive = 1,
-    Project = 2
-}
-
-export enum WorkOrderStatus {
-    Open = 0,
-    InProgress = 1,
-    Done = 2,
-    Cancelled = 3
-}
-
-// --- DTOs ---
-export type Paged<T> = {
-    total: number;
-    take: number;
-    skip: number;
+export type WorkOrderPaged<T> = {
     items: T[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
 };
 
-export type WoLocationDto = {
-    id: string;
-    name: string;
-    code?: string | null;
-    isAct: boolean;
-};
-
-export type WoAssetDto = {
-    id: string;
-    name: string;
-    code?: string | null;
-    locationId?: string | null;
-    location?: WoLocationDto | null;
-    isAct: boolean;
-};
-
-export type WoPersonDto = {
-    id: string;
-    displayName: string;
-};
+// Am sters const-urile locale WorkOrderType si WorkOrderStatus 
+// pentru ca generau conflictul "Type 0 is not assignable to type WorkOrderStatus"
 
 export type WorkOrderDto = {
     id: string;
+    number: string;
+    title: string;
+    description?: string;
     type: WorkOrderType;
     status: WorkOrderStatus;
-    title: string;
-    description?: string | null;
-    assetId?: string | null;
-    asset?: WoAssetDto | null;
-    assignedToPersonId?: string | null;
-    assignedToPerson?: WoPersonDto | null;
-    startAt?: string | null;
-    stopAt?: string | null;
-    durationMinutes?: number | null;
-    pmPlanId?: string | null;
-    extraRequestId?: string | null;
+    assetId: string;
+    assetName: string;
+    locationName: string;
+    priority: number;
+    createdAt: string;
+    assignedToPersonId?: string;
+    startAt?: string;
+    stopAt?: string;
+    durationMinutes?: number;
+    asset?: {
+        id: string;
+        name: string;
+        locationId: string;
+    };
 };
 
-// --- PARAMS & REQUESTS ---
-export type WoListParams = {
-    q?: string;
+export interface WorkOrdersParams {
+    take?: number; // Folosit in pagina sub numele 'take' (limit)
+    skip?: number; // Folosit in pagina sub numele 'skip' (offset)
     status?: WorkOrderStatus;
     type?: WorkOrderType;
-    assetId?: string;
-    locId?: string;
-    from?: string; // ISO string
-    to?: string;   // ISO string
-    take?: number;
-    skip?: number;
-};
-
-export interface CreateWoReq {
-    title: string;
-    description?: string | null;
-    type: WorkOrderType;
-    assetId?: string | null;
-    assignedToPersonId?: string | null;
-    startAt?: string | null;
-    stopAt?: string | null;
+    q?: string;
+    locId?: string; // Adaugat pentru a rezolva eroarea TS
+    assetId?: string; // Adaugat pentru a rezolva eroarea TS
 }
 
-export interface UpdateWoReq {
-    title: string;
-    description?: string | null;
-    status: WorkOrderStatus;
-    assetId?: string | null;
-    assignedToPersonId?: string | null;
-    startAt?: string | null;
-    stopAt?: string | null;
-}
-
-// --- FUNCTIONS ---
-
-export async function getWorkOrders(p: WoListParams = {}): Promise<Paged<WorkOrderDto>> {
+export async function getWorkOrders(p: WorkOrdersParams): Promise<WorkOrderPaged<WorkOrderDto>> {
     const qs = new URLSearchParams();
-    if (p.q) qs.set("q", p.q);
+    // Mapam parametrii conform asteptarilor API-ului tau (take/skip)
+    if (p.take !== undefined) qs.set("take", String(p.take));
+    if (p.skip !== undefined) qs.set("skip", String(p.skip));
     if (p.status !== undefined) qs.set("status", String(p.status));
     if (p.type !== undefined) qs.set("type", String(p.type));
-    if (p.assetId) qs.set("assetId", p.assetId);
+    if (p.q) qs.set("q", p.q);
     if (p.locId) qs.set("locId", p.locId);
-    if (p.from) qs.set("from", p.from);
-    if (p.to) qs.set("to", p.to);
+    if (p.assetId) qs.set("assetId", p.assetId);
 
-    qs.set("take", String(p.take ?? 50));
-    qs.set("skip", String(p.skip ?? 0));
-
-    return apiFetch<Paged<WorkOrderDto>>(`/api/work-orders?${qs.toString()}`, { method: "GET" });
+    return await apiFetch<WorkOrderPaged<WorkOrderDto>>(`/api/work-orders?${qs.toString()}`, { method: "GET" });
 }
 
-export async function getWorkOrderById(id: string): Promise<WorkOrderDto> {
-    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}`, { method: "GET" });
+// Folosim tipuri mai precise in loc de 'any' unde este posibil
+export async function createWorkOrder(req: Partial<WorkOrderDto>): Promise<WorkOrderDto> {
+    return await apiFetch<WorkOrderDto>(`/api/work-orders`, { method: "POST", body: JSON.stringify(req) });
 }
 
-export async function createWorkOrder(req: CreateWoReq): Promise<WorkOrderDto> {
-    return apiFetch<WorkOrderDto>(`/api/work-orders`, {
-        method: "POST",
-        body: JSON.stringify(req),
-    });
+export async function updateWorkOrder(id: string, req: Partial<WorkOrderDto>): Promise<WorkOrderDto> {
+    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}`, { method: "PUT", body: JSON.stringify(req) });
 }
 
-export async function updateWorkOrder(id: string, req: UpdateWoReq): Promise<WorkOrderDto> {
-    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(req),
-    });
+// Am schimbat void in Promise<WorkOrderDto | void> pentru a permite verificarea in UI
+export async function cancelWorkOrder(id: string): Promise<WorkOrderDto | void> {
+    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}/cancel`, { method: "POST" });
 }
 
-// --- STATE MACHINE ACTIONS ---
-
-export async function startWorkOrder(id: string): Promise<WorkOrderDto> {
-    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/start`, { method: "POST" });
+export async function startWorkOrder(id: string): Promise<WorkOrderDto | void> {
+    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}/start`, { method: "POST" });
 }
 
-export async function stopWorkOrder(id: string): Promise<WorkOrderDto> {
-    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/stop`, { method: "POST" });
+export async function stopWorkOrder(id: string): Promise<WorkOrderDto | void> {
+    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}/stop`, { method: "POST" });
 }
 
-export async function cancelWorkOrder(id: string): Promise<WorkOrderDto> {
-    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/cancel`, { method: "POST" });
-}
-
-export async function reopenWorkOrder(id: string): Promise<WorkOrderDto> {
-    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/reopen`, { method: "POST" });
+export async function reopenWorkOrder(id: string): Promise<WorkOrderDto | void> {
+    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}/reopen`, { method: "POST" });
 }

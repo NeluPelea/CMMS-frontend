@@ -41,15 +41,22 @@ export default function WoAssignmentsPanel({ workOrderId }: { workOrderId: strin
         setLoading(true);
         try {
             const [r, a] = await Promise.all([getRoles(), getWoAssignments(workOrderId)]);
+
             const activeRoles = (r ?? [])
                 .filter(x => x.isActive)
                 .sort((x, y) => (x.sortOrder ?? 0) - (y.sortOrder ?? 0));
 
             setRoles(activeRoles);
             setItems(Array.isArray(a) ? a : []);
-            if (!roleId && activeRoles.length) setRoleId(activeRoles[0].id);
-        } catch (e: any) {
-            setErr(e?.message ?? "Eroare la incarcarea alocarilor.");
+
+            if (!roleId && activeRoles.length) {
+                setRoleId(activeRoles[0].id);
+            }
+        } catch (e) {
+            // Verificam daca 'e' este un obiect care are proprietatea message
+            const errorMessage = e instanceof Error ? e.message : "Eroare la incarcarea alocarilor.";
+            setErr(errorMessage);
+            console.error(e); // Adaugam log pentru a evita eroarea "e is defined but never used"
         } finally {
             setLoading(false);
         }
@@ -62,7 +69,8 @@ export default function WoAssignmentsPanel({ workOrderId }: { workOrderId: strin
             setPeople(arr);
             if (arr.length && !arr.some(p => p.id === personId)) setPersonId(arr[0].id);
             if (!arr.length) setPersonId("");
-        } catch (e: any) {
+        } catch (e) {
+            console.error("Eroare:", e); // Folosim 'e' ca sa nu mai avem eroarea 'defined but never used'
             setPeople([]);
         }
     }
@@ -72,8 +80,18 @@ export default function WoAssignmentsPanel({ workOrderId }: { workOrderId: strin
 
     async function onAdd() {
         setErr(null);
-        if (!roleId || !personId) return setErr("Selecteaza rolul si persoana.");
-        if (new Date(toUtc).getTime() <= new Date(fromUtc).getTime()) return setErr("Interval orar invalid.");
+
+        // 1. Validari initiale fara diacritice in cod (mesajele catre user pot ramane cu diacritice daca doresti)
+        if (!roleId || !personId) {
+            return setErr("Selectati rolul si persoana.");
+        }
+
+        const start = new Date(fromUtc).getTime();
+        const end = new Date(toUtc).getTime();
+
+        if (end <= start) {
+            return setErr("Interval orar invalid.");
+        }
 
         const body: CreateAssignmentReq = {
             personId,
@@ -87,9 +105,13 @@ export default function WoAssignmentsPanel({ workOrderId }: { workOrderId: strin
         try {
             await createWoAssignment(workOrderId, body);
             setNotes("");
+            // Refresh date dupa succes
             await refreshAll();
-        } catch (e: any) {
-            setErr(e?.message ?? "Eroare la creare.");
+        } catch (e) {
+            // 2. Gestionare sigura a erorii (fara : any)
+            const msg = e instanceof Error ? e.message : "Eroare la creare.";
+            setErr(msg);
+            console.error("onAdd error:", e); // Previne eroarea de variabila neutilizata
         } finally {
             setLoading(false);
         }
