@@ -9,31 +9,267 @@ namespace Cmms.Api.Controllers;
 [ApiController]
 [Route("api/people")]
 [Authorize]
-public class PeopleController : ControllerBase
+public sealed class PeopleController : ControllerBase
 {
     private readonly AppDbContext _db;
     public PeopleController(AppDbContext db) => _db = db;
 
+    // Paged list + search + include inactive
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] int take = 200)
+    public async Task<ActionResult<Paged<PersonDto>>> List(
+        [FromQuery] int take = 50,
+        [FromQuery] int skip = 0,
+        [FromQuery] string? q = null,
+        [FromQuery] int includeInactive = 0,
+        CancellationToken ct = default)
     {
-        if (take <= 0) take = 200;
-        if (take > 500) take = 500;
-        var items = await _db.People.AsNoTracking().OrderBy(x => x.DisplayName).Take(take).ToListAsync();
-        return Ok(items);
+        take = Math.Clamp(take, 1, 200);
+        skip = Math.Max(0, skip);
+        q = (q ?? "").Trim();
+
+        var query = _db.People.AsNoTracking();
+
+        if (includeInactive == 0)
+            query = query.Where(p => p.IsActive);
+
+        if (q.Length > 0)
+        {
+            var qq = q.ToLower();
+
+            query = query.Where(p =>
+                (p.FullName ?? "").ToLower().Contains(qq) ||
+                (p.DisplayName ?? "").ToLower().Contains(qq) ||
+                (p.JobTitle ?? "").ToLower().Contains(qq) ||
+                (p.Specialization ?? "").ToLower().Contains(qq) ||
+                (p.Phone ?? "").ToLower().Contains(qq) ||
+                ((p.Email ?? "").ToLower().Contains(qq)));
+        }
+
+        var total = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderBy(p => p.FullName)
+            .Skip(skip)
+            .Take(take)
+            .Select(p => new PersonDto
+            {
+                Id = p.Id,
+                FullName = p.FullName,
+                DisplayName = p.DisplayName,
+                JobTitle = p.JobTitle,
+                Specialization = p.Specialization,
+                Phone = p.Phone,
+                Email = p.Email,
+                IsActive = p.IsActive
+            })
+            .ToListAsync(ct);
+
+        return new Paged<PersonDto> { Total = total, Take = take, Skip = skip, Items = items };
     }
 
-    public record CreateReq(string DisplayName);
+    // Details (includes schedule + status)
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<PersonDetailsDto>> Get(Guid id, CancellationToken ct)
+    {
+        var p = await _db.People
+            .Include(x => x.WorkSchedule)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+
+        if (p == null) return NotFound();
+
+        var status = await GetCurrentStatusAsync(id, DateTime.UtcNow.Date, ct);
+
+        return new PersonDetailsDto
+        {
+            Id = p.Id,
+            FullName = p.FullName,
+            DisplayName = p.DisplayName,
+            JobTitle = p.JobTitle,
+            Specialization = p.Specialization,
+            Phone = p.Phone,
+            Email = p.Email,
+            IsActive = p.IsActive,
+            CurrentStatus = status,
+            Schedule = p.WorkSchedule == null ? null : new PersonScheduleDto
+            {
+                MonFriStartMinutes = (int)p.WorkSchedule.MonFriStart.TotalMinutes,
+                MonFriEndMinutes = (int)p.WorkSchedule.MonFriEnd.TotalMinutes,
+                SatStartMinutes = p.WorkSchedule.SatStart.HasValue ? (int)p.WorkSchedule.SatStart.Value.TotalMinutes : (int?)null,
+                SatEndMinutes = p.WorkSchedule.SatEnd.HasValue ? (int)p.WorkSchedule.SatEnd.Value.TotalMinutes : (int?)null,
+                Timezone = p.WorkSchedule.Timezone
+            }
+        };
+    }
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateReq req)
+    public async Task<ActionResult<PersonDto>> Create([FromBody] CreatePersonReq req, CancellationToken ct)
     {
-        var n = (req.DisplayName ?? "").Trim();
-        if (n.Length < 2) return BadRequest("displayName too short");
+        var fullName = (req.FullName ?? "").Trim();
+        if (fullName.Length < 3) return BadRequest("fullName too short.");
 
-        var p = new Person { DisplayName = n };
+        var display = (req.DisplayName ?? fullName).Trim();
+        if (display.Length < 2) display = fullName;
+
+        var p = new Person
+        {
+            Id = Guid.NewGuid(),
+            FullName = fullName,
+            DisplayName = display,
+            JobTitle = (req.JobTitle ?? "").Trim(),
+            Specialization = (req.Specialization ?? "").Trim(),
+            Phone = (req.Phone ?? "").Trim(),
+            Email = string.IsNullOrWhiteSpace(req.Email) ? null : req.Email.Trim(),
+            IsActive = req.IsActive
+        };
+
         _db.People.Add(p);
-        await _db.SaveChangesAsync();
-        return Ok(p);
+
+        // default schedule (L-V 08:00-16:30, no Saturday)
+        _db.PersonWorkSchedules.Add(new PersonWorkSchedule
+        {
+            PersonId = p.Id,
+            MonFriStart = new TimeSpan(8, 0, 0),
+            MonFriEnd = new TimeSpan(16, 30, 0),
+            SatStart = null,
+            SatEnd = null,
+            Timezone = "Europe/Bucharest"
+        });
+
+        await _db.SaveChangesAsync(ct);
+
+        var dto = new PersonDto
+        {
+            Id = p.Id,
+            FullName = p.FullName,
+            DisplayName = p.DisplayName,
+            JobTitle = p.JobTitle,
+            Specialization = p.Specialization,
+            Phone = p.Phone,
+            Email = p.Email,
+            IsActive = p.IsActive
+        };
+
+        return CreatedAtAction(nameof(Get), new { id = p.Id }, dto);
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<PersonDto>> Update(Guid id, [FromBody] UpdatePersonReq req, CancellationToken ct)
+    {
+        var p = await _db.People.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (p == null) return NotFound();
+
+        var fullName = (req.FullName ?? "").Trim();
+        if (fullName.Length < 3) return BadRequest("fullName too short.");
+
+        p.FullName = fullName;
+
+        var display = (req.DisplayName ?? fullName).Trim();
+        p.DisplayName = display.Length >= 2 ? display : fullName;
+
+        p.JobTitle = (req.JobTitle ?? "").Trim();
+        p.Specialization = (req.Specialization ?? "").Trim();
+        p.Phone = (req.Phone ?? "").Trim();
+        p.Email = string.IsNullOrWhiteSpace(req.Email) ? null : req.Email.Trim();
+        p.IsActive = req.IsActive;
+
+        await _db.SaveChangesAsync(ct);
+
+        return new PersonDto
+        {
+            Id = p.Id,
+            FullName = p.FullName,
+            DisplayName = p.DisplayName,
+            JobTitle = p.JobTitle,
+            Specialization = p.Specialization,
+            Phone = p.Phone,
+            Email = p.Email,
+            IsActive = p.IsActive
+        };
+    }
+
+    [HttpPost("{id:guid}/activate")]
+    public async Task<IActionResult> Activate(Guid id, CancellationToken ct)
+    {
+        var p = await _db.People.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (p == null) return NotFound();
+        p.IsActive = true;
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    [HttpPost("{id:guid}/deactivate")]
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
+    {
+        var p = await _db.People.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (p == null) return NotFound();
+        p.IsActive = false;
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    // ---------- helpers ----------
+
+    private async Task<string> GetCurrentStatusAsync(Guid personId, DateTime dayUtc, CancellationToken ct)
+    {
+        var d = DateTime.SpecifyKind(dayUtc.Date, DateTimeKind.Utc);
+
+        var leaveType = await _db.PersonLeaves.AsNoTracking()
+            .Where(x => x.PersonId == personId && x.StartDate <= d && x.EndDate >= d)
+            .Select(x => x.Type)
+            .FirstOrDefaultAsync(ct);
+
+        if ((int)leaveType == 0) return "ACTIVE";
+        return leaveType == LeaveType.CO ? "CO" : "CM";
+    }
+
+    // ---------- DTOs ----------
+
+    public sealed class Paged<T>
+    {
+        public int Total { get; set; }
+        public int Take { get; set; }
+        public int Skip { get; set; }
+        public List<T> Items { get; set; } = new();
+    }
+
+    public class PersonDto
+    {
+        public Guid Id { get; set; }
+        public string FullName { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string JobTitle { get; set; } = "";
+        public string Specialization { get; set; } = "";
+        public string Phone { get; set; } = "";
+        public string? Email { get; set; }
+        public bool IsActive { get; set; }
+    }
+
+    public sealed class PersonDetailsDto : PersonDto
+    {
+        public string CurrentStatus { get; set; } = "ACTIVE";
+        public PersonScheduleDto? Schedule { get; set; }
+    }
+
+    public sealed class PersonScheduleDto
+    {
+        public int MonFriStartMinutes { get; set; }
+        public int MonFriEndMinutes { get; set; }
+        public int? SatStartMinutes { get; set; }
+        public int? SatEndMinutes { get; set; }
+        public string Timezone { get; set; } = "Europe/Bucharest";
+    }
+
+    public class CreatePersonReq
+    {
+        public string? FullName { get; set; }
+        public string? DisplayName { get; set; }
+        public string? JobTitle { get; set; }
+        public string? Specialization { get; set; }
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+
+    public sealed class UpdatePersonReq : CreatePersonReq { }
 }

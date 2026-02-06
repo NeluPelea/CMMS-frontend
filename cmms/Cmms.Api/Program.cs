@@ -80,12 +80,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+builder.Services.AddScoped<Cmms.Api.Services.PeopleAvailability>();
+
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
 // Seed dev data (Development only)
 await Cmms.Api.Seed.DevDataSeeder.SeedAsync(app.Services);
+
+
+
 
 
 app.UseCors("dev");

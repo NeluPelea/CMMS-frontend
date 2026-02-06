@@ -1,12 +1,15 @@
 export * from "./http";
+
 export * from "./auth";
 export * from "./assets";
-export * from "./locations";
-export * from "./people";
-export * from "./workOrders";
-export * from "./pmPlans";
-export * from "./parts";
+export * from "./dashboard";
 export * from "./inventory";
+export * from "./locations";
+export * from "./parts";
+export * from "./people";
+export * from "./pmPlans";
 export * from "./woParts";
+export * from "./workOrders";
 
-
+export * from "./roles";
+export * from "./workOrderAssignments";

@@ -1,4 +1,4 @@
-// src/pages/PmPlansPage.tsx
+﻿// src/pages/PmPlansPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import { getAssets, getLocs, type AssetDto, type LocDto } from "../api";
@@ -90,7 +90,7 @@ function TextArea(props: {
 }
 
 function checklistPreview(items: Array<{ text: string }> | null | undefined) {
-  if (!items || items.length === 0) return "�";
+  if (!items || items.length === 0) return "—";
   const texts = items
     .slice()
     .sort((a: any, b: any) => (a.sort ?? 0) - (b.sort ?? 0))
@@ -369,3 +369,5 @@ export default function PmPlansPage() {
     </AppShell>
   );
 }
+
+

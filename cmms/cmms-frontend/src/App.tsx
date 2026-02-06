@@ -11,6 +11,10 @@ import PmPlansPage from "./pages/PmPlansPage";
 import PartsPage from "./pages/PartsPage";
 import InventoryPage from "./pages/InventoryPage";
 import DashboardPage from "./pages/DashboardPage";
+import PeoplePage from "./pages/PeoplePage";
+import RolesPage from "./pages/RolesPage";
+import CalendarPage from "./pages/CalendarPage";
+
 
 export default function App() {
   return (
@@ -86,7 +90,45 @@ export default function App() {
                 <DashboardPage />
                 </RequireAuth>
             }
+        />
+       
+        <Route
+          path="/people"
+          element={
+            <RequireAuth>
+              <PeoplePage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/roles"
+          element={
+            <RequireAuth>
+              <RolesPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/calendar"
+          element={
+            <RequireAuth>
+              <CalendarPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+           path="/people"
+           element={
+             <RequireAuth>
+                <PeoplePage />
+            </RequireAuth>
+  }
 />
+
+
 
       <Route path="/" element={<Navigate to="/work-orders" replace />} />
      

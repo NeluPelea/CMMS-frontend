@@ -13,7 +13,12 @@ const NAV: NavItem[] = [
   { to: "/pm-plans", label: "PM Plans" },
   { to: "/parts", label: "Parts" },
   { to: "/inventory", label: "Inventory" },
+
+  { to: "/people", label: "People" },
+  { to: "/roles", label: "Roles" },
+  { to: "/calendar", label: "Calendar" },
 ];
+
 
 
 function cx(...xs: Array<string | false | undefined>) {

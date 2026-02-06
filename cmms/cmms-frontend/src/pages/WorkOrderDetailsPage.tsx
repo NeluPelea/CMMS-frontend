@@ -2,10 +2,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import AppShell from "../components/AppShell";
+import WoAssignmentsPanel from "../components/WoAssignmentsPanel";
+
 import {
   cancelWorkOrder,
   getAssets,
-  getPeople,
+  getPeopleSimple,
   getWorkOrderById,
   reopenWorkOrder,
   startWorkOrder,
@@ -197,7 +199,7 @@ export default function WorkOrderDetailsPage() {
     }
 
     try {
-      const p = await getPeople();
+      const p = await getPeopleSimple();
       setPeople(Array.isArray(p) ? p : []);
     } catch {
       setPeople([]);
@@ -445,6 +447,10 @@ export default function WorkOrderDetailsPage() {
         <>
           {/* Edit */}
           <Card title="Edit work order">
+          <div className="mt-6" />
+            {id ? <WoAssignmentsPanel workOrderId={id} /> : null}
+            <div className="mt-6" />
+
             <div className="grid gap-3 lg:grid-cols-12">
               <div className="lg:col-span-6">
                 <FieldLabel>Title</FieldLabel>

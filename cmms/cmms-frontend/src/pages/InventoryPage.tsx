@@ -1,4 +1,4 @@
-// src/pages/InventoryPage.tsx
+ï»¿// src/pages/InventoryPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import { adjustInventory, getInventory, type InventoryRowDto } from "../api";
@@ -197,8 +197,8 @@ export default function InventoryPage() {
                 <td className="px-4 py-3 text-zinc-100 font-medium">
                   {x.partName}
                 </td>
-                <td className="px-4 py-3 text-zinc-300">{x.partCode ?? "—"}</td>
-                <td className="px-4 py-3 text-zinc-300">{x.uom ?? "—"}</td>
+                <td className="px-4 py-3 text-zinc-300">{x.partCode ?? "â€”"}</td>
+                <td className="px-4 py-3 text-zinc-300">{x.uom ?? "â€”"}</td>
                 <td className="px-4 py-3 text-right font-semibold text-zinc-100">
                   {x.qtyOnHand}
                 </td>
@@ -214,3 +214,5 @@ export default function InventoryPage() {
     </AppShell>
   );
 }
+
+
