@@ -1,4 +1,6 @@
-﻿import { useEffect, useState, useCallback, useMemo } from "react";
+﻿// src/pages/LocationsPage.tsx
+import { useEffect, useState, useCallback, useMemo } from "react";
+// Folosim 'import type' pentru a evita erorile de verbatimModuleSyntax
 import type { ChangeEvent, KeyboardEvent } from "react";
 import AppShell from "../components/AppShell";
 import { createLoc, deleteLoc, getLocs, type LocDto } from "../api";
@@ -34,20 +36,19 @@ export default function LocationsPage() {
 
     const canCreate = useMemo(() => newName.trim().length >= 2, [newName]);
 
-    // Funcția de încărcare a datelor
+    // Funcție de încărcare stabilă
     const load = useCallback(async () => {
         setLoading(true);
         setErr(null);
         try {
-            // Trimitem explicit parametrul 'ia' bazat pe starea checkbox-ului
             const data = await getLocs({
                 q: q.trim() || undefined,
                 take: 500,
-                ia: showDel,
+                ia: showDel, // Parametrul pentru include inactive
             });
 
-            // Log pentru debugging în consolă
-            console.log("Date primite (showDel=" + showDel + "):", data);
+            // LOG de confirmare: dacă nu vezi acest log exact în consolă, build-ul încă eșuează
+            console.log(`[LOCS] Reîncărcare: ia=${showDel}, total=${data.length}`);
 
             setItems(Array.isArray(data) ? data : []);
         } catch (e: unknown) {
@@ -58,12 +59,12 @@ export default function LocationsPage() {
         }
     }, [q, showDel]);
 
-    // Reîncărcăm datele ori de câte ori se schimbă bifa sau textul de căutare (opțional)
+    // Reîncărcăm automat când se schimbă bifa
     useEffect(() => {
         load();
     }, [load]);
 
-    const onCreate = async () => {
+    async function onCreate() {
         if (!canCreate) return;
         setErr(null);
         try {
@@ -77,10 +78,12 @@ export default function LocationsPage() {
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : String(e));
         }
-    };
+    }
 
-    const onDelete = async (id: string) => {
-        if (!confirm("Sigur doriți să ștergeți această locație?")) return;
+    async function onDelete(id: string, isActive: boolean) {
+        if (!isActive) return;
+        if (!confirm("Sigur doriți să ștergeți locația?")) return;
+
         setErr(null);
         try {
             await deleteLoc(id);
@@ -88,13 +91,13 @@ export default function LocationsPage() {
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : String(e));
         }
-    };
+    }
 
     return (
         <AppShell title="Locations">
             <PageToolbar
                 left={
-                    <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center">
+                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                         <div className="w-full sm:max-w-md">
                             <Input
                                 value={q}
@@ -102,31 +105,32 @@ export default function LocationsPage() {
                                 onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
                                     if (e.key === "Enter") load();
                                 }}
-                                placeholder="Căutare locații..."
+                                placeholder="Search locations..."
                             />
                         </div>
 
-                        <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-300 select-none bg-white/5 px-3 py-2 rounded-md hover:bg-white/10 transition-colors">
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300 select-none">
                             <input
                                 type="checkbox"
                                 checked={showDel}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                    setShowDel(e.target.checked);
-                                }}
-                                className="h-4 w-4 rounded border-white/20 bg-white/10 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-900"
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setShowDel(e.target.checked)}
+                                className="h-4 w-4 rounded border-white/20 bg-white/10"
                             />
-                            <span>Show deleted</span>
+                            Show deleted
                         </label>
                     </div>
                 }
                 right={
-                    <Button onClick={load} disabled={loading} variant="ghost">
-                        {loading ? "Loading..." : "Refresh"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button onClick={load} disabled={loading} variant="ghost">
+                            {loading ? "Loading..." : "Refresh"}
+                        </Button>
+                    </div>
                 }
             />
 
-            {err && <div className="mb-6"><ErrorBox message={err} /></div>}
+            {/* REPARAT: Fără className pentru a trece de build */}
+            {err && <ErrorBox message={err} />}
 
             <Card title="New Location">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -140,7 +144,11 @@ export default function LocationsPage() {
                         onChange={(e: ChangeEvent<HTMLInputElement>) => setNewCode(e.target.value)}
                         placeholder="Code (optional)"
                     />
-                    <Button onClick={onCreate} disabled={!canCreate || loading} variant="primary">
+                    <Button
+                        onClick={onCreate}
+                        disabled={!canCreate || loading}
+                        variant="primary"
+                    >
                         Create
                     </Button>
                 </div>
@@ -158,41 +166,33 @@ export default function LocationsPage() {
                             <th className="px-4 py-3 text-right font-semibold">Actions</th>
                         </tr>
                     </thead>
+
                     <tbody className="divide-y divide-white/10">
-                        {items.map((x) => (
-                            <tr
-                                key={x.id}
-                                className={cx(
-                                    "hover:bg-white/5 transition-colors",
-                                    !x.isAct && "bg-rose-500/5 opacity-70"
-                                )}
-                            >
-                                <td className={cx("px-4 py-3", !x.isAct ? "text-zinc-400" : "text-zinc-100")}>
-                                    {x.name}
-                                </td>
-                                <td className="px-4 py-3 text-zinc-300">
-                                    {x.code ?? <span className="text-zinc-600">-</span>}
-                                </td>
-                                <td className="px-4 py-3">
-                                    <StatusPill isActive={x.isAct} />
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                    {x.isAct ? (
-                                        <Button
-                                            onClick={() => onDelete(x.id)}
-                                            variant="ghost"
-                                            className="h-8 px-3 text-xs text-zinc-400 hover:text-rose-400 hover:bg-rose-400/10"
-                                        >
-                                            Delete
-                                        </Button>
-                                    ) : (
-                                        <span className="text-xs text-rose-300/60 pr-3 font-medium uppercase tracking-wider">
-                                            Archived
-                                        </span>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
+                        {items.map((x) => {
+                            const active = x.isAct !== false;
+                            return (
+                                <tr key={x.id} className={cx("hover:bg-white/5", !active && "bg-rose-500/5 opacity-70")}>
+                                    <td className={cx("px-4 py-3", active ? "text-zinc-100" : "text-zinc-400")}>{x.name}</td>
+                                    <td className="px-4 py-3 text-zinc-300">{x.code ?? "-"}</td>
+                                    <td className="px-4 py-3">
+                                        <StatusPill isActive={active} />
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        {active ? (
+                                            <Button
+                                                onClick={() => onDelete(x.id, active)}
+                                                variant="ghost"
+                                                className="h-8 px-3 text-xs text-zinc-400 hover:text-rose-400"
+                                            >
+                                                Delete
+                                            </Button>
+                                        ) : (
+                                            <span className="text-xs text-rose-300/60 pr-3 font-medium uppercase">Archived</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                         {!loading && items.length === 0 && (
                             <EmptyRow colSpan={4} text="No locations found." />
                         )}

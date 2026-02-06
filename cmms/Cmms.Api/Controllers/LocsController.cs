@@ -19,7 +19,6 @@ public sealed class LocsController : ControllerBase
     public sealed record UpdateReq(string Name, string? Code);
 
     // GET /api/locs?q=...&take=200&ia=true|false
-    // GET /api/locs?q=...&take=200&ia=true|false
     [HttpGet]
     public async Task<IActionResult> List(
         [FromQuery] string? q = null,
