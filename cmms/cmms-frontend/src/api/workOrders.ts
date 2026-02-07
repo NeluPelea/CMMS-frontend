@@ -1,90 +1,207 @@
+// src/api/workOrders.ts
+// UTF-8, fara diacritice
 import { apiFetch } from "./http";
-// Importam enums din domain pentru a avea aceleasi valori peste tot
 import { WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
-export type WorkOrderPaged<T> = {
+// Backend shape: PagedResp<T>(total, take, skip, items)
+export type PagedResp<T> = {
+    total: number;
+    take: number;
+    skip: number;
     items: T[];
-    totalCount: number;
-    page: number;
-    pageSize: number;
 };
-
-// Am sters const-urile locale WorkOrderType si WorkOrderStatus 
-// pentru ca generau conflictul "Type 0 is not assignable to type WorkOrderStatus"
 
 export type WorkOrderDto = {
     id: string;
-    number: string;
-    title: string;
-    description?: string;
     type: WorkOrderType;
     status: WorkOrderStatus;
-    assetId: string;
-    assetName: string;
-    locationName: string;
-    priority: number;
-    createdAt: string;
-    assignedToPersonId?: string;
-    startAt?: string;
-    stopAt?: string;
-    durationMinutes?: number;
+    title: string;
+    description?: string | null;
+
+    assetId?: string | null;
     asset?: {
         id: string;
         name: string;
-        locationId: string;
-    };
+        code?: string | null;
+        locationId?: string | null;
+        location?: { id: string; name: string; code?: string | null; isAct: boolean } | null;
+        isAct: boolean;
+    } | null;
+
+    assignedToPersonId?: string | null;
+    assignedToPerson?: { id: string; displayName: string } | null;
+
+    startAt?: string | null;
+    stopAt?: string | null;
+    durationMinutes?: number | null;
+
+    pmPlanId?: string | null;
+    extraRequestId?: string | null;
+
+    defect?: string | null;
+    cause?: string | null;
+    solution?: string | null;
 };
 
 export interface WorkOrdersParams {
-    take?: number; // Folosit in pagina sub numele 'take' (limit)
-    skip?: number; // Folosit in pagina sub numele 'skip' (offset)
+    take?: number;
+    skip?: number;
     status?: WorkOrderStatus;
     type?: WorkOrderType;
     q?: string;
-    locId?: string; // Adaugat pentru a rezolva eroarea TS
-    assetId?: string; // Adaugat pentru a rezolva eroarea TS
+    locId?: string;
+    assetId?: string;
+    from?: string; // DateTimeOffset ISO (optional)
+    to?: string; // DateTimeOffset ISO (optional)
 }
 
-export async function getWorkOrders(p: WorkOrdersParams): Promise<WorkOrderPaged<WorkOrderDto>> {
+// ---------------- Helpers ----------------
+
+function setIfDefined(qs: URLSearchParams, key: string, v: unknown) {
+    if (v === undefined || v === null) return;
+    qs.set(key, String(v));
+}
+
+function setIfNonEmpty(qs: URLSearchParams, key: string, v?: string) {
+    const s = (v ?? "").trim();
+    if (!s) return;
+    qs.set(key, s);
+}
+
+function buildQs(p?: WorkOrdersParams): string {
     const qs = new URLSearchParams();
-    // Mapam parametrii conform asteptarilor API-ului tau (take/skip)
-    if (p.take !== undefined) qs.set("take", String(p.take));
-    if (p.skip !== undefined) qs.set("skip", String(p.skip));
-    if (p.status !== undefined) qs.set("status", String(p.status));
-    if (p.type !== undefined) qs.set("type", String(p.type));
-    if (p.q) qs.set("q", p.q);
-    if (p.locId) qs.set("locId", p.locId);
-    if (p.assetId) qs.set("assetId", p.assetId);
+    if (!p) return "";
 
-    return await apiFetch<WorkOrderPaged<WorkOrderDto>>(`/api/work-orders?${qs.toString()}`, { method: "GET" });
+    setIfDefined(qs, "take", p.take);
+    setIfDefined(qs, "skip", p.skip);
+    setIfDefined(qs, "status", p.status);
+    setIfDefined(qs, "type", p.type);
+
+    setIfNonEmpty(qs, "q", p.q);
+    setIfNonEmpty(qs, "locId", p.locId);
+    setIfNonEmpty(qs, "assetId", p.assetId);
+    setIfNonEmpty(qs, "from", p.from);
+    setIfNonEmpty(qs, "to", p.to);
+
+    const s = qs.toString();
+    return s ? `?${s}` : "";
 }
 
-// Folosim tipuri mai precise in loc de 'any' unde este posibil
-export async function createWorkOrder(req: Partial<WorkOrderDto>): Promise<WorkOrderDto> {
-    return await apiFetch<WorkOrderDto>(`/api/work-orders`, { method: "POST", body: JSON.stringify(req) });
+function assertTitle(title: string) {
+    const t = (title ?? "").trim();
+    if (t.length < 2) throw new Error("Title too short (min 2 chars).");
+    return t;
 }
 
-export async function updateWorkOrder(id: string, req: Partial<WorkOrderDto>): Promise<WorkOrderDto> {
-    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}`, { method: "PUT", body: JSON.stringify(req) });
+// ---------------- API ----------------
+
+export async function getWorkOrders(p: WorkOrdersParams): Promise<PagedResp<WorkOrderDto>> {
+    return apiFetch<PagedResp<WorkOrderDto>>(`/api/work-orders${buildQs(p)}`, { method: "GET" });
 }
 
-// Am schimbat void in Promise<WorkOrderDto | void> pentru a permite verificarea in UI
-export async function cancelWorkOrder(id: string): Promise<WorkOrderDto | void> {
-    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}/cancel`, { method: "POST" });
+// Requests must match backend CreateReq/UpdateReq (NOT WorkOrderDto)
+export type CreateWorkOrderReq = {
+    title: string;
+    description?: string | null;
+    type: WorkOrderType;
+    assetId?: string | null;
+    assignedToPersonId?: string | null;
+    startAt?: string | null; // ISO
+    stopAt?: string | null; // ISO
+};
+
+export type UpdateWorkOrderReq = {
+    title: string;
+    description?: string | null;
+    status: WorkOrderStatus;
+    assetId?: string | null;
+    assignedToPersonId?: string | null;
+    startAt?: string | null; // ISO
+    stopAt?: string | null; // ISO
+    defect?: string | null;
+    cause?: string | null;
+    solution?: string | null;
+};
+
+export async function createWorkOrder(req: CreateWorkOrderReq): Promise<WorkOrderDto> {
+    const title = assertTitle(req.title);
+    return apiFetch<WorkOrderDto>(`/api/work-orders`, {
+        method: "POST",
+        body: JSON.stringify({
+            ...req,
+            title,
+            description: req.description ?? null,
+            assetId: req.assetId ?? null,
+            assignedToPersonId: req.assignedToPersonId ?? null,
+            startAt: req.startAt ?? null,
+            stopAt: req.stopAt ?? null,
+        }),
+    });
 }
 
-export async function startWorkOrder(id: string): Promise<WorkOrderDto | void> {
-    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}/start`, { method: "POST" });
+export async function updateWorkOrder(id: string, req: UpdateWorkOrderReq): Promise<WorkOrderDto> {
+    const title = assertTitle(req.title);
+    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+            ...req,
+            title,
+            description: req.description ?? null,
+            assetId: req.assetId ?? null,
+            assignedToPersonId: req.assignedToPersonId ?? null,
+            startAt: req.startAt ?? null,
+            stopAt: req.stopAt ?? null,
+            defect: req.defect ?? null,
+            cause: req.cause ?? null,
+            solution: req.solution ?? null,
+        }),
+    });
 }
 
-export async function stopWorkOrder(id: string): Promise<WorkOrderDto | void> {
-    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}/stop`, { method: "POST" });
+export async function startWorkOrder(id: string): Promise<WorkOrderDto> {
+    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/start`, { method: "POST" });
 }
 
-export async function reopenWorkOrder(id: string): Promise<WorkOrderDto | void> {
-    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}/reopen`, { method: "POST" });
+export async function stopWorkOrder(id: string): Promise<WorkOrderDto> {
+    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/stop`, { method: "POST" });
+}
+
+export async function cancelWorkOrder(id: string): Promise<WorkOrderDto> {
+    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/cancel`, { method: "POST" });
+}
+
+export async function reopenWorkOrder(id: string): Promise<WorkOrderDto> {
+    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}/reopen`, { method: "POST" });
 }
 
 export async function getWorkOrderById(id: string): Promise<WorkOrderDto> {
-    return await apiFetch<WorkOrderDto>(`/api/work-orders/${id}`, { method: "GET" });
+    return apiFetch<WorkOrderDto>(`/api/work-orders/${id}`, { method: "GET" });
+}
+
+// ---- Events (audit) ----
+export type WorkOrderEventKind = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+
+export type WorkOrderEventDto = {
+    id: string;
+    createdAtUtc: string;
+    actorId?: string | null;
+    kind: WorkOrderEventKind;
+    field?: string | null;
+    oldValue?: string | null;
+    newValue?: string | null;
+    message?: string | null;
+    correlationId?: string | null;
+};
+
+export async function getWorkOrderEvents(
+    id: string,
+    take = 200,
+    skip = 0
+): Promise<PagedResp<WorkOrderEventDto>> {
+    const qs = new URLSearchParams();
+    qs.set("take", String(take));
+    qs.set("skip", String(skip));
+    return apiFetch<PagedResp<WorkOrderEventDto>>(`/api/work-orders/${id}/events?${qs.toString()}`, {
+        method: "GET",
+    });
 }

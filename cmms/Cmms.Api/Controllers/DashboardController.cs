@@ -238,14 +238,12 @@ public sealed class DashboardController : ControllerBase
     public async Task<IActionResult> GetAssetsInMaintenance([FromQuery] Guid? locId = null)
     {
         var q = _db.WorkOrders.AsNoTracking()
-            .Include(x => x.Asset)!.ThenInclude(a => a.Location)
-            .Include(x => x.AssignedToPerson)
             .Where(x => x.Status == WorkOrderStatus.InProgress && x.AssetId != null);
 
         if (locId.HasValue)
             q = q.Where(x => x.Asset != null && x.Asset.LocationId == locId.Value);
 
-        // 1 rand per asset: ultimul WO in progress
+
         var rows = await q
             .OrderByDescending(x => x.StartAt ?? DateTimeOffset.MinValue)
             .Select(x => new AssetInMaintDto(

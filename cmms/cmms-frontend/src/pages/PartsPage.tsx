@@ -10,7 +10,6 @@ import {
   Input,
   PageToolbar,
   Pill,
-  Select,
   TableShell,
 } from "../components/ui";
 

@@ -6,9 +6,14 @@ export * from "./inventory";
 export * from "./locations";
 export * from "./parts";
 export * from "./people";
+export * from "./people";
 export * from "./pmPlans";
 export * from "./woParts";
 export * from "./workOrders";
 export * from "./roles";
 export * from "./workOrderAssignments";
-export * from "./laborLogs"; // Asigură-te că această linie există
+export * from "./calendar";
+export * from "./extraJobs";
+
+export * from "./laborLogs";
+

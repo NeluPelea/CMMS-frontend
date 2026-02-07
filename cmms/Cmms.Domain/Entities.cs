@@ -100,6 +100,7 @@ public sealed class NationalHoliday
     // Date-only semantics; currently stored as DateTime 00:00 UTC (keep as-is for DB compatibility).
     public DateTime Date { get; set; }
     public string? Name { get; set; }
+    public bool IsAct { get; set; } = true;
 }
 
 public sealed class CompanyBlackoutDay
@@ -107,6 +108,7 @@ public sealed class CompanyBlackoutDay
     // Date-only semantics; currently stored as DateTime 00:00 UTC (keep as-is for DB compatibility).
     public DateTime Date { get; set; }
     public string? Name { get; set; }
+    public bool IsAct { get; set; } = true;
 }
 
 // =========================
@@ -180,6 +182,9 @@ public sealed class WorkOrder
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
+    // Creation timestamp (used by reports)
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
     public WorkOrderType Type { get; set; } = WorkOrderType.AdHoc;
     public WorkOrderStatus Status { get; set; } = WorkOrderStatus.Open;
 
@@ -203,7 +208,16 @@ public sealed class WorkOrder
 
     public Guid? PmPlanId { get; set; }
     public Guid? ExtraRequestId { get; set; }
+
+    // Intervention fields
+    public string? Defect { get; set; }
+    public string? Cause { get; set; }
+    public string? Solution { get; set; }
+
+
+    public ICollection<FileAttachment> Attachments { get; set; } = new List<FileAttachment>();
 }
+
 
 // =========================
 // Preventive Maintenance
@@ -277,3 +291,49 @@ public sealed class AssetPart
 
     public bool IsAct { get; set; } = true; // soft delete
 }
+
+// =========================
+// Labor Logs (Manopera)
+// =========================
+
+public sealed class WorkOrderLabor
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid WorkOrderId { get; set; }
+    public WorkOrder? WorkOrder { get; set; }
+
+    public Guid PersonId { get; set; }
+    public Person? Person { get; set; }
+
+    // Minutes spent
+    public int Minutes { get; set; } = 0;
+
+    public string? Description { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+// =========================
+// Extra Jobs (IntExtra)
+// =========================
+
+public sealed class ExtraJob
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public string Title { get; set; } = "";
+    public string? Description { get; set; }
+
+    public bool IsDone { get; set; } = false;
+
+    public Guid? AssignedToPersonId { get; set; }
+    public Person? AssignedToPerson { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? FinishedAt { get; set; }
+}
+
+
+
+

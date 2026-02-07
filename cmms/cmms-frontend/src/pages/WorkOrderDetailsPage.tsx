@@ -1,35 +1,76 @@
 ﻿// src/pages/WorkOrderDetailsPage.tsx
-import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import AppShell from "../components/AppShell";
 import WoAssignmentsPanel from "../components/WoAssignmentsPanel";
-import LaborLogsManager from "../components/LaborLogsManager"; // Importul nou
+import LaborLogsManager from "../components/LaborLogsManager";
+
 import {
-    cancelWorkOrder, getAssets, getPeopleSimple, getWorkOrderById,
-    reopenWorkOrder, startWorkOrder, stopWorkOrder, updateWorkOrder,
-    getParts, addWorkOrderPart, getWorkOrderParts, deleteWorkOrderPart,
-    setWorkOrderPartQty, type AssetDto, type PersonDto, type WorkOrderDetailsDto,
-    type PartDto, type WorkOrderPartDto
+    // work orders
+    getWorkOrderById,
+    updateWorkOrder,
+    startWorkOrder,
+    stopWorkOrder,
+    reopenWorkOrder,
+    cancelWorkOrder,
+    type WorkOrderDto,
+
+    // assets / people
+    getAssets,
+    getPeopleSimple,
+    type AssetDto,
+    type PersonSimpleDto,
+
+    // parts
+    getParts,
+    getWorkOrderParts,
+    addWorkOrderPart,
+    deleteWorkOrderPart,
+    setWorkOrderPartQty,
+    type PartDto,
+    type WorkOrderPartDto,
 } from "../api";
+
+import { WorkOrderStatus } from "../domain/enums";
+
 import {
-    Button, Card, EmptyRow, ErrorBox, Input, PageToolbar,
-    Select, TableShell
+    Button,
+    Card,
+    EmptyRow,
+    ErrorBox,
+    Input,
+    PageToolbar,
+    Select,
+    TableShell,
 } from "../components/ui";
 
-// --- Helpers de formatare ---
-const toLocalInput = (iso?: string | null) => {
+// ---------------- Helpers ----------------
+function toLocalInput(iso?: string | null): string {
     if (!iso) return "";
     const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
     const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+        d.getHours()
+    )}:${pad(d.getMinutes())}`;
+}
 
-const parseQty = (input: string): number | null => {
+function localToIsoOrNull(v: string): string | null {
+    if (!v) return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function parseQty(input: string): number | null {
     const s = (input ?? "").trim().replace(",", ".");
     if (!s) return null;
     const n = Number(s);
-    return isFinite(n) ? n : null;
-};
+    return Number.isFinite(n) ? n : null;
+}
+
+function safeArray<T>(x: unknown): T[] {
+    return Array.isArray(x) ? (x as T[]) : [];
+}
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="flex flex-col gap-1">
@@ -38,40 +79,73 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
     </div>
 );
 
+type FormState = {
+    title: string;
+    description: string;
+    status: WorkOrderStatus;
+    assetId: string;
+    assignedToPersonId: string;
+    startAt: string; // datetime-local
+    stopAt: string;  // datetime-local
+    defect: string;
+    cause: string;
+    solution: string;
+};
+
 export default function WorkOrderDetailsPage() {
     const { id } = useParams<{ id: string }>();
-    const [loading, setLoading] = useState(false);
+
+    const [loading, setLoading] = useState(false);          // loadAll
+    const [actionLoading, setActionLoading] = useState(false); // save/status
     const [err, setErr] = useState<string | null>(null);
 
-    const [wo, setWo] = useState<WorkOrderDetailsDto | null>(null);
+    const [wo, setWo] = useState<WorkOrderDto | null>(null);
     const [assets, setAssets] = useState<AssetDto[]>([]);
-    const [people, setPeople] = useState<PersonDto[]>([]);
+    const [people, setPeople] = useState<PersonSimpleDto[]>([]);
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<FormState>({
         title: "",
         description: "",
-        status: 1,
+        status: WorkOrderStatus.Open,
         assetId: "",
         assignedToPersonId: "",
         startAt: "",
-        stopAt: ""
+        stopAt: "",
+        defect: "",
+        cause: "",
+        solution: "",
     });
 
-    const canSave = form.title.trim().length >= 2;
+    const canSave = useMemo(() => form.title.trim().length >= 2 && !actionLoading, [form.title, actionLoading]);
+
+    const sortedAssets = useMemo(() => {
+        const a = [...assets];
+        a.sort((x, y) => (x.name || "").localeCompare(y.name || "", "ro"));
+        return a;
+    }, [assets]);
+
+    const sortedPeople = useMemo(() => {
+        const p = [...people];
+        p.sort((x, y) => (x.displayName || "").localeCompare(y.displayName || "", "ro"));
+        return p;
+    }, [people]);
 
     const loadAll = useCallback(async () => {
         if (!id) return;
+
         setLoading(true);
+        setErr(null);
+
         try {
             const [woData, assetsData, peopleData] = await Promise.all([
                 getWorkOrderById(id),
                 getAssets({ take: 500, ia: true }),
-                getPeopleSimple()
+                getPeopleSimple({ take: 500, includeInactive: true }),
             ]);
 
             setWo(woData);
-            setAssets(Array.isArray(assetsData) ? assetsData : []);
-            setPeople(Array.isArray(peopleData) ? peopleData : []);
+            setAssets(safeArray<AssetDto>(assetsData));
+            setPeople(safeArray<PersonSimpleDto>(peopleData));
 
             setForm({
                 title: woData.title || "",
@@ -80,196 +154,415 @@ export default function WorkOrderDetailsPage() {
                 assetId: woData.assetId || "",
                 assignedToPersonId: woData.assignedToPersonId || "",
                 startAt: toLocalInput(woData.startAt),
-                stopAt: toLocalInput(woData.stopAt)
+                stopAt: toLocalInput(woData.stopAt),
+                defect: woData.defect || "",
+                cause: woData.cause || "",
+                solution: woData.solution || "",
             });
-        } catch (e: any) {
-            setErr(e?.message || "Eroare la incarcarea datelor");
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : "Eroare la incarcarea datelor";
+            setErr(msg);
         } finally {
             setLoading(false);
         }
     }, [id]);
 
-    useEffect(() => { loadAll(); }, [loadAll]);
+    useEffect(() => {
+        loadAll();
+    }, [loadAll]);
 
-    async function handleUpdate() {
+    const handleUpdate = useCallback(async () => {
         if (!id) return;
+        if (!canSave) return;
+
+        setActionLoading(true);
+        setErr(null);
+
         try {
-            setErr(null);
             await updateWorkOrder(id, {
-                ...form,
-                startAt: form.startAt ? new Date(form.startAt).toISOString() : null,
-                stopAt: form.stopAt ? new Date(form.stopAt).toISOString() : null,
+                title: form.title.trim(),
+                description: form.description?.trim() ? form.description.trim() : null,
+                status: form.status,
+                assetId: form.assetId || null,
+                assignedToPersonId: form.assignedToPersonId || null,
+                startAt: localToIsoOrNull(form.startAt),
+                stopAt: localToIsoOrNull(form.stopAt),
+                defect: form.defect?.trim() ? form.defect.trim() : null,
+                cause: form.cause?.trim() ? form.cause.trim() : null,
+                solution: form.solution?.trim() ? form.solution.trim() : null,
             });
             await loadAll();
-        } catch (e: any) { setErr(e.message); }
-    }
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : "Eroare la salvare";
+            setErr(msg);
+        } finally {
+            setActionLoading(false);
+        }
+    }, [id, form, loadAll, canSave]);
 
-    async function handleStatusAction(fn: (id: string) => Promise<any>) {
-        if (!id) return;
-        try {
+    const handleStatusAction = useCallback(
+        async (fn: (id: string) => Promise<unknown>) => {
+            if (!id) return;
+            if (actionLoading) return;
+
+            setActionLoading(true);
             setErr(null);
-            await fn(id);
-            await loadAll();
-        } catch (e: any) { setErr(e.message); }
-    }
 
-    if (loading && !wo) return <AppShell title="Incarcare..."><div className="p-8 text-zinc-500">Se incarca...</div></AppShell>;
+            try {
+                await fn(id);
+                await loadAll();
+            } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : "Eroare la schimbare status";
+                setErr(msg);
+            } finally {
+                setActionLoading(false);
+            }
+        },
+        [id, loadAll, actionLoading]
+    );
+
+    if (loading && !wo) {
+        return (
+            <AppShell title="Incarcare...">
+                <div className="p-8 text-zinc-500">Se incarca...</div>
+            </AppShell>
+        );
+    }
 
     return (
         <AppShell title="Detalii Ordin Lucru">
             <PageToolbar
                 left={
                     <div className="flex flex-col">
-                        <Link to="/work-orders" className="text-xs text-teal-500 hover:underline">← Inapoi la lista</Link>
-                        <div className="text-sm font-bold text-zinc-200">#{id?.substring(0, 8)} - {wo?.title}</div>
+                        <Link to="/work-orders" className="text-xs text-teal-500 hover:underline">
+                            ← Inapoi la lista
+                        </Link>
+                        <div className="text-sm font-bold text-zinc-200">
+                            #{id?.substring(0, 8)} - {wo?.title}
+                        </div>
                     </div>
                 }
-                right={<Button onClick={loadAll} variant="ghost" size="sm">Refresh</Button>}
+                right={
+                    <div className="flex gap-2">
+                        <Button onClick={loadAll} variant="ghost" size="sm" disabled={loading || actionLoading}>
+                            Refresh
+                        </Button>
+                        <Button
+                            onClick={() => window.open(`/work-orders/${id}/print`, "_blank")}
+                            variant="ghost"
+                            size="sm"
+                        >
+                            🖨️ Print
+                        </Button>
+                    </div>
+                }
             />
 
-            {err && <ErrorBox message={err} />}
+            {err ? <ErrorBox message={err} onClose={() => setErr(null)} /> : null}
 
-            {wo && (
+            {wo ? (
                 <div className="grid gap-6 pb-20">
-                    <Card title="Informatii Generale">
-                        <div className="mt-4 mb-6">
-                            <WoAssignmentsPanel workOrderId={id!} />
-                        </div>
+                    <Card title="Echipa & Planificare">
+                        <WoAssignmentsPanel workOrderId={id!} />
+                    </Card>
 
+                    <Card title="Informatii Generale">
                         <div className="grid gap-4 lg:grid-cols-12">
-                            <div className="lg:col-span-6">
+                            <div className="lg:col-span-8">
                                 <Field label="Titlu Lucrare">
-                                    <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                    <Input
+                                        value={form.title}
+                                        onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
+                                    />
                                 </Field>
                             </div>
-                            <div className="lg:col-span-3">
+
+                            <div className="lg:col-span-4">
                                 <Field label="Status">
-                                    <Select value={form.status} onChange={e => setForm({ ...form, status: Number(e.target.value) })}>
-                                        <option value={1}>Deschis (Open)</option>
-                                        <option value={2}>In Lucru (In Progress)</option>
-                                        <option value={3}>Inchis (Closed)</option>
-                                        <option value={4}>Anulat (Canceled)</option>
+                                    <Select
+                                        value={form.status}
+                                        onChange={(e) =>
+                                            setForm((s) => ({ ...s, status: Number(e.target.value) as WorkOrderStatus }))
+                                        }
+                                    >
+                                        <option value={WorkOrderStatus.Open}>Deschis (Open)</option>
+                                        <option value={WorkOrderStatus.InProgress}>In Lucru (In Progress)</option>
+                                        <option value={WorkOrderStatus.Done}>Inchis (Done)</option>
+                                        <option value={WorkOrderStatus.Cancelled}>Anulat (Cancelled)</option>
                                     </Select>
                                 </Field>
                             </div>
-                            <div className="lg:col-span-3">
-                                <Field label="Responsabil">
-                                    <Select value={form.assignedToPersonId} onChange={e => setForm({ ...form, assignedToPersonId: e.target.value })}>
+
+                            <div className="lg:col-span-6">
+                                <Field label="Responsabil Principal (Legacy)">
+                                    <Select
+                                        value={form.assignedToPersonId}
+                                        onChange={(e) => setForm((s) => ({ ...s, assignedToPersonId: e.target.value }))}
+                                    >
                                         <option value="">(Nealocat)</option>
-                                        {people.map(p => <option key={p.id} value={p.id}>{p.displayName}</option>)}
+                                        {sortedPeople.map((p) => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.displayName}
+                                            </option>
+                                        ))}
                                     </Select>
                                 </Field>
                             </div>
 
                             <div className="lg:col-span-6">
                                 <Field label="Activ / Echipament">
-                                    <Select value={form.assetId} onChange={e => setForm({ ...form, assetId: e.target.value })}>
+                                    <Select
+                                        value={form.assetId}
+                                        onChange={(e) => setForm((s) => ({ ...s, assetId: e.target.value }))}
+                                    >
                                         <option value="">(Fara activ)</option>
-                                        {assets.map(a => <option key={a.id} value={a.id}>{a.name} {a.code ? `[${a.code}]` : ""}</option>)}
+                                        {sortedAssets.map((a) => (
+                                            <option key={a.id} value={a.id}>
+                                                {a.name} {a.code ? `[${a.code}]` : ""}
+                                            </option>
+                                        ))}
                                     </Select>
                                 </Field>
                             </div>
+
                             <div className="lg:col-span-3">
                                 <Field label="Data Start">
-                                    <input type="datetime-local" className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-zinc-100"
-                                        value={form.startAt} onChange={e => setForm({ ...form, startAt: e.target.value })} />
+                                    <input
+                                        type="datetime-local"
+                                        className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-zinc-100"
+                                        value={form.startAt}
+                                        onChange={(e) => setForm((s) => ({ ...s, startAt: e.target.value }))}
+                                    />
                                 </Field>
                             </div>
+
                             <div className="lg:col-span-3">
                                 <Field label="Data Stop">
-                                    <input type="datetime-local" className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-zinc-100"
-                                        value={form.stopAt} onChange={e => setForm({ ...form, stopAt: e.target.value })} />
+                                    <input
+                                        type="datetime-local"
+                                        className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-zinc-100"
+                                        value={form.stopAt}
+                                        onChange={(e) => setForm((s) => ({ ...s, stopAt: e.target.value }))}
+                                    />
                                 </Field>
                             </div>
 
                             <div className="lg:col-span-12">
                                 <Field label="Descriere Detaliata">
-                                    <textarea rows={3} className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-100"
-                                        value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+                                    <textarea
+                                        rows={6}
+                                        className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-100 placeholder-zinc-600"
+                                        value={form.description}
+                                        onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+                                        placeholder="Descrie lucrarea, pasii de executie, observatii..."
+                                    />
+                                </Field>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 border-t border-white/5 pt-6 grid gap-4 lg:grid-cols-12">
+                            <div className="lg:col-span-12">
+                                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">
+                                    Raport Tehnic (Interventie)
+                                </h3>
+                            </div>
+
+                            <div className="lg:col-span-12">
+                                <Field label="Defect Constatat">
+                                    <textarea
+                                        rows={2}
+                                        className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-100 placeholder-zinc-600"
+                                        value={form.defect}
+                                        onChange={(e) => setForm((s) => ({ ...s, defect: e.target.value }))}
+                                        placeholder="Ce a fost defect..."
+                                    />
+                                </Field>
+                            </div>
+
+                            <div className="lg:col-span-12">
+                                <Field label="Cauza Defectiunii">
+                                    <textarea
+                                        rows={2}
+                                        className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-100 placeholder-zinc-600"
+                                        value={form.cause}
+                                        onChange={(e) => setForm((s) => ({ ...s, cause: e.target.value }))}
+                                        placeholder="De ce s-a intamplat..."
+                                    />
+                                </Field>
+                            </div>
+
+                            <div className="lg:col-span-12">
+                                <Field label="Solutie Aplicata">
+                                    <textarea
+                                        rows={3}
+                                        className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-100 placeholder-zinc-600"
+                                        value={form.solution}
+                                        onChange={(e) => setForm((s) => ({ ...s, solution: e.target.value }))}
+                                        placeholder="Ce s-a facut pentru remediere..."
+                                    />
                                 </Field>
                             </div>
                         </div>
 
                         <div className="mt-6 flex flex-wrap items-center justify-between border-t border-white/5 pt-4 gap-4">
                             <div className="text-[10px] text-zinc-500 uppercase tracking-widest">
-                                Durata automata: <span className="text-zinc-300 font-mono">{wo.durationMinutes || 0} min</span>
+                                Durata automata:{" "}
+                                <span className="text-zinc-300 font-mono">{wo.durationMinutes ?? 0} min</span>
                             </div>
-                            <div className="flex gap-2">
-                                <Button onClick={handleUpdate} disabled={!canSave} variant="primary">Salveaza Modificari</Button>
+
+                            <div className="flex flex-wrap gap-2">
+                                <Button onClick={handleUpdate} disabled={!canSave} variant="primary">
+                                    Salveaza Modificari
+                                </Button>
+
                                 <div className="w-px h-8 bg-white/10 mx-2" />
-                                <Button onClick={() => handleStatusAction(startWorkOrder)} variant="ghost" size="sm">Start</Button>
-                                <Button onClick={() => handleStatusAction(stopWorkOrder)} variant="ghost" size="sm">Stop</Button>
-                                <Button onClick={() => handleStatusAction(reopenWorkOrder)} variant="ghost" size="sm">Redeschide</Button>
+
+                                <Button
+                                    onClick={() => handleStatusAction(startWorkOrder)}
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={actionLoading}
+                                >
+                                    Start
+                                </Button>
+                                <Button
+                                    onClick={() => handleStatusAction(stopWorkOrder)}
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={actionLoading}
+                                >
+                                    Stop
+                                </Button>
+                                <Button
+                                    onClick={() => handleStatusAction(reopenWorkOrder)}
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={actionLoading}
+                                >
+                                    Redeschide
+                                </Button>
+                                <Button
+                                    onClick={() => handleStatusAction(cancelWorkOrder)}
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={actionLoading}
+                                >
+                                    Anuleaza
+                                </Button>
                             </div>
                         </div>
                     </Card>
 
-                    {/* Sectiune Piese */}
-                    <PartsManager workOrderId={id!} assetId={form.assetId} />
-
-                    {/* Sectiune Timp Lucrat (Log-uri) */}
+                    <PartsManager workOrderId={id!} disabled={actionLoading} />
                     <LaborLogsManager workOrderId={id!} />
                 </div>
-            )}
+            ) : null}
         </AppShell>
     );
 }
 
-// --- Componenta interna PartsManager (neschimbata, inclusa pentru context) ---
-function PartsManager({ workOrderId, assetId }: { workOrderId: string, assetId?: string }) {
+// ---------------- PartsManager ----------------
+function PartsManager({ workOrderId, disabled }: { workOrderId: string; disabled?: boolean }) {
     const [woParts, setWoParts] = useState<WorkOrderPartDto[]>([]);
     const [catalog, setCatalog] = useState<PartDto[]>([]);
     const [search, setSearch] = useState("");
     const [selectedPartId, setSelectedPartId] = useState("");
     const [qty, setQty] = useState("1");
     const [loading, setLoading] = useState(false);
+    const [err, setErr] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
         setLoading(true);
+        setErr(null);
         try {
             const [saved, all] = await Promise.all([
                 getWorkOrderParts(workOrderId),
-                getParts({ take: 50, q: search || undefined, assetId: assetId || undefined })
+                getParts({ take: 50, q: search || undefined, ia: true }),
             ]);
-            setWoParts(saved);
-            setCatalog(all);
-        } finally { setLoading(false); }
-    }, [workOrderId, search, assetId]);
+            setWoParts(safeArray<WorkOrderPartDto>(saved));
+            setCatalog(safeArray<PartDto>(all));
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : "Eroare la incarcarea pieselor";
+            setErr(msg);
+            setWoParts([]);
+            setCatalog([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [workOrderId, search]);
 
-    useEffect(() => { loadData(); }, [loadData]);
-
-    const handleAdd = async () => {
-        const n = parseQty(qty);
-        if (!selectedPartId || !n) return;
-        await addWorkOrderPart(workOrderId, selectedPartId, n);
-        setQty("1");
-        setSelectedPartId("");
+    useEffect(() => {
         loadData();
-    };
+    }, [loadData]);
+
+    const handleAdd = useCallback(async () => {
+        const n = parseQty(qty);
+        if (!selectedPartId || !n || n <= 0) return;
+
+        setLoading(true);
+        setErr(null);
+        try {
+            await addWorkOrderPart(workOrderId, selectedPartId, n);
+            setQty("1");
+            setSelectedPartId("");
+            await loadData();
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : "Eroare la adaugare piesa";
+            setErr(msg);
+        } finally {
+            setLoading(false);
+        }
+    }, [qty, selectedPartId, workOrderId, loadData]);
 
     return (
         <Card title="Piese Utilizate">
+            {err ? <ErrorBox message={err} onClose={() => setErr(null)} /> : null}
+
             <div className="grid gap-4 sm:grid-cols-12 items-end mb-6">
                 <div className="sm:col-span-4">
                     <Field label="Cauta in Catalog">
-                        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nume sau cod..." />
+                        <Input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Nume sau cod..."
+                            disabled={disabled}
+                        />
                     </Field>
                 </div>
+
                 <div className="sm:col-span-5">
                     <Field label="Selecteaza Piesa">
-                        <Select value={selectedPartId} onChange={e => setSelectedPartId(e.target.value)}>
+                        <Select
+                            value={selectedPartId}
+                            onChange={(e) => setSelectedPartId(e.target.value)}
+                            disabled={disabled}
+                        >
                             <option value="">-- Alege piesa --</option>
-                            {catalog.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
+                            {catalog.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                    {p.name}
+                                    {p.code ? ` (${p.code})` : ""}
+                                </option>
+                            ))}
                         </Select>
                     </Field>
                 </div>
+
                 <div className="sm:col-span-2">
                     <Field label="Cantitate">
-                        <Input value={qty} onChange={e => setQty(e.target.value)} />
+                        <Input value={qty} onChange={(e) => setQty(e.target.value)} disabled={disabled} />
                     </Field>
                 </div>
+
                 <div className="sm:col-span-1">
-                    <Button onClick={handleAdd} variant="primary" className="w-full">Add</Button>
+                    <Button
+                        onClick={handleAdd}
+                        variant="primary"
+                        className="w-full"
+                        disabled={disabled || loading}
+                    >
+                        Add
+                    </Button>
                 </div>
             </div>
 
@@ -284,32 +577,56 @@ function PartsManager({ workOrderId, assetId }: { workOrderId: string, assetId?:
                         </tr>
                     </thead>
                     <tbody>
-                        {woParts.map(p => (
+                        {woParts.map((p) => (
                             <tr key={p.id} className="border-b border-white/5 hover:bg-white/5">
                                 <td className="p-3 font-medium text-zinc-200">{p.partName}</td>
                                 <td className="p-3 text-zinc-500">{p.partCode}</td>
                                 <td className="p-3">
                                     <input
+                                        key={p.qtyUsed} // Force re-render if backend value mismatches (e.g. revert)
                                         className="w-20 mx-auto block bg-zinc-900 border border-white/10 rounded px-2 py-1 text-center"
-                                        defaultValue={p.qtyUsed}
+                                        defaultValue={String(p.qtyUsed)}
+                                        disabled={disabled || loading}
                                         onBlur={async (e) => {
                                             const val = parseQty(e.target.value);
-                                            if (val !== null) {
-                                                await setWorkOrderPartQty(workOrderId, p.id, val);
+                                            try {
+                                                if (val !== null && val > 0) {
+                                                    // Optimization: don't call API if value hasn't changed
+                                                    if (val === p.qtyUsed) return;
+
+                                                    await setWorkOrderPartQty(workOrderId, p.id, val);
+                                                }
+                                            } catch (err: any) {
+                                                setErr(err instanceof Error ? err.message : "Eroare la actualizare stoc");
+                                            } finally {
+                                                // Always reload to ensure UI matches backend (e.g. revert on error)
                                                 loadData();
                                             }
                                         }}
                                     />
                                 </td>
                                 <td className="p-3 text-right">
-                                    <button className="text-red-400 hover:text-red-300 text-xs"
-                                        onClick={async () => { if (confirm("Stergi piesa?")) { await deleteWorkOrderPart(workOrderId, p.id); loadData(); } }}>
+                                    <button
+                                        className="text-red-400 hover:text-red-300 text-xs disabled:opacity-50"
+                                        disabled={disabled || loading}
+                                        onClick={async () => {
+                                            if (!window.confirm("Stergi piesa?")) return;
+                                            try {
+                                                await deleteWorkOrderPart(workOrderId, p.id);
+                                            } catch (err: any) {
+                                                setErr(err instanceof Error ? err.message : "Eroare la stergere piesa");
+                                            } finally {
+                                                loadData();
+                                            }
+                                        }}
+                                    >
                                         Sterge
                                     </button>
                                 </td>
                             </tr>
                         ))}
-                        {woParts.length === 0 && <EmptyRow colSpan={4} text="Nu exista piese inregistrate." />}
+
+                        {woParts.length === 0 ? <EmptyRow colSpan={4} text={loading ? "Se incarca..." : "Nu exista piese inregistrate."} /> : null}
                     </tbody>
                 </table>
             </TableShell>

@@ -34,22 +34,23 @@ public sealed class WorkOrderPartsController : ControllerBase
         var ok = await _db.WorkOrders.AsNoTracking().AnyAsync(x => x.Id == workOrderId);
         if (!ok) return NotFound("work order not found");
 
-        var items = await _db.WorkOrderParts.AsNoTracking()
+        var entities = await _db.WorkOrderParts.AsNoTracking()
+            .Include(x => x.Part)
             .Where(x => x.WorkOrderId == workOrderId)
-            .Join(_db.Parts.AsNoTracking(),
-                wop => wop.PartId,
-                p => p.Id,
-                (wop, p) => new WoPartDto(
-                    wop.Id,
-                    wop.WorkOrderId,
-                    wop.PartId,
-                    p.Name,
-                    p.Code,
-                    p.Uom,
-                    wop.QtyUsed
-                ))
-            .OrderBy(x => x.PartName)
             .ToListAsync();
+
+        var items = entities
+            .Select(wop => new WoPartDto(
+                wop.Id,
+                wop.WorkOrderId,
+                wop.PartId,
+                wop.Part?.Name ?? "Unknown",
+                wop.Part?.Code,
+                wop.Part?.Uom,
+                wop.QtyUsed
+            ))
+            .OrderBy(x => x.PartName)
+            .ToList();
 
         return Ok(items);
     }

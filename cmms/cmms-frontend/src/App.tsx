@@ -14,6 +14,9 @@ import DashboardPage from "./pages/DashboardPage";
 import PeoplePage from "./pages/PeoplePage";
 import RolesPage from "./pages/RolesPage";
 import CalendarPage from "./pages/CalendarPage";
+import ExtraJobsPage from "./pages/ExtraJobsPage";
+import WorkOrderPrintPage from "./pages/WorkOrderPrintPage";
+import ReportsPage from "./pages/ReportsPage";
 
 export default function App() {
     return (
@@ -47,10 +50,26 @@ export default function App() {
                 }
             />
             <Route
+                path="/work-orders/:id/print"
+                element={
+                    <RequireAuth>
+                        <WorkOrderPrintPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
                 path="/calendar"
                 element={
                     <RequireAuth>
                         <CalendarPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/extra-jobs"
+                element={
+                    <RequireAuth>
+                        <ExtraJobsPage />
                     </RequireAuth>
                 }
             />
@@ -113,6 +132,14 @@ export default function App() {
                 element={
                     <RequireAuth>
                         <RolesPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/reports"
+                element={
+                    <RequireAuth>
+                        <ReportsPage />
                     </RequireAuth>
                 }
             />

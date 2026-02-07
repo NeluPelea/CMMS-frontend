@@ -87,19 +87,19 @@ function KpiCard(props: {
     tone === "good"
       ? "bg-emerald-400"
       : tone === "warn"
-      ? "bg-amber-400"
-      : tone === "bad"
-      ? "bg-rose-400"
-      : "bg-teal-400";
+        ? "bg-amber-400"
+        : tone === "bad"
+          ? "bg-rose-400"
+          : "bg-teal-400";
 
   const valueColor =
     tone === "good"
       ? "text-emerald-200"
       : tone === "warn"
-      ? "text-amber-200"
-      : tone === "bad"
-      ? "text-rose-200"
-      : "text-teal-200";
+        ? "text-amber-200"
+        : tone === "bad"
+          ? "text-rose-200"
+          : "text-teal-200";
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -161,20 +161,27 @@ export default function DashboardPage() {
       ]);
       setKpis(k);
       setAssetsMaint(am);
-    } catch (e: any) {
-      setErr(e?.message ?? String(e));
+    } catch (e) {
+      if (e && typeof e === "object") {
+        const r = e as Record<string, unknown>;
+        if (typeof r.message === "string") setErr(r.message);
+        else setErr(String(e));
+      } else {
+        setErr(String(e));
+      }
     }
   }
 
   async function loadPeople() {
     try {
       const ps = await getPeople();
-      setPeople(ps);
+      // getPeople returns PersonSimpleDto[] which matches PersonDto shape used here
+      setPeople(ps as unknown as PersonDto[]);
       if (!personId && ps.length > 0) {
         setPersonId(ps[0].id);
       }
-    } catch {
-      // non blocking
+    } catch (err) {
+      console.error("Failed to load people", err);
     }
   }
 
@@ -182,8 +189,8 @@ export default function DashboardPage() {
     try {
       const a = await getPersonActivity(pid, p);
       setActivity(a);
-    } catch {
-      // non blocking
+    } catch (err) {
+      console.error("Failed to load person activity", err);
     }
   }
 
@@ -261,7 +268,7 @@ export default function DashboardPage() {
 
             <select
               value={period}
-              onChange={(e) => setPeriod(e.target.value as any)}
+              onChange={(e) => setPeriod(e.target.value as "week" | "month" | "quarter")}
               className="h-10 rounded-xl border border-white/10 bg-zinc-900/60 px-3 text-sm text-zinc-100"
             >
               <option value="week">Saptamana</option>
@@ -286,61 +293,61 @@ export default function DashboardPage() {
       </div>
 
       {/* Assets in maintenance */}
-<div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-  <div className="mb-2 text-sm font-semibold text-zinc-200">
-    Utilaje in mentenanta
-  </div>
-  <div className="mb-3 text-xs text-zinc-400">
-    Utilaje cu Work Order InProgress
-  </div>
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="mb-2 text-sm font-semibold text-zinc-200">
+          Utilaje in mentenanta
+        </div>
+        <div className="mb-3 text-xs text-zinc-400">
+          Utilaje cu Work Order InProgress
+        </div>
 
-  <div className="overflow-x-auto">
-    <table className="w-full border-collapse text-sm">
-      <thead className="bg-white/5 text-zinc-300">
-        <tr>
-          <th className="px-3 py-2 text-left font-semibold">Utilaj</th>
-          <th className="px-3 py-2 text-left font-semibold">Locatie</th>
-          <th className="px-3 py-2 text-left font-semibold">Work Order</th>
-          <th className="px-3 py-2 text-left font-semibold">Asignat</th>
-          <th className="px-3 py-2 text-left font-semibold">Start</th>
-        </tr>
-      </thead>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-white/5 text-zinc-300">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold">Utilaj</th>
+                <th className="px-3 py-2 text-left font-semibold">Locatie</th>
+                <th className="px-3 py-2 text-left font-semibold">Work Order</th>
+                <th className="px-3 py-2 text-left font-semibold">Asignat</th>
+                <th className="px-3 py-2 text-left font-semibold">Start</th>
+              </tr>
+            </thead>
 
-      <tbody className="divide-y divide-white/10">
-        {assetsMaint.map((x) => (
-          <tr key={x.assetId} className="hover:bg-white/5">
-            <td className="px-3 py-2 text-zinc-100">
-              {x.assetName}
-            </td>
-            <td className="px-3 py-2 text-zinc-300">
-              {x.locationName ?? "-"}
-            </td>
-            <td className="px-3 py-2 text-zinc-300">
-              {x.workOrderTitle}
-            </td>
-            <td className="px-3 py-2 text-zinc-300">
-              {x.assignedToName ?? "-"}
-            </td>
-            <td className="px-3 py-2 text-zinc-300">
-              {fmtDate(x.startAt)}
-            </td>
-          </tr>
-        ))}
+            <tbody className="divide-y divide-white/10">
+              {assetsMaint.map((x) => (
+                <tr key={x.assetId} className="hover:bg-white/5">
+                  <td className="px-3 py-2 text-zinc-100">
+                    {x.assetName}
+                  </td>
+                  <td className="px-3 py-2 text-zinc-300">
+                    {x.locationName ?? "-"}
+                  </td>
+                  <td className="px-3 py-2 text-zinc-300">
+                    {x.workOrderTitle}
+                  </td>
+                  <td className="px-3 py-2 text-zinc-300">
+                    {x.assignedToName ?? "-"}
+                  </td>
+                  <td className="px-3 py-2 text-zinc-300">
+                    {fmtDate(x.startAt)}
+                  </td>
+                </tr>
+              ))}
 
-        {assetsMaint.length === 0 && (
-          <tr>
-            <td
-              colSpan={5}
-              className="px-3 py-4 text-zinc-400"
-            >
-              Nu exista utilaje cu WO InProgress.
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
-</div>
+              {assetsMaint.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-3 py-4 text-zinc-400"
+                  >
+                    Nu exista utilaje cu WO InProgress.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
     </AppShell>
   );

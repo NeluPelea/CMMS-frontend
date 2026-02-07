@@ -1,16 +1,24 @@
 // src/api/assets.ts
 import { apiFetch } from "./http";
 
+/**
+ * Asset DTO as used by the frontend.
+ * - Aligns with usage in WorkOrdersPage: filtering by locId
+ * - Avoids implicit any and keeps nullability explicit
+ */
 export type AssetDto = {
     id: string;
     name: string;
-    code?: string;
-    locId?: string; // Ne asigurăm că este definit clar ca string opțional
-    locName?: string;
-    isAct?: boolean;
+    code?: string | null;
+
+    // Location (flat fields used by your UI filters)
+    locId?: string | null;
+    locName?: string | null;
+
+    // Active flag
+    isAct: boolean;
 };
 
-// Interfață pentru parametri pentru a evita 'any' implicit
 export interface GetAssetsParams {
     q?: string;
     locId?: string;
@@ -18,15 +26,23 @@ export interface GetAssetsParams {
     ia?: boolean;
 }
 
-export async function getAssets(params?: GetAssetsParams): Promise<AssetDto[]> {
+/**
+ * GET /api/as
+ * Query params:
+ * - q: search
+ * - locId: filter by location
+ * - take: limit
+ * - ia: include inactive (true)
+ */
+export async function getAssets(params: GetAssetsParams = {}): Promise<AssetDto[]> {
     const qs = new URLSearchParams();
-    if (params?.q) qs.set("q", params.q);
-    if (params?.locId) qs.set("locId", params.locId);
-    if (params?.take != null) qs.set("take", String(params.take));
-    if (params?.ia) qs.set("ia", "true");
+
+    if (params.q?.trim()) qs.set("q", params.q.trim());
+    if (params.locId) qs.set("locId", params.locId);
+    if (typeof params.take === "number") qs.set("take", String(params.take));
+    if (params.ia) qs.set("ia", "true");
 
     const tail = qs.toString() ? `?${qs.toString()}` : "";
-    // Am păstrat ruta /api/as conform codului tău original
     return apiFetch<AssetDto[]>(`/api/as${tail}`, { method: "GET" });
 }
 
@@ -36,18 +52,26 @@ export interface CreateAssetRequest {
     locId?: string | null;
 }
 
+/**
+ * POST /api/as
+ */
 export async function createAsset(req: CreateAssetRequest): Promise<AssetDto> {
+    const name = req.name.trim();
+    if (name.length < 2) throw new Error("Asset name too short.");
+
     return apiFetch<AssetDto>(`/api/as`, {
         method: "POST",
         body: JSON.stringify({
-            name: req.name,
+            name,
             code: req.code ?? null,
             locId: req.locId ?? null,
         }),
     });
 }
 
+/**
+ * DELETE /api/as/{id}
+ */
 export async function deleteAsset(id: string): Promise<void> {
-    // Schimbat din null în void pentru consistență cu standardele de fetch
-    return apiFetch<void>(`/api/as/${id}`, { method: "DELETE" });
+    await apiFetch<void>(`/api/as/${id}`, { method: "DELETE" });
 }

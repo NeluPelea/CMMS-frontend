@@ -7,8 +7,19 @@ export type RoleDto = {
     sortOrder: number;
 };
 
-export async function getRoles(): Promise<RoleDto[]> {
-    return await apiFetch<RoleDto[]>("/api/roles", { method: "GET" });
+export type GetRolesParams = {
+    take?: number;
+    includeInactive?: boolean;
+    q?: string;
+};
+
+export async function getRoles(params?: GetRolesParams): Promise<RoleDto[]> {
+    const qs = new URLSearchParams();
+    if (params?.take != null) qs.set("take", String(Math.max(1, Math.floor(params.take))));
+    if (params?.includeInactive) qs.set("includeInactive", "1");
+    if (params?.q) qs.set("q", params.q);
+    const tail = qs.toString() ? `?${qs.toString()}` : "";
+    return await apiFetch<RoleDto[]>(`/api/roles${tail}`, { method: "GET" });
 }
 
 export async function createRole(name: string, sortOrder = 0): Promise<RoleDto> {

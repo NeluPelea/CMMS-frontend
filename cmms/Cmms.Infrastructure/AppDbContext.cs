@@ -33,9 +33,52 @@ public sealed class AppDbContext : DbContext
     public DbSet<WorkOrderPart> WorkOrderParts => Set<WorkOrderPart>();
     public DbSet<AssetPart> AssetParts => Set<AssetPart>();
 
+    public DbSet<WorkOrderEvent> WorkOrderEvents => Set<WorkOrderEvent>();
+    public DbSet<FileAttachment> FileAttachments => Set<FileAttachment>();
+    public DbSet<WorkOrderLabor> WorkOrderLaborLogs => Set<WorkOrderLabor>();
+    public DbSet<ExtraJob> ExtraJobs => Set<ExtraJob>();
+
+
     protected override void OnModelCreating(ModelBuilder b)
+
     {
         base.OnModelCreating(b);
+
+        b.Entity<FileAttachment>(e =>
+        {
+            e.ToTable("FileAttachments");
+            e.HasKey(x => x.Id);
+            
+            e.HasOne(x => x.WorkOrder)
+                .WithMany(w => w.Attachments)
+                .HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(x => x.FileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.StoredFileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100);
+        });
+
+        b.Entity<WorkOrderEvent>(e =>
+        {
+            e.ToTable("work_order_events");
+            e.HasKey(x => x.Id);
+
+            e.Property(x => x.ActorId).HasMaxLength(200);
+            e.Property(x => x.Field).HasMaxLength(80);
+            e.Property(x => x.OldValue).HasMaxLength(400);
+            e.Property(x => x.NewValue).HasMaxLength(400);
+            e.Property(x => x.Message).HasMaxLength(2000);
+
+            e.HasIndex(x => new { x.WorkOrderId, x.CreatedAtUtc });
+            e.HasIndex(x => x.CreatedAtUtc);
+
+            e.HasOne(x => x.WorkOrder)
+              .WithMany() // nu adaugam navigation pe WorkOrder (optional)
+              .HasForeignKey(x => x.WorkOrderId)
+              .OnDelete(DeleteBehavior.Cascade);
+        });
+
 
         // ---------------- Index / existing ----------------
         b.Entity<Location>().HasIndex(x => x.Name);

@@ -64,6 +64,7 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
 
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<Cmms.Api.Services.PeopleAvailability>();
+builder.Services.AddHostedService<Cmms.Api.Services.PmBackgroundService>();
 
 // ---------------------------------------------------------
 // 4. SECURITATE JWT (UTF-8 Enforced)

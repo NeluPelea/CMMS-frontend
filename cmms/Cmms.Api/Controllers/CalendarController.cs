@@ -20,14 +20,13 @@ public sealed class CalendarController : ControllerBase
     [HttpGet("holidays")]
     public async Task<ActionResult<List<DayDto>>> ListHolidays([FromQuery] int? year = null, CancellationToken ct = default)
     {
-        var q = _db.NationalHolidays.AsNoTracking();
+        var q = _db.NationalHolidays.AsNoTracking().Where(x => x.IsAct);
 
         if (year.HasValue && year.Value >= 2000 && year.Value <= 2100)
         {
             var y = year.Value;
             q = q.Where(x => x.Date.Year == y);
         }
-
         var items = await q
             .OrderBy(x => x.Date)
             .Select(x => new DayDto { Date = x.Date, Name = x.Name })
@@ -64,11 +63,67 @@ public sealed class CalendarController : ControllerBase
             return BadRequest("Invalid date. Use yyyy-MM-dd.");
 
         var d = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
-
         var e = await _db.NationalHolidays.FirstOrDefaultAsync(x => x.Date == d, ct);
         if (e == null) return NotFound();
 
-        _db.NationalHolidays.Remove(e);
+        // soft delete
+        if (e.IsAct)
+        {
+            e.IsAct = false;
+            await _db.SaveChangesAsync(ct);
+        }
+
+        return NoContent();
+    }
+
+    // PUT /api/calendar/holidays/{date}
+    [HttpPut("holidays/{date}")]
+    public async Task<IActionResult> UpdateHoliday(string date, [FromBody] AddDayReq req, CancellationToken ct)
+    {
+        if (!DateTime.TryParse(date, out var parsed))
+            return BadRequest("Invalid date. Use yyyy-MM-dd.");
+
+        var oldD = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
+        var newD = DateTime.SpecifyKind(req.Date.Date, DateTimeKind.Utc);
+        var name = string.IsNullOrWhiteSpace(req.Name) ? null : req.Name.Trim();
+
+        var e = await _db.NationalHolidays.FirstOrDefaultAsync(x => x.Date == oldD, ct);
+        if (e == null) return NotFound();
+
+        if (newD != oldD)
+        {
+            var exists = await _db.NationalHolidays.AnyAsync(x => x.Date == newD, ct);
+            if (exists) return Conflict("Holiday already exists for that new date.");
+            e.Date = newD;
+        }
+
+        e.Name = name;
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    // PUT /api/calendar/blackouts/{date}
+    [HttpPut("blackouts/{date}")]
+    public async Task<IActionResult> UpdateBlackout(string date, [FromBody] AddDayReq req, CancellationToken ct)
+    {
+        if (!DateTime.TryParse(date, out var parsed))
+            return BadRequest("Invalid date. Use yyyy-MM-dd.");
+
+        var oldD = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
+        var newD = DateTime.SpecifyKind(req.Date.Date, DateTimeKind.Utc);
+        var name = string.IsNullOrWhiteSpace(req.Name) ? null : req.Name.Trim();
+
+        var e = await _db.CompanyBlackoutDays.FirstOrDefaultAsync(x => x.Date == oldD, ct);
+        if (e == null) return NotFound();
+
+        if (newD != oldD)
+        {
+            var exists = await _db.CompanyBlackoutDays.AnyAsync(x => x.Date == newD, ct);
+            if (exists) return Conflict("Blackout already exists for that new date.");
+            e.Date = newD;
+        }
+
+        e.Name = name;
         await _db.SaveChangesAsync(ct);
         return NoContent();
     }
@@ -79,7 +134,7 @@ public sealed class CalendarController : ControllerBase
     [HttpGet("blackouts")]
     public async Task<ActionResult<List<DayDto>>> ListBlackouts([FromQuery] int? year = null, CancellationToken ct = default)
     {
-        var q = _db.CompanyBlackoutDays.AsNoTracking();
+        var q = _db.CompanyBlackoutDays.AsNoTracking().Where(x => x.IsAct);
 
         if (year.HasValue && year.Value >= 2000 && year.Value <= 2100)
         {
@@ -123,12 +178,16 @@ public sealed class CalendarController : ControllerBase
             return BadRequest("Invalid date. Use yyyy-MM-dd.");
 
         var d = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
-
         var e = await _db.CompanyBlackoutDays.FirstOrDefaultAsync(x => x.Date == d, ct);
         if (e == null) return NotFound();
 
-        _db.CompanyBlackoutDays.Remove(e);
-        await _db.SaveChangesAsync(ct);
+        // soft delete
+        if (e.IsAct)
+        {
+            e.IsAct = false;
+            await _db.SaveChangesAsync(ct);
+        }
+
         return NoContent();
     }
 

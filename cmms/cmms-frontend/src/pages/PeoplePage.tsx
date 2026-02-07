@@ -1,13 +1,7 @@
 // src/pages/PeoplePage.tsx
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
-import {
-    activatePerson,
-    createPerson,
-    deactivatePerson,
-    getPeoplePaged,
-    type PersonDto,
-} from "../api";
+import { createPerson, getPeoplePaged, updatePerson, type PersonDto } from "../api";
 import {
     Button,
     Card,
@@ -18,7 +12,7 @@ import {
     Pill,
     Select,
     TableShell,
-    cx,
+    IconButton,
 } from "../components/ui";
 
 function FieldLabel(props: { children: React.ReactNode }) {
@@ -47,6 +41,8 @@ export default function PeoplePage() {
     const [specialization, setSpecialization] = useState("");
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
+    // edit state
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     const canCreate = useMemo(() => fullName.trim().length >= 3, [fullName]);
 
@@ -88,10 +84,15 @@ export default function PeoplePage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [q]);
 
-    async function onCreate() {
+    async function onSubmit() {
         if (!canCreate) return;
         setErr(null);
         try {
+            if (editingId) {
+                await handleSave(editingId);
+                return;
+            }
+
             await createPerson({
                 fullName: fullName.trim(),
                 jobTitle: jobTitle.trim() || "",
@@ -111,23 +112,70 @@ export default function PeoplePage() {
             setSkip(0);
             await load();
         } catch (e: any) {
-            setErr(e?.message || "Eroare la crearea persoanei.");
+            setErr(e?.message || "Eroare la salvarea datelor.");
         }
     }
 
-    async function onToggleActive(p: PersonDto) {
+    function startEdit(p: PersonDto) {
+        setEditingId(p.id);
+        setFullName(p.fullName || "");
+        setJobTitle(p.jobTitle || "");
+        setSpecialization(p.specialization || "");
+        setPhone(p.phone || "");
+        setEmail(p.email || "");
+    }
+
+    function cancelEdit() {
+        setEditingId(null);
+        setFullName("");
+        setJobTitle("");
+        setSpecialization("");
+        setPhone("");
+        setEmail("");
+    }
+
+    async function handleSave(id: string) {
         setErr(null);
         try {
-            if (p.isActive) {
-                await deactivatePerson(p.id);
-            } else {
-                await activatePerson(p.id);
-            }
+            await updatePerson(id, {
+                fullName: fullName.trim(),
+                displayName: fullName.trim(),
+                jobTitle: jobTitle.trim(),
+                specialization: specialization.trim(),
+                phone: phone.trim(),
+                email: email.trim() || null,
+                isActive: true,
+            });
+
+            cancelEdit();
             await load();
         } catch (e: any) {
-            setErr("Eroare la schimbarea statusului.");
+            setErr(e?.message || "Eroare la salvarea persoanei.");
         }
     }
+
+    async function handleDelete(id: string) {
+        if (!confirm("Sigur ștergi (soft) persoana?")) return;
+        setErr(null);
+        try {
+            await updatePerson(id, {
+                fullName: fullName.trim() || "",
+                displayName: fullName.trim() || "",
+                jobTitle: jobTitle.trim() || "",
+                specialization: specialization.trim() || "",
+                phone: phone.trim() || "",
+                email: email.trim() || null,
+                isActive: false,
+            });
+            // If deleting the currently edited person, cancel edit
+            if (editingId === id) cancelEdit();
+            await load();
+        } catch (e: any) {
+            setErr(e?.message || "Eroare la ștergerea persoanei.");
+        }
+    }
+
+    // status toggle handled via Delete (soft-delete) button
 
     const pageFrom = skip + 1;
     const pageTo = Math.min(skip + take, total);
@@ -201,10 +249,19 @@ export default function PeoplePage() {
                         />
                     </div>
 
-                    <div className="lg:col-span-8 flex items-end justify-end">
-                        <Button onClick={onCreate} disabled={!canCreate || loading} variant="primary">
-                            {loading ? "Se creează..." : "Adaugă Persoană"}
-                        </Button>
+                    <div className="lg:col-span-8 flex items-end justify-end gap-2">
+                        {editingId ? (
+                            <>
+                                <Button variant="ghost" onClick={cancelEdit} disabled={loading}>Cancel</Button>
+                                <Button onClick={onSubmit} disabled={!canCreate || loading} variant="primary">
+                                    {loading ? "Se salvează..." : "Salvează"}
+                                </Button>
+                            </>
+                        ) : (
+                            <Button onClick={onSubmit} disabled={!canCreate || loading} variant="primary">
+                                {loading ? "Se creează..." : "Adaugă Persoană"}
+                            </Button>
+                        )}
                     </div>
                 </div>
             </Card>
@@ -292,40 +349,72 @@ export default function PeoplePage() {
                                     </tr>
                                 ) : null}
 
-                                {items.map((p) => (
-                                    <tr key={p.id} className="hover:bg-white/5 transition-colors">
-                                        <td className="px-3 py-2 text-zinc-100">
-                                            <div className="font-semibold">{p.fullName}</div>
-                                            <div className="text-[10px] uppercase tracking-tighter text-zinc-500 font-mono">
-                                                ID: {p.id.substring(0, 8)}...
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-2 text-zinc-200">{p.jobTitle || "—"}</td>
-                                        <td className="px-3 py-2 text-zinc-200">{p.specialization || "—"}</td>
-                                        <td className="px-3 py-2 text-zinc-200">
-                                            <div className="text-xs">{p.phone || "—"}</div>
-                                            <div className="text-[11px] text-zinc-500">{p.email || ""}</div>
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <Pill tone={p.isActive ? "teal" : "zinc"}>
-                                                {p.isActive ? "Activ" : "Inactiv"}
-                                            </Pill>
-                                        </td>
-                                        <td className="px-3 py-2 text-right">
-                                            <button
-                                                onClick={() => onToggleActive(p)}
-                                                className={cx(
-                                                    "rounded-lg px-3 py-1.5 text-xs font-semibold ring-1 transition-all",
-                                                    p.isActive
-                                                        ? "bg-red-500/10 text-red-400 ring-red-500/20 hover:bg-red-500/20"
-                                                        : "bg-teal-500/10 text-teal-400 ring-teal-500/20 hover:bg-teal-500/20"
+                                {items.map((p) => {
+                                    const isEditing = editingId === p.id;
+                                    return (
+                                        <tr key={p.id} className="hover:bg-white/5 transition-colors">
+                                            <td className="px-3 py-2 text-zinc-100">
+                                                <div className="font-semibold">
+                                                    {isEditing ? (
+                                                        <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                                                    ) : (
+                                                        p.fullName
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] uppercase tracking-tighter text-zinc-500 font-mono">
+                                                    ID: {p.id.substring(0, 8)}...
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-2 text-zinc-200">
+                                                {isEditing ? (
+                                                    <Input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
+                                                ) : (
+                                                    p.jobTitle || "—"
                                                 )}
-                                            >
-                                                {p.isActive ? "Dezactivează" : "Activează"}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                            </td>
+                                            <td className="px-3 py-2 text-zinc-200">
+                                                {isEditing ? (
+                                                    <Input value={specialization} onChange={(e) => setSpecialization(e.target.value)} />
+                                                ) : (
+                                                    p.specialization || "—"
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2 text-zinc-200">
+                                                {isEditing ? (
+                                                    <div>
+                                                        <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+                                                        <div className="mt-1">
+                                                            <Input value={email} onChange={(e) => setEmail(e.target.value)} />
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="text-xs">{p.phone || "—"}</div>
+                                                        <div className="text-[11px] text-zinc-500">{p.email || ""}</div>
+                                                    </>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <Pill tone={p.isActive ? "teal" : "zinc"}>{p.isActive ? "Activ" : "Inactiv"}</Pill>
+                                            </td>
+                                            <td className="px-3 py-2 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {isEditing ? (
+                                                        <>
+                                                            <Button variant="ghost" onClick={cancelEdit}>Cancel</Button>
+                                                            <Button variant="primary" onClick={() => handleSave(p.id)}>Save</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Button variant="ghost" onClick={() => startEdit(p)}>Modifica</Button>
+                                                            <IconButton aria-label="Delete" variant="danger" onClick={() => handleDelete(p.id)}>🗑️</IconButton>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
 
                                 {!loading && items.length === 0 ? (
                                     <EmptyRow colSpan={6} text="Nu a fost găsită nicio persoană." />

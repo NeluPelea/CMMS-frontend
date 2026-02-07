@@ -38,4 +38,21 @@ export async function deleteWoAssignment(workOrderId: string, assignmentId: stri
     await apiFetch<void>(`/api/work-orders/${workOrderId}/assignments/${assignmentId}`, { method: "DELETE" });
 }
 
-// Am eliminat getAvailablePeople de aici deoarece exista deja in people.ts
+export type UpdateAssignmentReq = {
+    personId: string;
+    roleId: string;
+    plannedFrom: string;
+    plannedTo: string;
+    notes?: string;
+};
+
+export async function updateWoAssignment(
+    workOrderId: string,
+    assignmentId: string,
+    req: UpdateAssignmentReq
+): Promise<AssignmentDto> {
+    return apiFetch<AssignmentDto>(`/api/work-orders/${workOrderId}/assignments/${assignmentId}`, {
+        method: "PUT",
+        body: JSON.stringify(req),
+    });
+}
