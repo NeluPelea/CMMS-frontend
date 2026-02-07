@@ -43,16 +43,16 @@ public sealed class PeopleController : ControllerBase
         take = Math.Clamp(take, MinTake, MaxTake);
         skip = Math.Max(0, skip);
 
-        IQueryable<Person> query = _db.People.AsNoTracking();
+        IQueryable<Person> baseQ = _db.People.AsNoTracking();
 
         if (!includeInactive)
-            query = query.Where(p => p.IsActive);
+            baseQ = baseQ.Where(p => p.IsActive);
 
         q = (q ?? "").Trim();
         if (q.Length > 0)
         {
             var pattern = $"%{q}%";
-            query = query.Where(p =>
+            baseQ = baseQ.Where(p =>
                 EF.Functions.ILike(p.FullName ?? "", pattern) ||
                 EF.Functions.ILike(p.DisplayName ?? "", pattern) ||
                 EF.Functions.ILike(p.JobTitle ?? "", pattern) ||
@@ -61,15 +61,53 @@ public sealed class PeopleController : ControllerBase
                 EF.Functions.ILike(p.Email ?? "", pattern));
         }
 
-        var total = await query.CountAsync(ct);
+        var total = await baseQ.CountAsync(ct);
 
-        var items = await query
-            .OrderBy(p => p.FullName)
-            .ThenBy(p => p.DisplayName)
-            .Skip(skip)
-            .Take(take)
-            .Select(ToPersonDtoExpr)
-            .ToListAsync(ct);
+        // IMPORTANT: evitam N+1; facem LEFT JOIN cu schedule intr-un singur query.
+        // Formatam ScheduleSummary in memorie ca sa nu depindem de traducerea EF pentru TimeSpan -> string.
+        var rows = await (
+            from p in baseQ
+            join ws0 in _db.PersonWorkSchedules.AsNoTracking() on p.Id equals ws0.PersonId into wsg
+            from ws in wsg.DefaultIfEmpty()
+            orderby p.FullName, p.DisplayName
+            select new
+            {
+                p.Id,
+                p.FullName,
+                p.DisplayName,
+                p.JobTitle,
+                p.Specialization,
+                p.Phone,
+                p.Email,
+                p.IsActive,
+
+                Ws = ws
+            }
+        )
+        .Skip(skip)
+        .Take(take)
+        .ToListAsync(ct);
+
+        var items = rows.Select(x =>
+        {
+            var dto = new PersonDto
+            {
+                Id = x.Id,
+                FullName = x.FullName,
+                DisplayName = x.DisplayName,
+                JobTitle = x.JobTitle,
+                Specialization = x.Specialization,
+                Phone = x.Phone,
+                Email = x.Email,
+                IsActive = x.IsActive,
+
+                // NEW
+                HasCustomSchedule = HasCustomSchedule(x.Ws),
+                ScheduleSummary = BuildScheduleSummary(x.Ws)
+            };
+
+            return dto;
+        }).ToList();
 
         return Ok(new Paged<PersonDto>
         {
@@ -98,7 +136,6 @@ public sealed class PeopleController : ControllerBase
     }
 
     // GET /api/people/availability?fromUtc=...&toUtc=...
-    // Returneaza DOAR persoanele asignabile (active pe interval).
     [HttpGet("availability")]
     public async Task<ActionResult<List<PersonLiteDto>>> Availability(
         [FromQuery] DateTimeOffset fromUtc,
@@ -120,10 +157,6 @@ public sealed class PeopleController : ControllerBase
     }
 
     // GET /api/people/availability/details?fromUtc=...&toUtc=...&includeInactive=true
-    // Returneaza TOTI oamenii (optional includeInactive), cu:
-    // - HrIsActive (manual)
-    // - IsActive = TRUE DOAR daca poate fi alocat in interval
-    // - Status/Reason (derivate din CanAssignAsync)
     [HttpGet("availability/details")]
     public async Task<ActionResult<List<PersonAvailabilityDto>>> AvailabilityDetails(
         [FromQuery] DateTimeOffset fromUtc,
@@ -207,6 +240,7 @@ public sealed class PeopleController : ControllerBase
 
         _db.People.Add(p);
 
+        // pastreaza comportamentul actual: schedule default creat automat
         _db.PersonWorkSchedules.Add(new PersonWorkSchedule
         {
             PersonId = p.Id,
@@ -221,7 +255,12 @@ public sealed class PeopleController : ControllerBase
 
         await _db.SaveChangesAsync(ct);
 
-        return CreatedAtAction(nameof(Get), new { id = p.Id }, ToPersonDto(p));
+        // optional: aici nu incarcam schedule; ramanem compatibili
+        var dto = ToPersonDto(p);
+        dto.HasCustomSchedule = false;
+        dto.ScheduleSummary = $"L-V {Fmt(DefaultMonFriStart)}-{Fmt(DefaultMonFriEnd)}; S -; D -";
+
+        return CreatedAtAction(nameof(Get), new { id = p.Id }, dto);
     }
 
     // PUT /api/people/{id}
@@ -245,7 +284,9 @@ public sealed class PeopleController : ControllerBase
 
         await _db.SaveChangesAsync(ct);
 
-        return Ok(ToPersonDto(p));
+        // nu atingem schedule aici (ramane prin /schedule)
+        var dto = ToPersonDto(p);
+        return Ok(dto);
     }
 
     [HttpPost("{id:guid}/activate")]
@@ -360,6 +401,7 @@ public sealed class PeopleController : ControllerBase
         Phone = p.Phone,
         Email = p.Email,
         IsActive = p.IsActive
+        // NOTE: schedule info se populeaza in List() unde avem join cu WorkSchedule
     };
 
     private static PersonLiteDto ToLiteDto(Person p) => new()
@@ -414,6 +456,36 @@ public sealed class PeopleController : ControllerBase
         Timezone = s.Timezone
     };
 
+    private static bool HasCustomSchedule(PersonWorkSchedule? ws)
+    {
+        if (ws == null) return false;
+
+        return
+            ws.MonFriStart != DefaultMonFriStart ||
+            ws.MonFriEnd != DefaultMonFriEnd ||
+            ws.SatStart != null ||
+            ws.SatEnd != null ||
+            ws.SunStart != null ||
+            ws.SunEnd != null ||
+            !string.Equals(ws.Timezone, DefaultTimezone, StringComparison.Ordinal);
+    }
+
+    private static string? BuildScheduleSummary(PersonWorkSchedule? ws)
+    {
+        if (ws == null) return null;
+
+        return
+            $"L-V {Fmt(ws.MonFriStart)}-{Fmt(ws.MonFriEnd)}; " +
+            $"S {FmtOpt(ws.SatStart)}-{FmtOpt(ws.SatEnd)}; " +
+            $"D {FmtOpt(ws.SunStart)}-{FmtOpt(ws.SunEnd)}";
+    }
+
+    private static string Fmt(TimeSpan t)
+        => $"{(int)t.TotalHours:00}:{t.Minutes:00}";
+
+    private static string FmtOpt(TimeSpan? t)
+        => t.HasValue ? Fmt(t.Value) : "-";
+
     // Mapping STRICT pe string-urile din PeopleAvailability (as-is)
     private static string MapAvailabilityStatus(string? reason)
     {
@@ -440,6 +512,7 @@ public sealed class PeopleController : ControllerBase
         return "UNAVAILABLE";
     }
 
+    // pastrat: poate fi folosit in alte locuri / viitor; nu mai e folosit in List()
     private static readonly Expression<Func<Person, PersonDto>> ToPersonDtoExpr =
         p => new PersonDto
         {

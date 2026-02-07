@@ -11,83 +11,135 @@ namespace Cmms.Api.Controllers;
 public sealed class PeopleScheduleController : ControllerBase
 {
     private readonly AppDbContext _db;
-    public PeopleScheduleController(AppDbContext db) => _db = db;
+
+    public PeopleScheduleController(AppDbContext db)
+    {
+        _db = db;
+    }
 
     // PUT /api/people/{id}/schedule
     [HttpPut("{id:guid}/schedule")]
     public async Task<IActionResult> UpdateSchedule(Guid id, UpdateScheduleReq req, CancellationToken ct)
     {
+        if (req is null) return BadRequest("Missing body.");
+
         // person exists?
         var personExists = await _db.People.AnyAsync(x => x.Id == id, ct);
         if (!personExists) return NotFound("Person not found.");
 
-        // validate minutes
-        if (!IsValidMinute(req.MonFriStartMinutes) || !IsValidMinute(req.MonFriEndMinutes))
-            return BadRequest("Invalid MonFri minutes.");
+        // validate Mon-Fri
+        ValidateRequiredRange(
+            req.MonFriStartMinutes,
+            req.MonFriEndMinutes,
+            "MonFri",
+            out var monFriStart,
+            out var monFriEnd);
 
-        if (req.MonFriEndMinutes <= req.MonFriStartMinutes)
-            return BadRequest("MonFriEnd must be after MonFriStart.");
+        // validate Sat/Sun (optional)
+        ValidateOptionalRange(req.SatStartMinutes, req.SatEndMinutes, "Saturday", out var satStart, out var satEnd);
+        ValidateOptionalRange(req.SunStartMinutes, req.SunEndMinutes, "Sunday", out var sunStart, out var sunEnd);
 
-        if (req.SatStartMinutes.HasValue || req.SatEndMinutes.HasValue)
-        {
-            if (!req.SatStartMinutes.HasValue || !req.SatEndMinutes.HasValue)
-                return BadRequest("Provide both SatStartMinutes and SatEndMinutes, or neither.");
-
-            if (!IsValidMinute(req.SatStartMinutes.Value) || !IsValidMinute(req.SatEndMinutes.Value))
-                return BadRequest("Invalid Saturday minutes.");
-
-            if (req.SatEndMinutes.Value <= req.SatStartMinutes.Value)
-                return BadRequest("SatEnd must be after SatStart.");
-        }
+        var tz = NormalizeTimezone(req.Timezone);
 
         var s = await _db.PersonWorkSchedules.FirstOrDefaultAsync(x => x.PersonId == id, ct);
 
         if (s == null)
         {
-            // create schedule row if missing
             s = new Cmms.Domain.PersonWorkSchedule
             {
                 PersonId = id,
-                MonFriStart = TimeSpan.FromMinutes(req.MonFriStartMinutes),
-                MonFriEnd = TimeSpan.FromMinutes(req.MonFriEndMinutes),
-                SatStart = req.SatStartMinutes.HasValue ? TimeSpan.FromMinutes(req.SatStartMinutes.Value) : (TimeSpan?)null,
-                SatEnd = req.SatEndMinutes.HasValue ? TimeSpan.FromMinutes(req.SatEndMinutes.Value) : (TimeSpan?)null,
-                Timezone = string.IsNullOrWhiteSpace(req.Timezone) ? "Europe/Bucharest" : req.Timezone.Trim()
+                MonFriStart = monFriStart,
+                MonFriEnd = monFriEnd,
+                SatStart = satStart,
+                SatEnd = satEnd,
+                SunStart = sunStart,
+                SunEnd = sunEnd,
+                Timezone = tz
             };
 
             _db.PersonWorkSchedules.Add(s);
         }
         else
         {
-            s.MonFriStart = TimeSpan.FromMinutes(req.MonFriStartMinutes);
-            s.MonFriEnd = TimeSpan.FromMinutes(req.MonFriEndMinutes);
+            s.MonFriStart = monFriStart;
+            s.MonFriEnd = monFriEnd;
 
-            if (req.SatStartMinutes.HasValue && req.SatEndMinutes.HasValue)
-            {
-                s.SatStart = TimeSpan.FromMinutes(req.SatStartMinutes.Value);
-                s.SatEnd = TimeSpan.FromMinutes(req.SatEndMinutes.Value);
-            }
-            else
-            {
-                s.SatStart = null;
-                s.SatEnd = null;
-            }
+            s.SatStart = satStart;
+            s.SatEnd = satEnd;
 
-            s.Timezone = string.IsNullOrWhiteSpace(req.Timezone) ? "Europe/Bucharest" : req.Timezone.Trim();
+            s.SunStart = sunStart;
+            s.SunEnd = sunEnd;
+
+            s.Timezone = tz;
         }
 
         await _db.SaveChangesAsync(ct);
         return NoContent();
     }
 
+    private static void ValidateRequiredRange(
+        int startMinutes,
+        int endMinutes,
+        string label,
+        out TimeSpan start,
+        out TimeSpan end)
+    {
+        if (!IsValidMinute(startMinutes) || !IsValidMinute(endMinutes))
+            throw new BadHttpRequestException($"Invalid {label} minutes.");
+
+        if (endMinutes <= startMinutes)
+            throw new BadHttpRequestException($"{label}End must be after {label}Start.");
+
+        start = TimeSpan.FromMinutes(startMinutes);
+        end = TimeSpan.FromMinutes(endMinutes);
+    }
+
+    private static void ValidateOptionalRange(
+        int? startMinutes,
+        int? endMinutes,
+        string label,
+        out TimeSpan? start,
+        out TimeSpan? end)
+    {
+        if (!startMinutes.HasValue && !endMinutes.HasValue)
+        {
+            start = null;
+            end = null;
+            return;
+        }
+
+        if (!startMinutes.HasValue || !endMinutes.HasValue)
+            throw new BadHttpRequestException($"Provide both {label}StartMinutes and {label}EndMinutes, or neither.");
+
+        var s = startMinutes.Value;
+        var e = endMinutes.Value;
+
+        if (!IsValidMinute(s) || !IsValidMinute(e))
+            throw new BadHttpRequestException($"Invalid {label} minutes.");
+
+        if (e <= s)
+            throw new BadHttpRequestException($"{label}End must be after {label}Start.");
+
+        start = TimeSpan.FromMinutes(s);
+        end = TimeSpan.FromMinutes(e);
+    }
+
     private static bool IsValidMinute(int x) => x >= 0 && x < 24 * 60;
+
+    private static string NormalizeTimezone(string? tz)
+        => string.IsNullOrWhiteSpace(tz) ? "Europe/Bucharest" : tz.Trim();
 
     public sealed class UpdateScheduleReq
     {
         public int MonFriStartMinutes { get; set; }
         public int MonFriEndMinutes { get; set; }
+
         public int? SatStartMinutes { get; set; }
         public int? SatEndMinutes { get; set; }
+
+        public int? SunStartMinutes { get; set; }
+        public int? SunEndMinutes { get; set; }
+
         public string? Timezone { get; set; }
     }
 }
