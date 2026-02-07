@@ -41,6 +41,13 @@ export default function PeoplePage() {
     const [specialization, setSpecialization] = useState("");
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
+    // work schedule (times as HH:mm strings, empty = not set)
+    const [monFriStart, setMonFriStart] = useState("08:00");
+    const [monFriEnd, setMonFriEnd] = useState("16:30");
+    const [satStart, setSatStart] = useState<string | null>(null);
+    const [satEnd, setSatEnd] = useState<string | null>(null);
+    const [sunStart, setSunStart] = useState<string | null>(null);
+    const [sunEnd, setSunEnd] = useState<string | null>(null);
     // edit state
     const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -93,6 +100,17 @@ export default function PeoplePage() {
                 return;
             }
 
+            // prepare workSchedule payload (null for optional days)
+            const ws = {
+                monFriStart: monFriStart,
+                monFriEnd: monFriEnd,
+                satStart: satStart ?? null,
+                satEnd: satEnd ?? null,
+                sunStart: sunStart ?? null,
+                sunEnd: sunEnd ?? null,
+                timezone: "Europe/Bucharest",
+            };
+
             await createPerson({
                 fullName: fullName.trim(),
                 jobTitle: jobTitle.trim() || "",
@@ -100,7 +118,8 @@ export default function PeoplePage() {
                 phone: phone.trim() || "",
                 email: email.trim() || null,
                 isActive: true,
-            });
+                workSchedule: ws,
+            } as any);
 
             // Resetare formular
             setFullName("");
@@ -123,6 +142,23 @@ export default function PeoplePage() {
         setSpecialization(p.specialization || "");
         setPhone(p.phone || "");
         setEmail(p.email || "");
+        // load schedule (if present)
+        const s: any = (p as any).workSchedule;
+        if (s) {
+            setMonFriStart(s.monFriStart ?? "08:00");
+            setMonFriEnd(s.monFriEnd ?? "16:30");
+            setSatStart(s.satStart ?? null);
+            setSatEnd(s.satEnd ?? null);
+            setSunStart(s.sunStart ?? null);
+            setSunEnd(s.sunEnd ?? null);
+        } else {
+            setMonFriStart("08:00");
+            setMonFriEnd("16:30");
+            setSatStart(null);
+            setSatEnd(null);
+            setSunStart(null);
+            setSunEnd(null);
+        }
     }
 
     function cancelEdit() {
@@ -132,11 +168,27 @@ export default function PeoplePage() {
         setSpecialization("");
         setPhone("");
         setEmail("");
+        setMonFriStart("08:00");
+        setMonFriEnd("16:30");
+        setSatStart(null);
+        setSatEnd(null);
+        setSunStart(null);
+        setSunEnd(null);
     }
 
     async function handleSave(id: string) {
         setErr(null);
         try {
+            const ws = {
+                monFriStart: monFriStart,
+                monFriEnd: monFriEnd,
+                satStart: satStart ?? null,
+                satEnd: satEnd ?? null,
+                sunStart: sunStart ?? null,
+                sunEnd: sunEnd ?? null,
+                timezone: "Europe/Bucharest",
+            };
+
             await updatePerson(id, {
                 fullName: fullName.trim(),
                 displayName: fullName.trim(),
@@ -145,7 +197,8 @@ export default function PeoplePage() {
                 phone: phone.trim(),
                 email: email.trim() || null,
                 isActive: true,
-            });
+                workSchedule: ws,
+            } as any);
 
             cancelEdit();
             await load();

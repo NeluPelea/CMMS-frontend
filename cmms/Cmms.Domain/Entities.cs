@@ -72,7 +72,9 @@ public sealed class PersonWorkSchedule
 public enum LeaveType
 {
     CO = 1,
-    CM = 2
+    CM = 2,
+    ZL = 3, // Zi liberă (manual)
+    ZN = 4  // Recuperare zi liberă națională
 }
 
 public sealed class PersonLeave
@@ -218,7 +220,6 @@ public sealed class WorkOrder
     public ICollection<FileAttachment> Attachments { get; set; } = new List<FileAttachment>();
 }
 
-
 // =========================
 // Preventive Maintenance
 // =========================
@@ -333,7 +334,4 @@ public sealed class ExtraJob
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? FinishedAt { get; set; }
 }
-
-
-
 
