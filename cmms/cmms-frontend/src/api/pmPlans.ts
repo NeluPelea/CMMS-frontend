@@ -1,10 +1,12 @@
 import { apiFetch } from "./http";
 
-export enum PmFrequency {
-  Daily = 1,
-  Weekly = 2,
-  Monthly = 3,
-}
+export const PmFrequency = {
+  Daily: 1,
+  Weekly: 2,
+  Monthly: 3,
+} as const;
+
+export type PmFrequency = typeof PmFrequency[keyof typeof PmFrequency];
 
 export type PmPlanItemDto = {
   id: string;

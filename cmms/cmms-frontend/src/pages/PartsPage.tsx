@@ -1,4 +1,4 @@
-// src/pages/PartsPage.tsx
+ï»¿// src/pages/PartsPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import { createPart, getParts, type PartDto } from "../api";
@@ -10,7 +10,6 @@ import {
   Input,
   PageToolbar,
   Pill,
-  Select,
   TableShell,
 } from "../components/ui";
 
@@ -206,8 +205,8 @@ export default function PartsPage() {
             {items.map((x) => (
               <tr key={x.id} className="hover:bg-white/5">
                 <td className="px-4 py-3 text-zinc-100 font-medium">{x.name}</td>
-                <td className="px-4 py-3 text-zinc-300">{x.code ?? "—"}</td>
-                <td className="px-4 py-3 text-zinc-300">{x.uom ?? "—"}</td>
+                <td className="px-4 py-3 text-zinc-300">{x.code ?? "â€”"}</td>
+                <td className="px-4 py-3 text-zinc-300">{x.uom ?? "â€”"}</td>
                 <td className="px-4 py-3 text-right">
                   <StatusPill active={x.isAct !== false} />
                 </td>
@@ -223,3 +222,5 @@ export default function PartsPage() {
     </AppShell>
   );
 }
+
+

@@ -11,88 +11,142 @@ import PmPlansPage from "./pages/PmPlansPage";
 import PartsPage from "./pages/PartsPage";
 import InventoryPage from "./pages/InventoryPage";
 import DashboardPage from "./pages/DashboardPage";
+import PeoplePage from "./pages/PeoplePage";
+import RolesPage from "./pages/RolesPage";
+import CalendarPage from "./pages/CalendarPage";
+import ExtraJobsPage from "./pages/ExtraJobsPage";
+import WorkOrderPrintPage from "./pages/WorkOrderPrintPage";
+import ReportsPage from "./pages/ReportsPage";
 
 export default function App() {
-  return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
+    return (
+        <Routes>
+            {/* Ruta pentru autentificare */}
+            <Route path="/login" element={<LoginPage />} />
 
-      <Route
-        path="/work-orders"
-        element={
-          <RequireAuth>
-            <WorkOrdersPage />
-          </RequireAuth>
-        }
-      />
+            {/* Rute protejate - Mentenanta si Operatiuni */}
+            <Route
+                path="/dashboard"
+                element={
+                    <RequireAuth>
+                        <DashboardPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/work-orders"
+                element={
+                    <RequireAuth>
+                        <WorkOrdersPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/work-orders/:id"
+                element={
+                    <RequireAuth>
+                        <WorkOrderDetailsPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/work-orders/:id/print"
+                element={
+                    <RequireAuth>
+                        <WorkOrderPrintPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/calendar"
+                element={
+                    <RequireAuth>
+                        <CalendarPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/extra-jobs"
+                element={
+                    <RequireAuth>
+                        <ExtraJobsPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/pm-plans"
+                element={
+                    <RequireAuth>
+                        <PmPlansPage />
+                    </RequireAuth>
+                }
+            />
 
-      <Route
-        path="/work-orders/:id"
-        element={
-          <RequireAuth>
-            <WorkOrderDetailsPage />
-          </RequireAuth>
-        }
-      />
+            {/* Gestiune Active si Locatii */}
+            <Route
+                path="/assets"
+                element={
+                    <RequireAuth>
+                        <AssetsPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/locations"
+                element={
+                    <RequireAuth>
+                        <LocationsPage />
+                    </RequireAuth>
+                }
+            />
 
-      <Route
-        path="/assets"
-        element={
-          <RequireAuth>
-            <AssetsPage />
-          </RequireAuth>
-        }
-      />
+            {/* Gestiune Stocuri si Piese */}
+            <Route
+                path="/parts"
+                element={
+                    <RequireAuth>
+                        <PartsPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/inventory"
+                element={
+                    <RequireAuth>
+                        <InventoryPage />
+                    </RequireAuth>
+                }
+            />
 
-      <Route
-        path="/locations"
-        element={
-          <RequireAuth>
-            <LocationsPage />
-          </RequireAuth>
-        }
-      />
+            {/* Administrare Utilizatori si Roluri */}
+            <Route
+                path="/people"
+                element={
+                    <RequireAuth>
+                        <PeoplePage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/roles"
+                element={
+                    <RequireAuth>
+                        <RolesPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/reports"
+                element={
+                    <RequireAuth>
+                        <ReportsPage />
+                    </RequireAuth>
+                }
+            />
 
-      <Route 
-         path="/pm-plans" 
-         element={
-             <RequireAuth>
-                <PmPlansPage />
-             </RequireAuth>} 
-       />
-
-      <Route
-          path="/parts"
-          element={
-            <RequireAuth>
-              <PartsPage />
-            </RequireAuth>
-          }
-        />
-
-       <Route
-       path="/inventory"
-          element={
-             <RequireAuth>
-              <InventoryPage />
-            </RequireAuth>
-          }
-        /> 
-
-        <Route
-        path="/dashboard"
-            element={
-                <RequireAuth>
-                <DashboardPage />
-                </RequireAuth>
-            }
-/>
-
-      <Route path="/" element={<Navigate to="/work-orders" replace />} />
-     
-
-      
-
-    </Routes>
-  );
+            {/* Redirect de siguranta si ruta principala */}
+            <Route path="/" element={<Navigate to="/work-orders" replace />} />
+            <Route path="*" element={<Navigate to="/work-orders" replace />} />
+        </Routes>
+    );
 }

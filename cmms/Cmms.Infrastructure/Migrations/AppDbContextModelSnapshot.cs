@@ -77,6 +77,119 @@ namespace Cmms.Infrastructure.Migrations
                     b.ToTable("asset_parts", (string)null);
                 });
 
+            modelBuilder.Entity("Cmms.Domain.AssignmentRole", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("AssignmentRoles");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.CompanyBlackoutDay", b =>
+                {
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsAct")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("text");
+
+                    b.HasKey("Date");
+
+                    b.ToTable("CompanyBlackoutDays");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.ExtraJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedToPersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDone")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedToPersonId");
+
+                    b.ToTable("ExtraJobs");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.FileAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("UploadedByUserId")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.ToTable("FileAttachments", (string)null);
+                });
+
             modelBuilder.Entity("Cmms.Domain.InventoryItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -122,6 +235,22 @@ namespace Cmms.Infrastructure.Migrations
                     b.ToTable("Locations");
                 });
 
+            modelBuilder.Entity("Cmms.Domain.NationalHoliday", b =>
+                {
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsAct")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("text");
+
+                    b.HasKey("Date");
+
+                    b.ToTable("NationalHolidays");
+                });
+
             modelBuilder.Entity("Cmms.Domain.Part", b =>
                 {
                     b.Property<Guid>("Id")
@@ -156,11 +285,100 @@ namespace Cmms.Infrastructure.Migrations
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("JobTitle")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Specialization")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
 
                     b.ToTable("People");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.PersonLeave", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId", "StartDate", "EndDate");
+
+                    b.ToTable("person_leaves", (string)null);
+                });
+
+            modelBuilder.Entity("Cmms.Domain.PersonWorkSchedule", b =>
+                {
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<TimeSpan>("MonFriEnd")
+                        .HasColumnType("interval");
+
+                    b.Property<TimeSpan>("MonFriStart")
+                        .HasColumnType("interval");
+
+                    b.Property<TimeSpan?>("SatEnd")
+                        .HasColumnType("interval");
+
+                    b.Property<TimeSpan?>("SatStart")
+                        .HasColumnType("interval");
+
+                    b.Property<TimeSpan?>("SunEnd")
+                        .HasColumnType("interval");
+
+                    b.Property<TimeSpan?>("SunStart")
+                        .HasColumnType("interval");
+
+                    b.Property<string>("Timezone")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("PersonId");
+
+                    b.ToTable("PersonWorkSchedules");
                 });
 
             modelBuilder.Entity("Cmms.Domain.PmPlan", b =>
@@ -190,6 +408,33 @@ namespace Cmms.Infrastructure.Migrations
                     b.HasIndex("AssetId");
 
                     b.ToTable("PmPlans");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.PmPlanAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PmPlanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex("PmPlanId", "PersonId", "RoleId")
+                        .IsUnique();
+
+                    b.ToTable("PmPlanAssignments");
                 });
 
             modelBuilder.Entity("Cmms.Domain.PmPlanItem", b =>
@@ -227,6 +472,15 @@ namespace Cmms.Infrastructure.Migrations
                     b.Property<Guid?>("AssignedToPersonId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Cause")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Defect")
+                        .HasColumnType("text");
+
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
@@ -238,6 +492,9 @@ namespace Cmms.Infrastructure.Migrations
 
                     b.Property<Guid?>("PmPlanId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Solution")
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("StartAt")
                         .HasColumnType("timestamp with time zone");
@@ -262,6 +519,126 @@ namespace Cmms.Infrastructure.Migrations
                     b.HasIndex("AssignedToPersonId");
 
                     b.ToTable("WorkOrders");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.WorkOrderAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("PlannedFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("PlannedTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex("WorkOrderId", "PersonId");
+
+                    b.HasIndex("WorkOrderId", "PersonId", "RoleId")
+                        .IsUnique();
+
+                    b.ToTable("WorkOrderAssignments");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.WorkOrderEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Field")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("NewValue")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<string>("OldValue")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("WorkOrderId", "CreatedAtUtc");
+
+                    b.ToTable("work_order_events", (string)null);
+                });
+
+            modelBuilder.Entity("Cmms.Domain.WorkOrderLabor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Minutes")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.ToTable("WorkOrderLaborLogs");
                 });
 
             modelBuilder.Entity("Cmms.Domain.WorkOrderPart", b =>
@@ -320,6 +697,26 @@ namespace Cmms.Infrastructure.Migrations
                     b.Navigation("Part");
                 });
 
+            modelBuilder.Entity("Cmms.Domain.ExtraJob", b =>
+                {
+                    b.HasOne("Cmms.Domain.Person", "AssignedToPerson")
+                        .WithMany()
+                        .HasForeignKey("AssignedToPersonId");
+
+                    b.Navigation("AssignedToPerson");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.FileAttachment", b =>
+                {
+                    b.HasOne("Cmms.Domain.WorkOrder", "WorkOrder")
+                        .WithMany("Attachments")
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WorkOrder");
+                });
+
             modelBuilder.Entity("Cmms.Domain.InventoryItem", b =>
                 {
                     b.HasOne("Cmms.Domain.Part", "Part")
@@ -331,6 +728,28 @@ namespace Cmms.Infrastructure.Migrations
                     b.Navigation("Part");
                 });
 
+            modelBuilder.Entity("Cmms.Domain.PersonLeave", b =>
+                {
+                    b.HasOne("Cmms.Domain.Person", "Person")
+                        .WithMany("Leaves")
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Person");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.PersonWorkSchedule", b =>
+                {
+                    b.HasOne("Cmms.Domain.Person", "Person")
+                        .WithOne("WorkSchedule")
+                        .HasForeignKey("Cmms.Domain.PersonWorkSchedule", "PersonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Person");
+                });
+
             modelBuilder.Entity("Cmms.Domain.PmPlan", b =>
                 {
                     b.HasOne("Cmms.Domain.Asset", "Asset")
@@ -340,6 +759,33 @@ namespace Cmms.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Asset");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.PmPlanAssignment", b =>
+                {
+                    b.HasOne("Cmms.Domain.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Cmms.Domain.PmPlan", "PmPlan")
+                        .WithMany("Assignments")
+                        .HasForeignKey("PmPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Cmms.Domain.AssignmentRole", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Person");
+
+                    b.Navigation("PmPlan");
+
+                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("Cmms.Domain.PmPlanItem", b =>
@@ -370,6 +816,63 @@ namespace Cmms.Infrastructure.Migrations
                     b.Navigation("AssignedToPerson");
                 });
 
+            modelBuilder.Entity("Cmms.Domain.WorkOrderAssignment", b =>
+                {
+                    b.HasOne("Cmms.Domain.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Cmms.Domain.AssignmentRole", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Cmms.Domain.WorkOrder", "WorkOrder")
+                        .WithMany("Assignments")
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Person");
+
+                    b.Navigation("Role");
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.WorkOrderEvent", b =>
+                {
+                    b.HasOne("Cmms.Domain.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.WorkOrderLabor", b =>
+                {
+                    b.HasOne("Cmms.Domain.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Cmms.Domain.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Person");
+
+                    b.Navigation("WorkOrder");
+                });
+
             modelBuilder.Entity("Cmms.Domain.WorkOrderPart", b =>
                 {
                     b.HasOne("Cmms.Domain.Part", "Part")
@@ -389,9 +892,25 @@ namespace Cmms.Infrastructure.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("Cmms.Domain.Person", b =>
+                {
+                    b.Navigation("Leaves");
+
+                    b.Navigation("WorkSchedule");
+                });
+
             modelBuilder.Entity("Cmms.Domain.PmPlan", b =>
                 {
+                    b.Navigation("Assignments");
+
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.WorkOrder", b =>
+                {
+                    b.Navigation("Assignments");
+
+                    b.Navigation("Attachments");
                 });
 #pragma warning restore 612, 618
         }
