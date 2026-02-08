@@ -96,7 +96,7 @@ export default function PartsPage() {
   }, []);
 
   return (
-    <AppShell title="Parts">
+    <AppShell title="Piese de schimb">
       <PageToolbar
         left={
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -150,7 +150,7 @@ export default function PartsPage() {
 
       {err ? <ErrorBox message={err} /> : null}
 
-      <Card title="Create Part">
+      <Card title="Creeaza Piesa">
         <div className="grid gap-3 lg:grid-cols-12">
           <div className="lg:col-span-6">
             <Input
@@ -214,7 +214,7 @@ export default function PartsPage() {
             ))}
 
             {!loading && items.length === 0 ? (
-              <EmptyRow colSpan={4} text="No parts." />
+              <EmptyRow colSpan={4} text="Nu exista piese." />
             ) : null}
           </tbody>
         </table>

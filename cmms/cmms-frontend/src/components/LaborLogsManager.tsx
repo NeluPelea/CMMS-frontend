@@ -59,7 +59,7 @@ export default function LaborLogsManager({ workOrderId }: { workOrderId: string 
     const totalMin = logs.reduce((acc, curr) => acc + curr.minutes, 0);
 
     return (
-        <Card title="Timp Lucrat (Labor Logs)">
+        <Card title="Timp Lucrat">
             <div className="grid gap-3 sm:grid-cols-12 items-end mb-6">
                 <div className="sm:col-span-3">
                     <div className="text-[10px] font-bold uppercase text-zinc-500 mb-1 ml-1">Tehnician</div>
@@ -95,7 +95,7 @@ export default function LaborLogsManager({ workOrderId }: { workOrderId: string 
                     <thead>
                         <tr className="text-left text-zinc-500 border-b border-white/10">
                             <th className="p-3 font-semibold">Data</th>
-                            <th className="p-3 font-semibold">Persoana</th>
+                            <th className="p-3 font-semibold">Angajat</th>
                             <th className="p-3 font-semibold">Descriere</th>
                             <th className="p-3 font-semibold text-center">Minute</th>
                             <th className="p-3 font-semibold text-right">Actiuni</th>

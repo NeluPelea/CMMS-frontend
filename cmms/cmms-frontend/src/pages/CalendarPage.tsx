@@ -96,7 +96,7 @@ function HolidaysPanel({ year }: { year: number }) {
       const data = await listHolidays(year, includeDeleted);
       setItems(data);
     } catch (err) {
-      setError(getErrMessage(err) || "Failed to load holidays.");
+      setError(getErrMessage(err) || "Eroare la incarcarea sarbatorilor.");
     } finally {
       setLoading(false);
     }
@@ -115,21 +115,21 @@ function HolidaysPanel({ year }: { year: number }) {
       setName("");
       await load();
     } catch (err) {
-      setError(getErrMessage(err) || "Failed to add holiday.");
+      setError(getErrMessage(err) || "Eroare la adaugarea sarbatorii.");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleDelete(d: string) {
-    if (!confirm("Are you sure?")) return;
+    if (!confirm("Sunteti sigur?")) return;
     try {
       setSubmitting(true);
       const simpleDate = d.split("T")[0];
       await deleteHoliday(simpleDate);
       await load();
     } catch (err) {
-      setError(getErrMessage(err) || "Failed to delete holiday.");
+      setError(getErrMessage(err) || "Eroare la stergerea sarbatorii.");
     } finally {
       setSubmitting(false);
     }
@@ -154,7 +154,7 @@ function HolidaysPanel({ year }: { year: number }) {
       cancelEdit();
       await load();
     } catch (err) {
-      setError(getErrMessage(err) || "Failed to update holiday.");
+      setError(getErrMessage(err) || "Eroare la actualizarea sarbatorii.");
     } finally {
       setSubmitting(false);
     }
@@ -170,7 +170,7 @@ function HolidaysPanel({ year }: { year: number }) {
       await addHoliday({ date: simpleDate, name: it?.name });
       await load();
     } catch (err) {
-      setError(getErrMessage(err) || "Failed to restore holiday.");
+      setError(getErrMessage(err) || "Eroare la restaurarea sarbatorii.");
     } finally {
       setSubmitting(false);
     }
@@ -302,7 +302,7 @@ function BlackoutsPanel({ year }: { year: number }) {
       const data = await listBlackouts(year, includeDeleted);
       setItems(data);
     } catch (err) {
-      setError(getErrMessage(err) || "Failed to load blackouts.");
+      setError(getErrMessage(err) || "Eroare la incarcarea zilelor inchise.");
     } finally {
       setLoading(false);
     }
@@ -321,7 +321,7 @@ function BlackoutsPanel({ year }: { year: number }) {
       setName("");
       await load();
     } catch (err) {
-      setError(getErrMessage(err) || "Failed to add blackout.");
+      setError(getErrMessage(err) || "Eroare la adaugarea zilei inchise.");
     } finally {
       setSubmitting(false);
     }
@@ -335,7 +335,7 @@ function BlackoutsPanel({ year }: { year: number }) {
       await deleteBlackout(simpleDate);
       await load();
     } catch (err) {
-      setError(getErrMessage(err) || "Failed to delete blackout.");
+      setError(getErrMessage(err) || "Eroare la stergerea zilei inchise.");
     } finally {
       setSubmitting(false);
     }
@@ -359,7 +359,7 @@ function BlackoutsPanel({ year }: { year: number }) {
       cancelEdit();
       await load();
     } catch (err) {
-      setError(getErrMessage(err) || "Failed to update blackout.");
+      setError(getErrMessage(err) || "Eroare la actualizarea zilei inchise.");
     } finally {
       setSubmitting(false);
     }
@@ -373,7 +373,7 @@ function BlackoutsPanel({ year }: { year: number }) {
       await addBlackout({ date: simpleDate, name: it?.name });
       await load();
     } catch (err) {
-      setError(getErrMessage(err) || "Failed to restore blackout.");
+      setError(getErrMessage(err) || "Eroare la restaurarea zilei inchise.");
     } finally {
       setSubmitting(false);
     }

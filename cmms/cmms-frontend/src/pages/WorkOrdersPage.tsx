@@ -671,21 +671,21 @@ export default function WorkOrdersPage() {
 
     // ---------------- Render ----------------
     return (
-        <AppShell title="Work Orders">
+        <AppShell title="Ordine de Lucru">
             <PageToolbar
                 left={
                     <div className="flex items-center gap-2">
                         <Button variant="primary" onClick={() => setCreateOpen(true)}>
-                            + New
+                            + Nou
                         </Button>
                         <Button onClick={() => loadList(0)} variant="ghost" disabled={loading}>
-                            Refresh
+                            Actualizeaza
                         </Button>
                     </div>
                 }
                 right={
                     <div className="flex items-center gap-2">
-                        <div className="text-sm text-zinc-400">{pageInfo}</div>
+                        <div className="text-sm text-zinc-400">{pageInfo.replace("of", "din")}</div>
                         <Button
                             onClick={() => {
                                 const next = Math.max(0, skip - take);
@@ -717,24 +717,24 @@ export default function WorkOrdersPage() {
             <Drawer
                 open={createOpen}
                 onClose={() => setCreateOpen(false)}
-                title="New Work Order"
+                title="Ordin de Lucru Nou"
                 footer={
                     <div className="flex items-center justify-end gap-2">
                         <Button variant="ghost" onClick={() => setCreateOpen(false)} disabled={actionLoading}>
-                            Cancel
+                            Anuleaza
                         </Button>
                         <Button variant="primary" disabled={!canCreate} onClick={onCreate}>
-                            Create Order
+                            Creeaza Ordin
                         </Button>
                     </div>
                 }
             >
                 <div className="grid gap-4">
-                    <Input label="Title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="What needs to be done?" />
+                    <Input label="Titlu" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Ce trebuie facut?" />
 
-                    <Select label="Type" value={newType} onChange={(e) => setNewType(Number(e.target.value) as WorkOrderType)}>
-                        <option value={WorkOrderType.Corrective}>Corrective</option>
-                        <option value={WorkOrderType.Preventive}>Preventive</option>
+                    <Select label="Tip" value={newType} onChange={(e) => setNewType(Number(e.target.value) as WorkOrderType)}>
+                        <option value={WorkOrderType.Corrective}>Corectiv</option>
+                        <option value={WorkOrderType.Preventive}>Preventiv</option>
                     </Select>
 
                     <Select label="Clasificare" value={newClassification} onChange={(e) => setNewClassification(Number(e.target.value) as WorkOrderClassification)}>
@@ -742,8 +742,8 @@ export default function WorkOrdersPage() {
                         <option value={WorkOrderClassification.Reactive}>Reactiv</option>
                     </Select>
 
-                    <Select label="Asset (optional)" value={newAssetId} onChange={(e) => setNewAssetId(e.target.value)}>
-                        <option value="">(None)</option>
+                    <Select label="Utilaj (optional)" value={newAssetId} onChange={(e) => setNewAssetId(e.target.value)}>
+                        <option value="">(Niciunul)</option>
                         {assets.map((a) => (
                             <option key={a.id} value={a.id}>
                                 {a.name}
@@ -752,7 +752,7 @@ export default function WorkOrdersPage() {
                     </Select>
 
                     <div>
-                        <label className="mb-1 block text-xs font-medium text-zinc-400">Description (optional)</label>
+                        <label className="mb-1 block text-xs font-medium text-zinc-400">Descriere (optional)</label>
                         <textarea
                             className="min-h-[120px] w-full rounded-xl border border-white/10 bg-white/5 p-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
                             value={newDesc}
@@ -767,36 +767,36 @@ export default function WorkOrdersPage() {
                 <div className="h-fit overflow-hidden rounded-xl border border-white/10 bg-zinc-900/50">
                     <div className="border-b border-white/10 bg-zinc-950/30 p-3">
                         <div className="grid gap-3">
-                            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search work orders..." />
+                            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cauta ordine de lucru..." />
 
                             <div className="flex flex-wrap gap-2">
                                 <PillButton active={status === ""} onClick={() => setStatus("")}>
-                                    All <span className="text-zinc-400">({counts.all})</span>
+                                    Toate <span className="text-zinc-400">({counts.all})</span>
                                 </PillButton>
                                 <PillButton tone="amber" active={status === WorkOrderStatus.Open} onClick={() => setStatus(WorkOrderStatus.Open)}>
-                                    Open <span className="text-zinc-400">({counts.open})</span>
+                                    Deschise <span className="text-zinc-400">({counts.open})</span>
                                 </PillButton>
                                 <PillButton tone="teal" active={status === WorkOrderStatus.InProgress} onClick={() => setStatus(WorkOrderStatus.InProgress)}>
-                                    In Progress <span className="text-zinc-400">({counts.inProgress})</span>
+                                    În Lucru <span className="text-zinc-400">({counts.inProgress})</span>
                                 </PillButton>
                                 <PillButton tone="emerald" active={status === WorkOrderStatus.Done} onClick={() => setStatus(WorkOrderStatus.Done)}>
-                                    Done <span className="text-zinc-400">({counts.done})</span>
+                                    Încheiate <span className="text-zinc-400">({counts.done})</span>
                                 </PillButton>
                                 <PillButton tone="rose" active={status === WorkOrderStatus.Cancelled} onClick={() => setStatus(WorkOrderStatus.Cancelled)}>
-                                    Cancelled <span className="text-zinc-400">({counts.cancelled})</span>
+                                    Anulate <span className="text-zinc-400">({counts.cancelled})</span>
                                 </PillButton>
                             </div>
 
                             <div className="grid gap-3 lg:grid-cols-2">
                                 <Select value={type} onChange={(e) => setType(e.target.value === "" ? "" : (Number(e.target.value) as WorkOrderType))}>
-                                    <option value="">All Types</option>
-                                    <option value={WorkOrderType.Corrective}>Corrective</option>
-                                    <option value={WorkOrderType.Preventive}>Preventive</option>
+                                    <option value="">Toate Tipurile</option>
+                                    <option value={WorkOrderType.Corrective}>Corectiv</option>
+                                    <option value={WorkOrderType.Preventive}>Preventiv</option>
                                 </Select>
 
                                 <Select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-                                    <option value="newest">Newest</option>
-                                    <option value="oldest">Oldest</option>
+                                    <option value="newest">Cele mai noi</option>
+                                    <option value="oldest">Cele mai vechi</option>
                                 </Select>
 
                                 <Select
@@ -806,7 +806,7 @@ export default function WorkOrdersPage() {
                                         setAssetId("");
                                     }}
                                 >
-                                    <option value="">All Locations</option>
+                                    <option value="">Toate Locatiile</option>
                                     {locs.map((l) => (
                                         <option key={l.id} value={l.id}>
                                             {l.name}
@@ -815,7 +815,7 @@ export default function WorkOrdersPage() {
                                 </Select>
 
                                 <Select value={assetId} onChange={(e) => setAssetId(e.target.value)}>
-                                    <option value="">All Assets</option>
+                                    <option value="">Toate Utilajele</option>
                                     {filteredAssets.map((a) => (
                                         <option key={a.id} value={a.id}>
                                             {a.name}
@@ -841,14 +841,14 @@ export default function WorkOrdersPage() {
                                     <StatusPill status={w.status} />
                                 </div>
                                 <div className="flex justify-between text-xs text-zinc-400">
-                                    <span>{w.asset?.name ?? "No Asset"}</span>
+                                    <span>{w.asset?.name ?? "Fara Utilaj"}</span>
                                     <span>{isoToLocalDisplay(w.startAt)}</span>
                                 </div>
                             </button>
                         ))}
 
                         {viewItems.length === 0 ? (
-                            <div className="p-6 text-center text-sm text-zinc-400">{loading ? "Loading..." : "No work orders."}</div>
+                            <div className="p-6 text-center text-sm text-zinc-400">{loading ? "Se incarca..." : "Nu exista ordine de lucru."}</div>
                         ) : null}
                     </div>
                 </div>
@@ -856,7 +856,7 @@ export default function WorkOrdersPage() {
                 {/* RIGHT DETAIL */}
                 <div className="space-y-6">
                     {selected ? (
-                        <Card title="Work Order">
+                        <Card title="Ordin de Lucru">
                             <div className="mb-5 flex items-center justify-between gap-3 rounded-xl bg-white/5 p-3">
                                 <div className="flex flex-wrap gap-2">
                                     <Button size="sm" onClick={() => applyAction("start")} disabled={selected.status !== WorkOrderStatus.Open || actionLoading} variant="ghost">
@@ -874,15 +874,15 @@ export default function WorkOrdersPage() {
                                 </div>
 
                                 <Link to={`/work-orders/${selected.id}`} className="text-sm text-teal-400 hover:underline">
-                                    Full Details →
+                                    Detalii Complete →
                                 </Link>
                             </div>
 
                             <Tabs
                                 items={[
-                                    { key: "details", label: "Details" },
-                                    { key: "activity", label: "Activity" },
-                                    { key: "parts", label: "Parts" },
+                                    { key: "details", label: "Detalii" },
+                                    { key: "activity", label: "Activitate" },
+                                    { key: "parts", label: "Piese de schimb" },
                                 ]}
                                 value={activeTab}
                                 onChange={(k) => setActiveTab(k as TabKey)}
@@ -894,14 +894,14 @@ export default function WorkOrdersPage() {
                                                     <Input label="Title" value={dTitle} onChange={(e) => setDTitle(e.target.value)} />
 
                                                     <Select label="Status" value={dStatus} onChange={(e) => setDStatus(Number(e.target.value) as WorkOrderStatus)}>
-                                                        <option value={WorkOrderStatus.Open}>Open</option>
-                                                        <option value={WorkOrderStatus.InProgress}>In Progress</option>
-                                                        <option value={WorkOrderStatus.Done}>Done</option>
-                                                        <option value={WorkOrderStatus.Cancelled}>Cancelled</option>
+                                                        <option value={WorkOrderStatus.Open}>Deschis</option>
+                                                        <option value={WorkOrderStatus.InProgress}>În Lucru</option>
+                                                        <option value={WorkOrderStatus.Done}>Finalizat</option>
+                                                        <option value={WorkOrderStatus.Cancelled}>Anulat</option>
                                                     </Select>
 
-                                                    <Select label="Asset" value={dAssetId} onChange={(e) => setDAssetId(e.target.value)}>
-                                                        <option value="">(None)</option>
+                                                    <Select label="Utilaj" value={dAssetId} onChange={(e) => setDAssetId(e.target.value)}>
+                                                        <option value="">(Niciunul)</option>
                                                         {assets.map((a) => (
                                                             <option key={a.id} value={a.id}>
                                                                 {a.name}
@@ -914,8 +914,8 @@ export default function WorkOrdersPage() {
                                                         <option value={WorkOrderClassification.Reactive}>Reactiv</option>
                                                     </Select>
 
-                                                    <Select label="Assign To" value={dAssignedId} onChange={(e) => setDAssignedId(e.target.value)}>
-                                                        <option value="">(Unassigned)</option>
+                                                    <Select label="Alocat angajat" value={dAssignedId} onChange={(e) => setDAssignedId(e.target.value)}>
+                                                        <option value="">(Nealocat)</option>
                                                         {people.map((p) => (
                                                             <option key={p.id} value={p.id}>
                                                                 {p.displayName}
@@ -923,12 +923,12 @@ export default function WorkOrdersPage() {
                                                         ))}
                                                     </Select>
 
-                                                    <Input type="datetime-local" label="Start Time" value={dStartAt} onChange={(e) => setDStartAt(e.target.value)} />
-                                                    <Input type="datetime-local" label="End Time" value={dStopAt} onChange={(e) => setDStopAt(e.target.value)} />
+                                                    <Input type="datetime-local" label="Data Start" value={dStartAt} onChange={(e) => setDStartAt(e.target.value)} />
+                                                    <Input type="datetime-local" label="Data Stop" value={dStopAt} onChange={(e) => setDStopAt(e.target.value)} />
                                                 </div>
 
                                                 <div className="mt-4">
-                                                    <label className="mb-1 block text-xs font-medium text-zinc-400">Description</label>
+                                                    <label className="mb-1 block text-xs font-medium text-zinc-400">Descriere</label>
                                                     <textarea
                                                         className="min-h-[110px] w-full rounded-xl border border-white/10 bg-white/5 p-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
                                                         value={dDesc}
@@ -938,10 +938,10 @@ export default function WorkOrdersPage() {
 
                                                 <div className="mt-6 flex items-center justify-between">
                                                     <div className="text-xs text-zinc-500">
-                                                        {selected.durationMinutes ? `Final Duration: ${selected.durationMinutes} min` : "Work in progress..."}
+                                                        {selected.durationMinutes ? `Durata Finala: ${selected.durationMinutes} min` : "In lucru..."}
                                                     </div>
                                                     <Button onClick={onSave} disabled={!canSave} variant="primary">
-                                                        Save Changes
+                                                        Salveaza Modificarile
                                                     </Button>
                                                 </div>
                                             </>
@@ -954,22 +954,22 @@ export default function WorkOrdersPage() {
                                                 {/* Assignments */}
                                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                                     <div className="mb-3 flex items-center justify-between">
-                                                        <div className="text-sm font-semibold text-zinc-200">Team assignments</div>
+                                                        <div className="text-sm font-semibold text-zinc-200">Alocari echipa</div>
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
                                                             disabled={asgLoading || actionLoading}
                                                             onClick={() => selected && loadAssignments(selected.id)}
                                                         >
-                                                            Refresh
+                                                            Actualizeaza
                                                         </Button>
                                                     </div>
 
                                                     {asgErr ? <ErrorBox message={asgErr} onClose={() => setAsgErr(null)} /> : null}
 
                                                     <div className="grid gap-3 lg:grid-cols-2">
-                                                        <Select label="Person" value={asgPersonId} onChange={(e) => setAsgPersonId(e.target.value)}>
-                                                            <option value="">(Select person)</option>
+                                                        <Select label="Angajat" value={asgPersonId} onChange={(e) => setAsgPersonId(e.target.value)}>
+                                                            <option value="">(Selecteaza angajat)</option>
                                                             {peopleForAssignment.map((p) => (
                                                                 <option key={p.id} value={p.id}>
                                                                     {p.displayName}
@@ -977,8 +977,8 @@ export default function WorkOrdersPage() {
                                                             ))}
                                                         </Select>
 
-                                                        <Select label="Role" value={asgRoleId} onChange={(e) => setAsgRoleId(e.target.value)}>
-                                                            <option value="">(Select role)</option>
+                                                        <Select label="Rol" value={asgRoleId} onChange={(e) => setAsgRoleId(e.target.value)}>
+                                                            <option value="">(Selecteaza rol)</option>
                                                             {rolesForAssignment.map((r) => (
                                                                 <option key={r.id} value={r.id}>
                                                                     {r.name}
@@ -986,11 +986,11 @@ export default function WorkOrdersPage() {
                                                             ))}
                                                         </Select>
 
-                                                        <Input type="datetime-local" label="Planned From" value={asgFrom} onChange={(e) => setAsgFrom(e.target.value)} />
-                                                        <Input type="datetime-local" label="Planned To" value={asgTo} onChange={(e) => setAsgTo(e.target.value)} />
+                                                        <Input type="datetime-local" label="Planificat din" value={asgFrom} onChange={(e) => setAsgFrom(e.target.value)} />
+                                                        <Input type="datetime-local" label="Planificat pana la" value={asgTo} onChange={(e) => setAsgTo(e.target.value)} />
 
                                                         <div className="lg:col-span-2">
-                                                            <label className="mb-1 block text-xs font-medium text-zinc-400">Notes (optional)</label>
+                                                            <label className="mb-1 block text-xs font-medium text-zinc-400">Note (optional)</label>
                                                             <textarea
                                                                 className="min-h-[80px] w-full rounded-xl border border-white/10 bg-white/5 p-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
                                                                 value={asgNotes}
@@ -1000,16 +1000,16 @@ export default function WorkOrdersPage() {
 
                                                         <div className="lg:col-span-2 flex justify-end">
                                                             <Button variant="primary" disabled={actionLoading} onClick={onCreateAssignment}>
-                                                                Add assignment
+                                                                Adauga alocare
                                                             </Button>
                                                         </div>
                                                     </div>
 
                                                     <div className="mt-4">
                                                         {asgLoading ? (
-                                                            <div className="text-sm text-zinc-400">Loading...</div>
+                                                            <div className="text-sm text-zinc-400">Se incarca...</div>
                                                         ) : assignments.length === 0 ? (
-                                                            <div className="text-sm text-zinc-400">No assignments.</div>
+                                                            <div className="text-sm text-zinc-400">Nu exista alocari.</div>
                                                         ) : (
                                                             <div className="space-y-2">
                                                                 {assignments.map((a) => (
@@ -1024,7 +1024,7 @@ export default function WorkOrdersPage() {
                                                                             </div>
                                                                         </div>
                                                                         <Button variant="ghost" size="sm" disabled={actionLoading} onClick={() => onDeleteAssignment(a)}>
-                                                                            Delete
+                                                                            Sterge
                                                                         </Button>
                                                                     </div>
                                                                 ))}
@@ -1036,22 +1036,22 @@ export default function WorkOrdersPage() {
                                                 {/* Labor logs */}
                                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                                     <div className="mb-3 flex items-center justify-between">
-                                                        <div className="text-sm font-semibold text-zinc-200">Labor logs</div>
+                                                        <div className="text-sm font-semibold text-zinc-200">Pontaj (Labor logs)</div>
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
                                                             disabled={laborLoading || actionLoading}
                                                             onClick={() => selected && loadLabor(selected.id)}
                                                         >
-                                                            Refresh
+                                                            Actualizeaza
                                                         </Button>
                                                     </div>
 
                                                     {laborErr ? <ErrorBox message={laborErr} onClose={() => setLaborErr(null)} /> : null}
 
                                                     <div className="grid gap-3 lg:grid-cols-[1fr_160px_1fr_140px]">
-                                                        <Select label="Person" value={laborPersonId} onChange={(e) => setLaborPersonId(e.target.value)}>
-                                                            <option value="">(Select person)</option>
+                                                        <Select label="Angajat" value={laborPersonId} onChange={(e) => setLaborPersonId(e.target.value)}>
+                                                            <option value="">(Selecteaza angajat)</option>
                                                             {people.map((p) => (
                                                                 <option key={p.id} value={p.id}>
                                                                     {p.displayName}
@@ -1060,7 +1060,7 @@ export default function WorkOrdersPage() {
                                                         </Select>
 
                                                         <Input
-                                                            label="Minutes"
+                                                            label="Minute"
                                                             type="number"
                                                             min={1}
                                                             step="1"
@@ -1069,7 +1069,7 @@ export default function WorkOrdersPage() {
                                                         />
 
                                                         <Input
-                                                            label="Description (optional)"
+                                                            label="Descriere (optional)"
                                                             value={laborDesc}
                                                             onChange={(e) => setLaborDesc(e.target.value)}
                                                             placeholder="ex: inlocuit curea, reglaj, verificare"
@@ -1077,16 +1077,16 @@ export default function WorkOrdersPage() {
 
                                                         <div className="flex items-end">
                                                             <Button variant="primary" disabled={actionLoading} onClick={onAddLabor}>
-                                                                Add
+                                                                Adauga
                                                             </Button>
                                                         </div>
                                                     </div>
 
                                                     <div className="mt-4">
                                                         {laborLoading ? (
-                                                            <div className="text-sm text-zinc-400">Loading...</div>
+                                                            <div className="text-sm text-zinc-400">Se incarca...</div>
                                                         ) : labor.length === 0 ? (
-                                                            <div className="text-sm text-zinc-400">No labor logs.</div>
+                                                            <div className="text-sm text-zinc-400">Nu exista pontaje.</div>
                                                         ) : (
                                                             <div className="space-y-2">
                                                                 {labor.map((l) => (
@@ -1101,7 +1101,7 @@ export default function WorkOrdersPage() {
                                                                             </div>
                                                                         </div>
                                                                         <Button variant="ghost" size="sm" disabled={actionLoading} onClick={() => onDeleteLabor(l)}>
-                                                                            Delete
+                                                                            Sterge
                                                                         </Button>
                                                                     </div>
                                                                 ))}
@@ -1117,17 +1117,17 @@ export default function WorkOrdersPage() {
                                     return (
                                         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                             <div className="mb-3 flex items-center justify-between">
-                                                <div className="text-sm font-semibold text-zinc-200">Parts used</div>
+                                                <div className="text-sm font-semibold text-zinc-200">Piese utilizate</div>
                                                 <Button variant="ghost" size="sm" disabled={woPartsLoading || actionLoading} onClick={() => selected && loadWoParts(selected.id)}>
-                                                    Refresh
+                                                    Actualizeaza
                                                 </Button>
                                             </div>
 
                                             {woPartsErr ? <ErrorBox message={woPartsErr} onClose={() => setWoPartsErr(null)} /> : null}
 
                                             <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_160px_140px]">
-                                                <Select label="Part" value={partIdInput} onChange={(e) => setPartIdInput(e.target.value)}>
-                                                    <option value="">(Select part)</option>
+                                                <Select label="Piesa" value={partIdInput} onChange={(e) => setPartIdInput(e.target.value)}>
+                                                    <option value="">(Selecteaza piesa)</option>
                                                     {partsCatalog.map((p) => (
                                                         <option key={p.id} value={p.id}>
                                                             {p.name}{p.code ? ` (${p.code})` : ""}
@@ -1135,19 +1135,19 @@ export default function WorkOrdersPage() {
                                                     ))}
                                                 </Select>
 
-                                                <Input label="Qty" type="number" min={0.0001} step="0.01" value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} />
+                                                <Input label="Cantitate" type="number" min={0.0001} step="0.01" value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} />
 
                                                 <div className="flex items-end">
                                                     <Button variant="primary" disabled={actionLoading} onClick={onAddPart}>
-                                                        Add
+                                                        Adauga
                                                     </Button>
                                                 </div>
                                             </div>
 
                                             {woPartsLoading ? (
-                                                <div className="text-sm text-zinc-400">Loading...</div>
+                                                <div className="text-sm text-zinc-400">Se incarca...</div>
                                             ) : woParts.length === 0 ? (
-                                                <div className="text-sm text-zinc-400">No parts on this work order.</div>
+                                                <div className="text-sm text-zinc-400">Nu exista piese pe acest ordin de lucru.</div>
                                             ) : (
                                                 <div className="space-y-2">
                                                     {woParts.map((row) => (

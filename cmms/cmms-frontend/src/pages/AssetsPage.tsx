@@ -24,7 +24,7 @@ import {
 
 // Eliminat export-ul pentru a respecta regula Fast Refresh (doar componenta principală exportată)
 function StatusPill({ isActive }: { isActive: boolean }) {
-    return <Pill tone={isActive ? "emerald" : "zinc"}>{isActive ? "Active" : "Deleted"}</Pill>;
+    return <Pill tone={isActive ? "emerald" : "zinc"}>{isActive ? "Activ" : "Sters"}</Pill>;
 }
 
 export default function AssetsPage() {
@@ -101,7 +101,7 @@ export default function AssetsPage() {
 
     async function onDelete(id: string, isActive: boolean) {
         if (!isActive) return;
-        if (!window.confirm("Soft delete asset?")) return;
+        if (!window.confirm("Stergeti utilajul?")) return;
         setErr(null);
         try {
             await deleteAsset(id);
@@ -113,7 +113,7 @@ export default function AssetsPage() {
     }
 
     return (
-        <AppShell title="Assets">
+        <AppShell title="Utilaje">
             <PageToolbar
                 left={
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -124,7 +124,7 @@ export default function AssetsPage() {
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter") load();
                                 }}
-                                placeholder="Search assets..."
+                                placeholder="Cauta utilaje..."
                             />
                         </div>
 
@@ -135,14 +135,14 @@ export default function AssetsPage() {
                                 onChange={(e) => setShowDel(e.target.checked)}
                                 className="h-4 w-4 rounded border-white/20 bg-white/10"
                             />
-                            Show deleted
+                            Arata sterse
                         </label>
                     </div>
                 }
                 right={
                     <div className="flex items-center gap-2">
                         <Button onClick={load} disabled={loading} variant="ghost">
-                            {loading ? "Loading..." : "Refresh"}
+                            {loading ? "Se incarca..." : "Actualizeaza"}
                         </Button>
                     </div>
                 }
@@ -150,22 +150,22 @@ export default function AssetsPage() {
 
             {err ? <ErrorBox message={err} onClose={() => setErr(null)} /> : null}
 
-            <Card title="New Asset">
+            <Card title="Utilaj Nou">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <Input
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
-                        placeholder="Name"
+                        placeholder="Nume"
                     />
 
                     <Input
                         value={newCode}
                         onChange={(e) => setNewCode(e.target.value)}
-                        placeholder="Code (optional)"
+                        placeholder="Cod (optional)"
                     />
 
                     <Select value={locId} onChange={(e) => setLocId(e.target.value)}>
-                        <option value="">(No location)</option>
+                        <option value="">(Fara locatie)</option>
                         {locs.map((l) => (
                             <option key={l.id} value={l.id}>
                                 {l.name}
@@ -174,7 +174,7 @@ export default function AssetsPage() {
                     </Select>
 
                     <Button onClick={onCreate} disabled={!canCreate} variant="primary">
-                        Create
+                        Creeaza
                     </Button>
                 </div>
             </Card>
@@ -185,11 +185,11 @@ export default function AssetsPage() {
                 <table className="w-full border-collapse text-sm">
                     <thead className="bg-white/5 text-zinc-300">
                         <tr>
-                            <th className="px-4 py-3 text-left font-semibold">Name</th>
-                            <th className="px-4 py-3 text-left font-semibold">Code</th>
-                            <th className="px-4 py-3 text-left font-semibold">Location</th>
+                            <th className="px-4 py-3 text-left font-semibold">Nume</th>
+                            <th className="px-4 py-3 text-left font-semibold">Cod</th>
+                            <th className="px-4 py-3 text-left font-semibold">Locatie</th>
                             <th className="px-4 py-3 text-left font-semibold">Status</th>
-                            <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                            <th className="px-4 py-3 text-right font-semibold">Actiuni</th>
                         </tr>
                     </thead>
 
@@ -215,7 +215,7 @@ export default function AssetsPage() {
                                                     : "bg-white/5 text-zinc-500 ring-white/10 cursor-not-allowed"
                                             )}
                                         >
-                                            Delete
+                                            Sterge
                                         </button>
                                     </td>
                                 </tr>
@@ -223,7 +223,7 @@ export default function AssetsPage() {
                         })}
 
                         {!loading && items.length === 0 ? (
-                            <EmptyRow colSpan={5} text="No assets found." />
+                            <EmptyRow colSpan={5} text="Nu au fost gasite utilaje." />
                         ) : null}
                     </tbody>
                 </table>

@@ -19,6 +19,7 @@ import ExtraJobsPage from "./pages/ExtraJobsPage";
 import WorkOrderPrintPage from "./pages/WorkOrderPrintPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
+import AiCopilotPage from "./pages/AiCopilotPage";
 
 export default function App() {
     return (
@@ -158,6 +159,14 @@ export default function App() {
                 element={
                     <RequireAuth>
                         <SettingsPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/ai-copilot"
+                element={
+                    <RequireAuth>
+                        <AiCopilotPage />
                     </RequireAuth>
                 }
             />

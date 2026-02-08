@@ -147,7 +147,7 @@ export default function WoAssignmentsPanel(props: { workOrderId: string }) {
         if (filteredPeopleForAdd.length > 0) {
             setPersonId(filteredPeopleForAdd[0].id);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [q, filteredPeopleForAdd]);
 
     const canAdd = useMemo(() => {
@@ -218,7 +218,7 @@ export default function WoAssignmentsPanel(props: { workOrderId: string }) {
             if (!isGuidLike(nextPersonId) || !isGuidLike(nextRoleId)) return;
             if (!nextFromIso || !nextToIso) return;
             if (new Date(nextFromIso) >= new Date(nextToIso)) {
-                setErr("Interval invalid: PlannedTo trebuie sa fie dupa PlannedFrom.");
+                setErr("Interval invalid: Data stop trebuie sa fie dupa data start.");
                 return;
             }
 
@@ -247,7 +247,7 @@ export default function WoAssignmentsPanel(props: { workOrderId: string }) {
         <div className="space-y-4">
             <div className="flex items-center justify-end gap-2">
                 <Button variant="ghost" size="sm" disabled={loading || actionLoading} onClick={load}>
-                    Refresh
+                    Actualizeaza
                 </Button>
                 <Button
                     variant="primary"
@@ -265,12 +265,12 @@ export default function WoAssignmentsPanel(props: { workOrderId: string }) {
                 <div className="mb-4 rounded-2xl border border-white/10 bg-white/5 p-4">
                     <div className="grid gap-3 lg:grid-cols-12">
                         <div className="lg:col-span-4">
-                            <Input label="Search person" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type a name..." />
+                            <Input label="Cauta angajat" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Scrie un nume..." />
                         </div>
 
                         <div className="lg:col-span-4">
-                            <Select label="Person" value={personId} onChange={(e) => setPersonId(e.target.value)}>
-                                <option value="">(Select)</option>
+                            <Select label="Angajat" value={personId} onChange={(e) => setPersonId(e.target.value)}>
+                                <option value="">(Selecteaza)</option>
                                 {filteredPeopleForAdd.map((p) => (
                                     <option key={p.id} value={p.id}>
                                         {p.displayName}
@@ -278,13 +278,13 @@ export default function WoAssignmentsPanel(props: { workOrderId: string }) {
                                 ))}
                             </Select>
                             <div className="mt-1 text-xs text-zinc-500">
-                                {filteredPeopleForAdd.length === 50 ? "Showing first 50 matches" : null}
+                                {filteredPeopleForAdd.length === 50 ? "Se afiseaza primele 50 rezultate" : null}
                             </div>
                         </div>
 
                         <div className="lg:col-span-4">
-                            <Select label="Role" value={roleId} onChange={(e) => setRoleId(e.target.value)}>
-                                <option value="">(Select role)</option>
+                            <Select label="Rol" value={roleId} onChange={(e) => setRoleId(e.target.value)}>
+                                <option value="">(Selecteaza rol)</option>
                                 {roles.map((r) => (
                                     <option key={r.id} value={r.id}>
                                         {r.name}
@@ -294,14 +294,14 @@ export default function WoAssignmentsPanel(props: { workOrderId: string }) {
                         </div>
 
                         <div className="lg:col-span-3">
-                            <Input type="datetime-local" label="Planned from" value={plannedFrom} onChange={(e) => setPlannedFrom(e.target.value)} />
+                            <Input type="datetime-local" label="Planificat de la" value={plannedFrom} onChange={(e) => setPlannedFrom(e.target.value)} />
                         </div>
                         <div className="lg:col-span-3">
-                            <Input type="datetime-local" label="Planned to" value={plannedTo} onChange={(e) => setPlannedTo(e.target.value)} />
+                            <Input type="datetime-local" label="Planificat pana la" value={plannedTo} onChange={(e) => setPlannedTo(e.target.value)} />
                         </div>
 
                         <div className="lg:col-span-4">
-                            <Input label="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
+                            <Input label="Note (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
                         </div>
 
                         <div className="lg:col-span-2 flex items-end gap-2">
@@ -313,10 +313,10 @@ export default function WoAssignmentsPanel(props: { workOrderId: string }) {
                                     setAddOpen(false);
                                 }}
                             >
-                                Cancel
+                                Anuleaza
                             </Button>
                             <Button variant="primary" disabled={!canAdd} onClick={onAdd}>
-                                Add
+                                Adauga
                             </Button>
                         </div>
                     </div>
@@ -324,7 +324,7 @@ export default function WoAssignmentsPanel(props: { workOrderId: string }) {
             ) : null}
 
             {loading ? (
-                <div className="text-sm text-zinc-400">Loading...</div>
+                <div className="text-sm text-zinc-400">Incarcare...</div>
             ) : assignments.length === 0 ? (
                 <div className="text-sm text-zinc-500 italic py-8 text-center border border-dashed border-white/10 rounded-xl">
                     Nu exista membri in echipa. Adauga pe cineva folosind butonul "+ Adauga Membru".
@@ -408,7 +408,7 @@ export default function WoAssignmentsPanel(props: { workOrderId: string }) {
                                             defaultValue={a.notes ?? ""}
                                             disabled={actionLoading}
                                             className="min-w-[220px]"
-                                            placeholder="Notes"
+                                            placeholder="Note"
                                             onBlur={(e) => {
                                                 const next = e.currentTarget.value;
                                                 updateRow(a, { notes: next });
@@ -416,7 +416,7 @@ export default function WoAssignmentsPanel(props: { workOrderId: string }) {
                                         />
 
                                         <Button variant="ghost" size="sm" disabled={actionLoading} onClick={() => onDelete(a)}>
-                                            Remove
+                                            Sterge
                                         </Button>
                                     </div>
                                 </div>

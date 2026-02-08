@@ -212,18 +212,18 @@ export default function DashboardPage() {
   }, [personId, period]);
 
   return (
-    <AppShell title="Dashboard">
+    <AppShell title="Tablou de bord">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm text-zinc-400">
-          Operational overview (live data)
+          Prezentare operationala (date live)
         </div>
 
         <button
           onClick={loadAll}
           className="inline-flex h-10 items-center justify-center rounded-xl bg-white/10 px-4 text-sm font-semibold text-zinc-200 ring-1 ring-white/15 hover:bg-white/15"
         >
-          Refresh
+          Actualizeaza
         </button>
       </div>
 
@@ -235,15 +235,15 @@ export default function DashboardPage() {
 
       {/* KPI grid */}
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <KpiCard label="WO DESCHISE" value={kpis?.woOpen} hint="Status Open" />
-        <KpiCard label="WO Done" value={kpis?.woClosed} hint="Closed" tone="good" />
-        <KpiCard label="WO In progress" value={kpis?.woInProgress} hint="Active now" tone="warn" />
-        <KpiCard label="PM On time" value={kpis?.pmOnTime} hint="Executed as planned" tone="good" />
-        <KpiCard label="PM Late" value={kpis?.pmLate} hint="Overdue" tone="bad" />
+        <KpiCard label="Ordine Deschise" value={kpis?.woOpen} hint="Status Deschis" />
+        <KpiCard label="Ordine Finalizate" value={kpis?.woClosed} hint="Inchis" tone="good" />
+        <KpiCard label="Ordine in Lucru" value={kpis?.woInProgress} hint="Activ acum" tone="warn" />
+        <KpiCard label="PM la Timp" value={kpis?.pmOnTime} hint="Executat conform planului" tone="good" />
+        <KpiCard label="PM Intarziate" value={kpis?.pmLate} hint="Intarziat" tone="bad" />
         <KpiCard
-          label="Assets in maintenance"
+          label="Utilaje in mentenanta"
           value={kpis?.assetsInMaintenance}
-          hint="WO InProgress"
+          hint="Ordine in Lucru"
         />
       </div>
 
@@ -287,10 +287,10 @@ export default function DashboardPage() {
         <div className="mt-3 text-sm text-zinc-300">
           {selectedPerson ? (
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <span>Total WO: <b>{activity?.woTotal ?? "—"}</b></span>
-              <span>Done: <b>{activity?.woClosed ?? "—"}</b></span>
-              <span>InProgress: <b>{activity?.woInProgress ?? "—"}</b></span>
-              <span>Total min: <b>{activity?.totalDurationMinutes ?? "—"}</b></span>
+              <span>Total Ordine: <b>{activity?.woTotal ?? "—"}</b></span>
+              <span>Finalizate: <b>{activity?.woClosed ?? "—"}</b></span>
+              <span>In Lucru: <b>{activity?.woInProgress ?? "—"}</b></span>
+              <span>Total minute: <b>{activity?.totalDurationMinutes ?? "—"}</b></span>
             </div>
           ) : (
             <div>Nu exista angajati.</div>
@@ -358,8 +358,8 @@ export default function DashboardPage() {
               <tr>
                 <th className="px-3 py-2 text-left font-semibold">Utilaj</th>
                 <th className="px-3 py-2 text-left font-semibold">Locatie</th>
-                <th className="px-3 py-2 text-left font-semibold">Work Order</th>
-                <th className="px-3 py-2 text-left font-semibold">Asignat</th>
+                <th className="px-3 py-2 text-left font-semibold">Ordin de Lucru</th>
+                <th className="px-3 py-2 text-left font-semibold">Alocat</th>
                 <th className="px-3 py-2 text-left font-semibold">Start</th>
               </tr>
             </thead>

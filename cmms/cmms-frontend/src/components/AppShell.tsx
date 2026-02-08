@@ -6,20 +6,21 @@ import { logout } from "../api";
 type NavItem = { to: string; label: string };
 
 const NAV: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/work-orders", label: "Work Orders" },
-  { to: "/work-orders/cards", label: "Carduri Work Orders" },
+  { to: "/dashboard", label: "Tablou de bord" },
+  { to: "/work-orders", label: "Ordine de Lucru" },
+  { to: "/work-orders/cards", label: "Carduri Ordine de Lucru" },
   { to: "/extra-jobs", label: "Activitati Extra" },
-  { to: "/assets", label: "Assets" },
-  { to: "/locations", label: "Locations" },
-  { to: "/pm-plans", label: "PM Plans" },
-  { to: "/parts", label: "Parts" },
-  { to: "/inventory", label: "Inventory" },
+  { to: "/assets", label: "Utilaje" },
+  { to: "/locations", label: "Locatii" },
+  { to: "/pm-plans", label: "Planuri Mentenanta" },
+  { to: "/parts", label: "Piese de schimb" },
+  { to: "/inventory", label: "Inventar" },
 
-  { to: "/people", label: "People" },
-  { to: "/roles", label: "Roles" },
+  { to: "/people", label: "Angajati" },
+  { to: "/roles", label: "Roluri" },
   { to: "/calendar", label: "Calendar" },
   { to: "/reports", label: "Rapoarte" },
+  { to: "/ai-copilot", label: "AI Copilot" },
   { to: "/settings", label: "Setari" },
 ];
 
@@ -72,7 +73,7 @@ function Sidebar(props: {
   return (
     <div className="h-full rounded-2xl border border-white/10 bg-white/5 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.35)]">
       <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-        Navigation
+        Navigare
       </div>
 
       <nav className="space-y-1 p-1">
@@ -102,13 +103,13 @@ function Sidebar(props: {
           onClick={props.onLogout}
           className="w-full rounded-xl bg-white/10 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-white/15"
         >
-          Logout
+          Deconectare
         </button>
       </div>
 
       {props.title ? (
         <div className="mt-2 px-3 pb-2 text-xs text-zinc-500">
-          Page: {props.title}
+          Pagina: {props.title}
         </div>
       ) : null}
     </div>
@@ -160,7 +161,7 @@ export default function AppShell(props: {
             type="button"
             className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-200 hover:bg-white/10 lg:hidden"
             onClick={() => setMobileNavOpen(true)}
-            aria-label="Open navigation"
+            aria-label="Deschide navigatia"
           >
             <IconHamburger className="h-5 w-5" />
           </button>
@@ -190,12 +191,12 @@ export default function AppShell(props: {
           />
           <div className="absolute left-0 top-0 h-full w-[300px] max-w-[85vw] p-3">
             <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm font-semibold text-zinc-200">Menu</div>
+              <div className="text-sm font-semibold text-zinc-200">Meniu</div>
               <button
                 type="button"
                 className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-200 hover:bg-white/10"
                 onClick={closeMobileNav}
-                aria-label="Close navigation"
+                aria-label="Inchide navigatia"
               >
                 <IconX className="h-5 w-5" />
               </button>

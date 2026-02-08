@@ -82,7 +82,7 @@ export default function InventoryPage() {
     const n = parseNumberLoose(delta);
 
     if (n == null || n === 0) {
-      setErr("Delta must be a non-zero number (ex: 1, -0.5, 2,5).");
+      setErr("Delta trebuie sa fie un numar diferit de zero (ex: 1, -0.5, 2,5).");
       return;
     }
 
@@ -101,7 +101,7 @@ export default function InventoryPage() {
   }, []);
 
   return (
-    <AppShell title="Inventory">
+    <AppShell title="Inventar">
       <PageToolbar
         left={
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -112,20 +112,20 @@ export default function InventoryPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") load(e.currentTarget.value);
                 }}
-                placeholder="Search part name / code..."
+                placeholder="Cauta nume piesa / cod..."
               />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Pill tone="zinc">Rows: {stats.totalRows}</Pill>
-              <Pill tone="teal">Total qty: {Math.round(stats.totalQty * 100) / 100}</Pill>
+              <Pill tone="zinc">Randuri: {stats.totalRows}</Pill>
+              <Pill tone="teal">Cantitate totala: {Math.round(stats.totalQty * 100) / 100}</Pill>
             </div>
           </div>
         }
         right={
           <div className="flex items-center gap-2">
             <Button onClick={() => load()} disabled={loading} variant="ghost">
-              {loading ? "Loading..." : "Refresh"}
+              {loading ? "Incarcare..." : "Actualizeaza"}
             </Button>
           </div>
         }
@@ -133,20 +133,20 @@ export default function InventoryPage() {
 
       {err ? <ErrorBox message={err} /> : null}
 
-      <Card title="Adjust stock">
+      <Card title="Ajustare stoc">
         <div className="grid gap-3 lg:grid-cols-12">
           <div className="lg:col-span-7">
             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Item
+              Articol
             </div>
             <Select value={selId} onChange={(e) => setSelId(e.target.value)}>
               <option value="" disabled>
-                {items.length ? "Select inventory row..." : "No inventory rows"}
+                {items.length ? "Selecteaza rand inventar..." : "Nu exista randuri de inventar"}
               </option>
               {items.map((x) => (
                 <option key={x.id} value={x.id}>
                   {x.partName}
-                  {x.partCode ? ` (${x.partCode})` : ""} | on hand: {x.qtyOnHand}
+                  {x.partCode ? ` (${x.partCode})` : ""} | pe stoc: {x.qtyOnHand}
                 </option>
               ))}
             </Select>
@@ -162,7 +162,7 @@ export default function InventoryPage() {
               placeholder="ex: 1, -0.5, 2,5"
             />
             <div className="mt-1 text-xs text-zinc-500">
-              Positive adds stock, negative removes stock.
+              Valorile pozitive adauga stoc, cele negative scad stocul.
             </div>
           </div>
 
@@ -172,7 +172,7 @@ export default function InventoryPage() {
               disabled={!selected || loading}
               variant="primary"
             >
-              Apply
+              Aplica
             </Button>
           </div>
         </div>
@@ -196,10 +196,10 @@ export default function InventoryPage() {
         <table className="w-full border-collapse text-sm">
           <thead className="bg-white/5 text-zinc-300">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold">Part</th>
-              <th className="px-4 py-3 text-left font-semibold">Code</th>
-              <th className="px-4 py-3 text-left font-semibold">UoM</th>
-              <th className="px-4 py-3 text-right font-semibold">On hand</th>
+              <th className="px-4 py-3 text-left font-semibold">Piesa</th>
+              <th className="px-4 py-3 text-left font-semibold">Cod</th>
+              <th className="px-4 py-3 text-left font-semibold">U.M.</th>
+              <th className="px-4 py-3 text-right font-semibold">Pe stoc</th>
             </tr>
           </thead>
 
@@ -218,7 +218,7 @@ export default function InventoryPage() {
             ))}
 
             {!loading && items.length === 0 ? (
-              <EmptyRow colSpan={4} text="No inventory rows." />
+              <EmptyRow colSpan={4} text="Nu exista randuri de inventar." />
             ) : null}
           </tbody>
         </table>
@@ -262,7 +262,7 @@ function ReceiveStockModal(props: {
         <button
           onClick={() => setOpen(true)}
           className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500 text-teal-950 shadow-lg ring-1 ring-teal-400 hover:bg-teal-400 hover:scale-105 transition"
-          title="Receive Stock"
+          title="Receptioneaza Stoc"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-6 h-6">
             <path d="M12 5v14M5 12h14" />
@@ -274,12 +274,12 @@ function ReceiveStockModal(props: {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
           <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900 p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="mb-4 text-lg font-semibold text-zinc-100">Receive Stock</h2>
+            <h2 className="mb-4 text-lg font-semibold text-zinc-100">Receptioneaza Stoc</h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
-                  Part
+                  Piesa
                 </label>
                 <select
                   className="w-full rounded-xl border border-white/10 bg-white/5 py-2 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
@@ -287,7 +287,7 @@ function ReceiveStockModal(props: {
                   onChange={e => setItemId(e.target.value)}
                   disabled={busy}
                 >
-                  <option value="">-- Select Part --</option>
+                  <option value="">-- Selecteaza Piesa --</option>
                   {props.items.map(i => (
                     <option key={i.id} value={i.id}>
                       {i.partName} ({i.qtyOnHand})
@@ -298,13 +298,13 @@ function ReceiveStockModal(props: {
 
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
-                  Quantity to Add
+                  Cantitate de adaugat
                 </label>
                 <input
                   className="w-full rounded-xl border border-white/10 bg-white/5 py-2 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   value={qty}
                   onChange={e => setQty(e.target.value)}
-                  placeholder="e.g. 10"
+                  placeholder="ex: 10"
                   disabled={busy}
                 />
               </div>
@@ -316,14 +316,14 @@ function ReceiveStockModal(props: {
                   className="rounded-xl px-4 py-2 text-sm font-semibold text-zinc-400 hover:text-zinc-200"
                   disabled={busy}
                 >
-                  Cancel
+                  Anuleaza
                 </button>
                 <button
                   type="submit"
                   disabled={busy || !itemId || !qty}
                   className="rounded-xl bg-teal-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-teal-400 disabled:opacity-50"
                 >
-                  {busy ? "Saving..." : "Receive"}
+                  {busy ? "Se salveaza..." : "Receptioneaza"}
                 </button>
               </div>
             </form>

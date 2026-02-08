@@ -216,7 +216,7 @@ export default function WorkOrderCardsPage() {
                 left={
                     <div className="flex items-center gap-2">
                         <Button onClick={loadData} variant="ghost" disabled={loading}>
-                            Refresh
+                            Actualizeaza
                         </Button>
                     </div>
                 }
@@ -228,9 +228,9 @@ export default function WorkOrderCardsPage() {
                 <div className="p-8 text-center text-zinc-500">Incarcare...</div>
             ) : (
                 <div className="pb-20">
-                    {renderGroup("Open", open)}
-                    {renderGroup("In Progress", inProgress)}
-                    {renderGroup("Done (Last 30 Days)", done)}
+                    {renderGroup("Deschise", open)}
+                    {renderGroup("In Lucru", inProgress)}
+                    {renderGroup("Finalizate (Ultimele 30 zile)", done)}
 
                     {!open.length && !inProgress.length && !done.length && (
                         <div className="text-center text-zinc-500 py-10">Nimic de afisat.</div>
@@ -248,7 +248,7 @@ export default function WorkOrderCardsPage() {
                         <div className="text-xs text-zinc-500">
                             {selected?.status}
                         </div>
-                        <Button variant="ghost" onClick={onCloseDrawer}>Close</Button>
+                        <Button variant="ghost" onClick={onCloseDrawer}>Inchide</Button>
                     </div>
                 }
             >

@@ -16,4 +16,5 @@ export * from "./calendar";
 export * from "./extraJobs";
 
 export * from "./laborLogs";
+export * from "./ai";
 

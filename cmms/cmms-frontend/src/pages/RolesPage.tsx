@@ -50,7 +50,7 @@ export default function RolesPage() {
 
     async function onCreate() {
         const n = (name ?? "").trim();
-        if (n.length < 2) return setErr("Name too short (min 2 chars).");
+        if (n.length < 2) return setErr("Nume prea scurt (min 2 caractere).");
         setErr(null);
         try {
             await createRole(n, 0);
@@ -73,11 +73,11 @@ export default function RolesPage() {
 
     async function handleSave(id: string) {
         const n = (editName ?? "").trim();
-        if (n.length < 2) return setErr("Name too short (min 2 chars).");
+        if (n.length < 2) return setErr("Nume prea scurt (min 2 caractere).");
         setErr(null);
         try {
             const r = items.find((x) => x.id === id);
-            if (!r) throw new Error("Role not found");
+            if (!r) throw new Error("Rolul nu a fost gasit");
             await updateRole(id, n, r.sortOrder ?? 0, r.isActive);
             cancelEdit();
             await load();
@@ -91,7 +91,7 @@ export default function RolesPage() {
         setErr(null);
         try {
             const r = items.find((x) => x.id === id);
-            if (!r) throw new Error("Role not found");
+            if (!r) throw new Error("Rolul nu a fost gasit");
             // soft delete -> set IsActive = false
             await updateRole(id, r.name, r.sortOrder ?? 0, false);
             await load();
@@ -101,32 +101,32 @@ export default function RolesPage() {
     }
 
     return (
-        <AppShell title="Roles">
+        <AppShell title="Roluri">
             <PageToolbar
                 left={
                     <div className="flex items-center gap-2">
-                        <div className="text-sm text-zinc-400">Manage assignment roles</div>
-                        <div className="ml-4 text-xs text-zinc-500">Examples: Responsabil, Coordonator, Manipulant</div>
+                        <div className="text-sm text-zinc-400">Gestioneaza rolurile de asignare</div>
+                        <div className="ml-4 text-xs text-zinc-500">Exemple: Responsabil, Coordonator, Manipulant</div>
                     </div>
                 }
                 right={
                     <div className="flex items-center gap-2">
-                        <Pill tone="zinc">Rows: {stats.total}</Pill>
+                        <Pill tone="zinc">Randuri: {stats.total}</Pill>
                         {stats.inactive > 0 ? <Pill tone="amber">Inactive: {stats.inactive}</Pill> : null}
-                        <Button onClick={load} variant="ghost" disabled={loading}>{loading ? "Loading..." : "Refresh"}</Button>
+                        <Button onClick={load} variant="ghost" disabled={loading}>{loading ? "Se incarca..." : "Actualizeaza"}</Button>
                     </div>
                 }
             />
 
             {err ? <ErrorBox message={err} onClose={() => setErr(null)} /> : null}
 
-            <Card title="Create Role">
+            <Card title="Creeaza Rol">
                 <div className="grid gap-3 sm:grid-cols-12 items-end">
                     <div className="sm:col-span-9">
-                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Role name" />
+                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nume rol" />
                     </div>
                     <div className="sm:col-span-3 flex justify-end">
-                        <Button variant="primary" onClick={onCreate} disabled={name.trim().length < 2}>{"Create"}</Button>
+                        <Button variant="primary" onClick={onCreate} disabled={name.trim().length < 2}>{"Creeaza"}</Button>
                     </div>
                 </div>
             </Card>
@@ -137,8 +137,8 @@ export default function RolesPage() {
                 <table className="w-full text-sm text-left">
                     <thead className="bg-white/5 text-zinc-400">
                         <tr>
-                    <th className="px-4 py-3">Name</th>
-                    <th className="px-4 py-3">Actions</th>
+                            <th className="px-4 py-3">Nume</th>
+                            <th className="px-4 py-3">Actiuni</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -155,8 +155,8 @@ export default function RolesPage() {
                                     <div className="flex items-center justify-end gap-2">
                                         {editingId === r.id ? (
                                             <>
-                                                <Button variant="ghost" onClick={cancelEdit}>Cancel</Button>
-                                                <Button variant="primary" onClick={() => handleSave(r.id)}>Save</Button>
+                                                <Button variant="ghost" onClick={cancelEdit}>Anuleaza</Button>
+                                                <Button variant="primary" onClick={() => handleSave(r.id)}>Salveaza</Button>
                                             </>
                                         ) : (
                                             <>
@@ -171,7 +171,7 @@ export default function RolesPage() {
 
                         {items.length === 0 ? (
                             <tr>
-                                <td colSpan={3} className="px-4 py-6 text-zinc-400 text-center">No roles defined.</td>
+                                <td colSpan={3} className="px-4 py-6 text-zinc-400 text-center">Nu exista roluri definite.</td>
                             </tr>
                         ) : null}
                     </tbody>

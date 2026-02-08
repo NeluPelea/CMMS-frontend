@@ -33,7 +33,7 @@ export default function WorkOrderPrintPage() {
     }, [id]);
 
     if (loading) return <div className="p-8">Se incarca...</div>;
-    if (!wo) return <div className="p-8">Work Order negasit.</div>;
+    if (!wo) return <div className="p-8">Ordin de lucru negasit.</div>;
 
     return (
         <div className="min-h-screen bg-white text-black p-8 font-sans">
@@ -210,9 +210,9 @@ export default function WorkOrderPrintPage() {
 }
 
 function getStatusName(s: number) {
-    if (s === 1) return "Open";
-    if (s === 2) return "In Progress";
-    if (s === 3) return "Done";
-    if (s === 4) return "Cancelled";
-    return "Unknown";
+    if (s === 1) return "Deschis";
+    if (s === 2) return "In Lucru";
+    if (s === 3) return "Finalizat";
+    if (s === 4) return "Anulat";
+    return "Necunoscut";
 }

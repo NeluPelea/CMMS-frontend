@@ -29,7 +29,7 @@ export default function LoginPage() {
 
   return (
     <div style={{ padding: 16, maxWidth: 420, margin: "40px auto" }}>
-      <h2 style={{ marginTop: 0 }}>CMMS Login</h2>
+      <h2 style={{ marginTop: 0 }}>Autentificare CMMS</h2>
 
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
         <input
@@ -41,12 +41,12 @@ export default function LoginPage() {
         <input
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
+          placeholder="Parola"
           type="password"
           style={{ padding: 10 }}
         />
         <button type="submit" disabled={loading} style={{ padding: 10 }}>
-          {loading ? "Signing in..." : "Login"}
+          {loading ? "Se incarca..." : "Autentificare"}
         </button>
       </form>
 

@@ -24,6 +24,13 @@ import {
     type TimelineSegmentDto,
 } from "../api/reports";
 
+const translatedStatus: Record<string, string> = {
+    "Open": "Deschis",
+    "InProgress": "In Lucru",
+    "Done": "Finalizat",
+    "Cancelled": "Anulat",
+};
+
 export default function ReportsPage() {
     return <ReportsContent />;
 }
@@ -196,7 +203,7 @@ function ReportsContent() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Export failed (HTTP ${response.status})`);
+                throw new Error(errorData.message || `Export esuat (HTTP ${response.status})`);
             }
 
             const blob = await response.blob();
@@ -209,7 +216,7 @@ function ReportsContent() {
             a.remove();
             window.URL.revokeObjectURL(url);
         } catch (err: any) {
-            setError(err.message || "Failed to export PDF");
+            setError(err.message || "Eroare la exportul PDF");
         } finally {
             setLoading(false);
         }
@@ -227,7 +234,7 @@ function ReportsContent() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Export failed (HTTP ${response.status})`);
+                throw new Error(errorData.message || `Export esuat (HTTP ${response.status})`);
             }
 
             const blob = await response.blob();
@@ -240,7 +247,7 @@ function ReportsContent() {
             a.remove();
             window.URL.revokeObjectURL(url);
         } catch (err: any) {
-            setError(err.message || "Failed to export PDF");
+            setError(err.message || "Eroare la exportul PDF");
         } finally {
             setLoading(false);
         }
@@ -258,7 +265,7 @@ function ReportsContent() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Export failed (HTTP ${response.status})`);
+                throw new Error(errorData.message || `Export esuat (HTTP ${response.status})`);
             }
 
             const blob = await response.blob();
@@ -271,7 +278,7 @@ function ReportsContent() {
             a.remove();
             window.URL.revokeObjectURL(url);
         } catch (err: any) {
-            setError(err.message || "Failed to export PDF");
+            setError(err.message || "Eroare la exportul PDF");
         } finally {
             setLoading(false);
         }
@@ -289,7 +296,7 @@ function ReportsContent() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Export failed (HTTP ${response.status})`);
+                throw new Error(errorData.message || `Export esuat (HTTP ${response.status})`);
             }
 
             const blob = await response.blob();
@@ -302,7 +309,7 @@ function ReportsContent() {
             a.remove();
             window.URL.revokeObjectURL(url);
         } catch (err: any) {
-            setError(err.message || "Failed to export PDF");
+            setError(err.message || "Eroare la exportul PDF");
         } finally {
             setLoading(false);
         }
@@ -427,7 +434,7 @@ function ReportsContent() {
                     onClick={() => setTab("parts")}
                     className={`pb-2 text-sm font-medium whitespace-nowrap ${tab === "parts" ? "text-teal-400 border-b-2 border-teal-400" : "text-zinc-400 hover:text-zinc-200"}`}
                 >
-                    Piese Consumate
+                    Piese de schimb
                 </button>
                 <button
                     onClick={() => setTab("labor-asset")}
@@ -445,7 +452,7 @@ function ReportsContent() {
                     onClick={() => setTab("downtime")}
                     className={`pb-2 text-sm font-medium whitespace-nowrap ${tab === "downtime" ? "text-teal-400 border-b-2 border-teal-400" : "text-zinc-400 hover:text-zinc-200"}`}
                 >
-                    Top Downtime
+                    Top Stationari (Downtime)
                 </button>
                 <button
                     onClick={() => setTab("extra")}
@@ -708,7 +715,7 @@ function ReportsContent() {
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-800 text-zinc-300 border border-zinc-700">
-                                                        {it.status}
+                                                        {translatedStatus[it.status] || it.status}
                                                     </span>
                                                 </td>
                                             </tr>

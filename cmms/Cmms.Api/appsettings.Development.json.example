@@ -1,0 +1,13 @@
+{
+  "ConnectionStrings": {
+    "Default": "Host=localhost;Database=cmms_dev;Username=postgres;Password=your_password"
+  },
+  "Jwt": {
+    "Key": "your-development-jwt-key-min-32-chars-long-for-security"
+  },
+  "Groq": {
+    "ApiKey": "gsk_your_groq_api_key_here",
+    "Model": "llama-3.3-70b-versatile",
+    "TimeoutSeconds": 30
+  }
+}

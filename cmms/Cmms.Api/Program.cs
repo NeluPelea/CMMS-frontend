@@ -70,6 +70,14 @@ builder.Services.AddScoped<Cmms.Api.Services.PeopleAvailability>();
 builder.Services.AddScoped<Cmms.Api.Services.IUnitScheduleService, Cmms.Api.Services.UnitScheduleService>();
 builder.Services.AddHostedService<Cmms.Api.Services.PmBackgroundService>();
 
+// AI Services
+builder.Services.AddScoped<Cmms.Api.Services.AiContextService>();
+builder.Services.AddScoped<Cmms.Api.Ai.Tools.AiToolService>();
+builder.Services.AddHttpClient<Cmms.Api.Services.IGroqClient, Cmms.Api.Services.GroqClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.groq.com/openai/v1/");
+});
+
 // ---------------------------------------------------------
 // 4. SECURITATE JWT (UTF-8 Enforced)
 // ---------------------------------------------------------

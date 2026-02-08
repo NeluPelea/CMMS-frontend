@@ -19,7 +19,7 @@ import {
 function StatusPill({ isActive }: { isActive: boolean }) {
     return (
         <Pill tone={isActive ? "emerald" : "zinc"}>
-            {isActive ? "Active" : "Deleted"}
+            {isActive ? "Activ" : "Sters"}
         </Pill>
     );
 }
@@ -94,7 +94,7 @@ export default function LocationsPage() {
     }
 
     return (
-        <AppShell title="Locations">
+        <AppShell title="Locatii">
             <PageToolbar
                 left={
                     <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
@@ -105,7 +105,7 @@ export default function LocationsPage() {
                                 onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
                                     if (e.key === "Enter") load();
                                 }}
-                                placeholder="Search locations..."
+                                placeholder="Cauta locatii..."
                             />
                         </div>
 
@@ -116,14 +116,14 @@ export default function LocationsPage() {
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setShowDel(e.target.checked)}
                                 className="h-4 w-4 rounded border-white/20 bg-white/10"
                             />
-                            Show deleted
+                            Arata sterse
                         </label>
                     </div>
                 }
                 right={
                     <div className="flex items-center gap-2">
                         <Button onClick={load} disabled={loading} variant="ghost">
-                            {loading ? "Loading..." : "Refresh"}
+                            {loading ? "Se incarca..." : "Actualizeaza"}
                         </Button>
                     </div>
                 }
@@ -132,24 +132,24 @@ export default function LocationsPage() {
             {/* REPARAT: Fără className pentru a trece de build */}
             {err && <ErrorBox message={err} />}
 
-            <Card title="New Location">
+            <Card title="Locatie Noua">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <Input
                         value={newName}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
-                        placeholder="Name"
+                        placeholder="Nume"
                     />
                     <Input
                         value={newCode}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => setNewCode(e.target.value)}
-                        placeholder="Code (optional)"
+                        placeholder="Cod (optional)"
                     />
                     <Button
                         onClick={onCreate}
                         disabled={!canCreate || loading}
                         variant="primary"
                     >
-                        Create
+                        Creeaza
                     </Button>
                 </div>
             </Card>
@@ -160,10 +160,10 @@ export default function LocationsPage() {
                 <table className="w-full border-collapse text-sm">
                     <thead className="bg-white/5 text-zinc-300">
                         <tr>
-                            <th className="px-4 py-3 text-left font-semibold">Name</th>
-                            <th className="px-4 py-3 text-left font-semibold">Code</th>
+                            <th className="px-4 py-3 text-left font-semibold">Nume</th>
+                            <th className="px-4 py-3 text-left font-semibold">Cod</th>
                             <th className="px-4 py-3 text-left font-semibold">Status</th>
-                            <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                            <th className="px-4 py-3 text-right font-semibold">Actiuni</th>
                         </tr>
                     </thead>
 
@@ -184,17 +184,17 @@ export default function LocationsPage() {
                                                 variant="ghost"
                                                 className="h-8 px-3 text-xs text-zinc-400 hover:text-rose-400"
                                             >
-                                                Delete
+                                                Sterge
                                             </Button>
                                         ) : (
-                                            <span className="text-xs text-rose-300/60 pr-3 font-medium uppercase">Archived</span>
+                                            <span className="text-xs text-rose-300/60 pr-3 font-medium uppercase">Arhivat</span>
                                         )}
                                     </td>
                                 </tr>
                             );
                         })}
                         {!loading && items.length === 0 && (
-                            <EmptyRow colSpan={4} text="No locations found." />
+                            <EmptyRow colSpan={4} text="Nu au fost gasite locatii." />
                         )}
                     </tbody>
                 </table>

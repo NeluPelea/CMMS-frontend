@@ -21,7 +21,7 @@ export default function SettingsPage() {
             const data = await apiFetch<TemplateMetadata[]>("/api/document-templates");
             setTemplates(data);
         } catch (err: any) {
-            setError(err.message || "Failed to load templates");
+            setError(err.message || "Eroare la incarcarea sabloanelor");
         } finally {
             setLoading(false);
         }
@@ -36,12 +36,12 @@ export default function SettingsPage() {
         if (!file) return;
 
         if (file.type !== "image/png") {
-            setError("Only .png files are allowed.");
+            setError("Sunt permise doar fisierele .png.");
             return;
         }
 
         if (file.size > 5 * 1024 * 1024) {
-            setError("Max file size 5MB.");
+            setError("Dimensiune maxima 5MB.");
             return;
         }
 
@@ -67,10 +67,10 @@ export default function SettingsPage() {
                 throw new Error(json.message || `HTTP ${res.status}`);
             }
 
-            setSuccess("Template uploaded successfully!");
+            setSuccess("Sablon incarcat cu succes!");
             await load();
         } catch (err: any) {
-            setError(err.message || "Upload failed");
+            setError(err.message || "Incarcare esuata");
         } finally {
             setLoading(false);
             e.target.value = ""; // clear input
@@ -114,7 +114,7 @@ export default function SettingsPage() {
                                         />
                                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                                             <label className="cursor-pointer bg-white text-black px-4 py-2 rounded-lg font-medium text-sm">
-                                                Change PNG
+                                                Schimba PNG
                                                 <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "header-png")} disabled={loading} />
                                             </label>
                                         </div>
@@ -122,7 +122,7 @@ export default function SettingsPage() {
                                 ) : (
                                     <label className="cursor-pointer flex flex-col items-center gap-2">
                                         <div className="text-2xl">🖼️</div>
-                                        <span className="text-sm text-zinc-400">Click to upload header.png</span>
+                                        <span className="text-sm text-zinc-400">Click pentru a incarca header.png</span>
                                         <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "header-png")} disabled={loading} />
                                     </label>
                                 )}
@@ -131,10 +131,10 @@ export default function SettingsPage() {
                             {headerTemplate && (
                                 <div className="space-y-1">
                                     <div className="text-[10px] text-zinc-500 font-mono">
-                                        File: {headerTemplate.fileName}
+                                        Fisier: {headerTemplate.fileName}
                                     </div>
                                     <div className="text-[10px] text-zinc-500 font-mono">
-                                        Last update: {new Date(headerTemplate.updatedAt).toLocaleString()}
+                                        Ultima actualizare: {new Date(headerTemplate.updatedAt).toLocaleString()}
                                     </div>
                                 </div>
                             )}
@@ -157,7 +157,7 @@ export default function SettingsPage() {
                                         />
                                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                                             <label className="cursor-pointer bg-white text-black px-4 py-2 rounded-lg font-medium text-sm">
-                                                Change PNG
+                                                Schimba PNG
                                                 <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "footer-png")} disabled={loading} />
                                             </label>
                                         </div>
@@ -165,7 +165,7 @@ export default function SettingsPage() {
                                 ) : (
                                     <label className="cursor-pointer flex flex-col items-center gap-2">
                                         <div className="text-2xl">🖼️</div>
-                                        <span className="text-sm text-zinc-400">Click to upload footer.png</span>
+                                        <span className="text-sm text-zinc-400">Click pentru a incarca footer.png</span>
                                         <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "footer-png")} disabled={loading} />
                                     </label>
                                 )}
@@ -174,10 +174,10 @@ export default function SettingsPage() {
                             {footerTemplate && (
                                 <div className="space-y-1">
                                     <div className="text-[10px] text-zinc-500 font-mono">
-                                        File: {footerTemplate.fileName}
+                                        Fisier: {footerTemplate.fileName}
                                     </div>
                                     <div className="text-[10px] text-zinc-500 font-mono">
-                                        Last update: {new Date(footerTemplate.updatedAt).toLocaleString()}
+                                        Ultima actualizare: {new Date(footerTemplate.updatedAt).toLocaleString()}
                                     </div>
                                 </div>
                             )}

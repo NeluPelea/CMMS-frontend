@@ -245,7 +245,7 @@ export default function WorkOrderDetailsPage() {
                 right={
                     <div className="flex gap-2">
                         <Button onClick={loadAll} variant="ghost" size="sm" disabled={loading || actionLoading}>
-                            Refresh
+                            Actualizeaza
                         </Button>
                         <Button
                             onClick={() => window.open(`/work-orders/${id}/print`, "_blank")}
@@ -285,10 +285,10 @@ export default function WorkOrderDetailsPage() {
                                             setForm((s) => ({ ...s, status: Number(e.target.value) as WorkOrderStatus }))
                                         }
                                     >
-                                        <option value={WorkOrderStatus.Open}>Deschis (Open)</option>
-                                        <option value={WorkOrderStatus.InProgress}>In Lucru (In Progress)</option>
-                                        <option value={WorkOrderStatus.Done}>Inchis (Done)</option>
-                                        <option value={WorkOrderStatus.Cancelled}>Anulat (Cancelled)</option>
+                                        <option value={WorkOrderStatus.Open}>Deschis</option>
+                                        <option value={WorkOrderStatus.InProgress}>In Lucru</option>
+                                        <option value={WorkOrderStatus.Done}>Finalizat</option>
+                                        <option value={WorkOrderStatus.Cancelled}>Anulat</option>
                                     </Select>
                                 </Field>
                             </div>
@@ -561,7 +561,7 @@ function PartsManager({ workOrderId, disabled }: { workOrderId: string; disabled
                         className="w-full"
                         disabled={disabled || loading}
                     >
-                        Add
+                        Adauga
                     </Button>
                 </div>
             </div>

@@ -30,11 +30,11 @@ function safeArray<T>(x: any): T[] {
 function freqLabel(v: number) {
   switch (v) {
     case PmFrequency.Daily:
-      return "Daily";
+      return "Zilnic";
     case PmFrequency.Weekly:
-      return "Weekly";
+      return "Saptamanal";
     case PmFrequency.Monthly:
-      return "Monthly";
+      return "Lunar";
     default:
       return `Freq ${v}`;
   }
@@ -45,8 +45,8 @@ function FreqPill({ freq }: { freq: number }) {
     freq === PmFrequency.Daily
       ? "rose"
       : freq === PmFrequency.Weekly
-      ? "amber"
-      : "teal";
+        ? "amber"
+        : "teal";
   return <Pill tone={tone as any}>{freqLabel(freq)}</Pill>;
 }
 
@@ -170,11 +170,11 @@ export default function PmPlansPage() {
   async function onCreate() {
     setErr(null);
     try {
-      if (!cAssetId) return setErr("Select asset");
-      if (cName.trim().length < 2) return setErr("Name too short");
+      if (!cAssetId) return setErr("Selecteaza utilaj");
+      if (cName.trim().length < 2) return setErr("Nume prea scurt");
 
       const nextIso = cNextDueLocal ? localInputToIso(cNextDueLocal) : null;
-      if (cNextDueLocal && !nextIso) return setErr("Invalid Next due");
+      if (cNextDueLocal && !nextIso) return setErr("Scadenta invalida");
 
       const lines = cChecklist
         .split("\n")
@@ -201,25 +201,25 @@ export default function PmPlansPage() {
   }
 
   async function onGenerateDue() {
-    if (!confirm("Generate due PM work orders now?")) return;
+    if (!confirm("Generati ordinele de lucru scadente acum?")) return;
 
     setErr(null);
     try {
       const res = await generateDuePmPlans(200);
       await load();
-      alert(`Generated work orders: ${res.created}\nUpdated plans: ${res.updatedPlans}`);
+      alert(`Ordine de lucru generate: ${res.created}\nPlanuri actualizate: ${res.updatedPlans}`);
     } catch (e: any) {
       setErr(e?.message || String(e));
     }
   }
 
   return (
-    <AppShell title="PM Plans">
+    <AppShell title="Planuri Mentenanta">
       <PageToolbar
         left={
           <div className="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <FieldLabel>Location</FieldLabel>
+              <FieldLabel>Locatie</FieldLabel>
               <Select
                 value={locId}
                 onChange={(e) => {
@@ -227,7 +227,7 @@ export default function PmPlansPage() {
                   setAssetId("");
                 }}
               >
-                <option value="">All locations</option>
+                <option value="">Toate locatiile</option>
                 {locs.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name} {l.code ? `(${l.code})` : ""}
@@ -237,9 +237,9 @@ export default function PmPlansPage() {
             </div>
 
             <div>
-              <FieldLabel>Asset</FieldLabel>
+              <FieldLabel>Utilaj</FieldLabel>
               <Select value={assetId} onChange={(e) => setAssetId(e.target.value)}>
-                <option value="">All assets</option>
+                <option value="">Toate utilajele</option>
                 {filteredAssets.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name} {a.code ? `(${a.code})` : ""}
@@ -252,10 +252,10 @@ export default function PmPlansPage() {
         right={
           <div className="flex items-center gap-2">
             <Button onClick={load} disabled={loading} variant="ghost">
-              Refresh
+              Actualizeaza
             </Button>
             <Button onClick={onGenerateDue} disabled={loading} variant="ghost">
-              Generate due
+              Genereaza scadente
             </Button>
           </div>
         }
@@ -263,12 +263,12 @@ export default function PmPlansPage() {
 
       {err ? <ErrorBox message={err} /> : null}
 
-      <Card title="Create PM Plan">
+      <Card title="Creeaza Plan Mentenanta">
         <div className="grid gap-3 lg:grid-cols-4">
           <div className="lg:col-span-2">
-            <FieldLabel>Asset</FieldLabel>
+            <FieldLabel>Utilaj</FieldLabel>
             <Select value={cAssetId} onChange={(e) => setCAssetId(e.target.value)}>
-              <option value="">Select asset...</option>
+              <option value="">Selecteaza utilaj...</option>
               {assets.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name} {a.code ? `(${a.code})` : ""}
@@ -278,16 +278,16 @@ export default function PmPlansPage() {
           </div>
 
           <div>
-            <FieldLabel>Frequency</FieldLabel>
+            <FieldLabel>Frecventa</FieldLabel>
             <Select value={cFreq} onChange={(e) => setCFreq(Number(e.target.value))}>
-              <option value={PmFrequency.Daily}>Daily</option>
-              <option value={PmFrequency.Weekly}>Weekly</option>
-              <option value={PmFrequency.Monthly}>Monthly</option>
+              <option value={PmFrequency.Daily}>Zilnic</option>
+              <option value={PmFrequency.Weekly}>Saptamanal</option>
+              <option value={PmFrequency.Monthly}>Lunar</option>
             </Select>
           </div>
 
           <div>
-            <FieldLabel>Next due</FieldLabel>
+            <FieldLabel>Urmatoarea scadenta</FieldLabel>
             <DateTimeLocalInput
               value={cNextDueLocal}
               onChange={(e) => setCNextDueLocal(e.target.value)}
@@ -295,18 +295,18 @@ export default function PmPlansPage() {
           </div>
 
           <div className="lg:col-span-4">
-            <FieldLabel>Name</FieldLabel>
-            <Input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Plan name" />
+            <FieldLabel>Nume</FieldLabel>
+            <Input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Nume plan" />
           </div>
         </div>
 
         <div className="mt-3">
-          <FieldLabel>Checklist</FieldLabel>
+          <FieldLabel>Lista sarcini</FieldLabel>
           <TextArea
             value={cChecklist}
             onChange={(e) => setCChecklist(e.target.value)}
             rows={4}
-            placeholder={"One item per line\nExample:\n- Check oil level\n- Inspect belts\n- Clean filters"}
+            placeholder={"Un item pe linie\nExemplu:\n- Verificare nivel ulei\n- Inspectie curele\n- Curatare filtre"}
           />
         </div>
 
@@ -316,12 +316,12 @@ export default function PmPlansPage() {
             disabled={loading || cName.trim().length < 2 || !cAssetId}
             variant="primary"
           >
-            Create
+            Creeaza
           </Button>
         </div>
 
         <div className="mt-2 text-xs text-zinc-500">
-          Tip: Checklist is stored as separate items; order is preserved by sort.
+          Sfat: Lista de sarcini este salvata ca elemente individuale; ordinea este pastrata prin sortare.
         </div>
       </Card>
 
@@ -331,11 +331,11 @@ export default function PmPlansPage() {
         <table className="w-full border-collapse text-sm">
           <thead className="bg-white/5 text-zinc-300">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold">Name</th>
-              <th className="px-4 py-3 text-left font-semibold">Asset</th>
-              <th className="px-4 py-3 text-left font-semibold">Frequency</th>
-              <th className="px-4 py-3 text-left font-semibold">Next due</th>
-              <th className="px-4 py-3 text-left font-semibold">Checklist</th>
+              <th className="px-4 py-3 text-left font-semibold">Nume</th>
+              <th className="px-4 py-3 text-left font-semibold">Utilaj</th>
+              <th className="px-4 py-3 text-left font-semibold">Frecventa</th>
+              <th className="px-4 py-3 text-left font-semibold">Urmatoarea scadenta</th>
+              <th className="px-4 py-3 text-left font-semibold">Lista sarcini</th>
             </tr>
           </thead>
 
@@ -361,7 +361,7 @@ export default function PmPlansPage() {
             ))}
 
             {!loading && items.length === 0 ? (
-              <EmptyRow colSpan={5} text="No PM plans." />
+              <EmptyRow colSpan={5} text="Nu exista planuri de mentenanta." />
             ) : null}
           </tbody>
         </table>

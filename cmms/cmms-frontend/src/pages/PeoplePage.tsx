@@ -368,11 +368,11 @@ export default function PeoplePage() {
     const pageTo = Math.min(skip + take, total);
 
     return (
-        <AppShell title="Personal">
+        <AppShell title="Angajati">
             <PageToolbar
                 left={
                     <div className="min-w-0">
-                        <div className="text-sm font-semibold text-zinc-200">Echipa / Personal</div>
+                        <div className="text-sm font-semibold text-zinc-200">Echipa / Angajati</div>
                         <div className="mt-0.5 text-xs text-zinc-500">{total ? `${pageFrom}-${pageTo} din ${total}` : "—"}</div>
                     </div>
                 }
@@ -433,7 +433,7 @@ export default function PeoplePage() {
                 </div>
             </Card>
 
-            <Card className="mt-4" title="Lista personal">
+            <Card className="mt-4" title="Lista angajati">
                 <div className="grid gap-3 lg:grid-cols-12">
                     <div className="lg:col-span-4">
                         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cauta..." />
@@ -578,7 +578,7 @@ export default function PeoplePage() {
                                     );
                                 })}
 
-                                {!loading && items.length === 0 ? <EmptyRow colSpan={7} text="Nu a fost gasita nicio persoana." /> : null}
+                                {!loading && items.length === 0 ? <EmptyRow colSpan={7} text="Nu a fost gasit niciun angajat." /> : null}
                             </tbody>
                         </table>
                     </TableShell>
