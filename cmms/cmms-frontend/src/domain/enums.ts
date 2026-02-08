@@ -17,6 +17,14 @@ export const WorkOrderStatus = {
 
 export type WorkOrderStatus = typeof WorkOrderStatus[keyof typeof WorkOrderStatus];
 
+export const WorkOrderClassification = {
+    Proactive: 1,
+    Reactive: 2
+} as const;
+
+export type WorkOrderClassification = typeof WorkOrderClassification[keyof typeof WorkOrderClassification];
+
+
 export function woStatusLabel(s: WorkOrderStatus): string {
     switch (s) {
         case WorkOrderStatus.Open: return "Deschis";
@@ -34,5 +42,13 @@ export function woTypeLabel(t: WorkOrderType): string {
         case WorkOrderType.Improvement: return "Imbunatatire";
         case WorkOrderType.Project: return "Proiect";
         default: return "Altul";
+    }
+}
+
+export function woClassificationLabel(c: WorkOrderClassification): string {
+    switch (c) {
+        case WorkOrderClassification.Proactive: return "Proactiv";
+        case WorkOrderClassification.Reactive: return "Reactiv";
+        default: return "Reactiv";
     }
 }

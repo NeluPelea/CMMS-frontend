@@ -16,7 +16,11 @@ import {
     deleteExtraJob,
     type ExtraJobDto,
     listExtraJobs,
-    toggleExtraJob,
+    WorkOrderStatus,
+    startExtraJob,
+    stopExtraJob,
+    cancelExtraJob,
+    reopenExtraJob,
 } from "../api/extraJobs";
 import { getPeopleSimple, type PersonSimpleDto } from "../api";
 
@@ -86,12 +90,30 @@ export default function ExtraJobsPage() {
         }
     }
 
-    async function handleToggle(id: string) {
+    async function handleAction(id: string, action: "start" | "stop" | "cancel" | "reopen") {
         try {
-            await toggleExtraJob(id);
+            if (action === "start") await startExtraJob(id);
+            else if (action === "stop") await stopExtraJob(id);
+            else if (action === "cancel") await cancelExtraJob(id);
+            else if (action === "reopen") await reopenExtraJob(id);
             await load();
         } catch (err: any) {
-            setError(err.message || "Failed to toggle.");
+            setError(err.message || `Failed to ${action}.`);
+        }
+    }
+
+    function renderStatus(s: WorkOrderStatus) {
+        switch (s) {
+            case WorkOrderStatus.Open:
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-900 text-blue-100">Open</span>;
+            case WorkOrderStatus.InProgress:
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-900 text-yellow-100 animate-pulse">In Progress</span>;
+            case WorkOrderStatus.Done:
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-900 text-green-100">Done</span>;
+            case WorkOrderStatus.Cancelled:
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-700 text-zinc-300">Cancelled</span>;
+            default:
+                return <span className="text-zinc-500">?</span>;
         }
     }
 
@@ -171,26 +193,21 @@ export default function ExtraJobsPage() {
                             <table className="w-full text-left text-sm text-zinc-300">
                                 <thead className="bg-white/5 text-zinc-400">
                                     <tr>
-                                        <th className="px-4 py-3 w-10">Stare</th>
+                                        <th className="px-4 py-3 w-24">Stare</th>
                                         <th className="px-4 py-3">Descriere</th>
                                         <th className="px-4 py-3">Responsabil</th>
-                                        <th className="px-4 py-3 text-right">Data</th>
-                                        <th className="px-4 py-3 w-10"></th>
+                                        <th className="px-4 py-3 text-right">Start / Stop</th>
+                                        <th className="px-4 py-3 text-right w-32">Actiuni</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {items.map((it) => (
-                                        <tr key={it.id} className={`hover:bg-white/5 ${it.isDone ? "opacity-50" : ""}`}>
-                                            <td className="px-4 py-3 text-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={it.isDone}
-                                                    onChange={() => handleToggle(it.id)}
-                                                    className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 cursor-pointer"
-                                                />
+                                        <tr key={it.id} className={`hover:bg-white/5 ${it.status === WorkOrderStatus.Cancelled ? "opacity-50" : ""}`}>
+                                            <td className="px-4 py-3">
+                                                {renderStatus(it.status)}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className={`font-medium ${it.isDone ? "line-through text-zinc-500" : "text-zinc-200"}`}>
+                                                <div className="font-medium text-zinc-200">
                                                     {it.title}
                                                 </div>
                                                 {it.description && (
@@ -201,9 +218,27 @@ export default function ExtraJobsPage() {
                                                 {it.assignedToPersonName || "—"}
                                             </td>
                                             <td className="px-4 py-3 text-right font-mono text-zinc-500 text-xs">
-                                                {new Date(it.createdAt).toLocaleDateString()}
+                                                {it.startAt ? new Date(it.startAt).toLocaleString() : "—"}
+                                                <br />
+                                                {it.stopAt ? new Date(it.stopAt).toLocaleString() : "—"}
                                             </td>
-                                            <td className="px-4 py-3 text-right">
+                                            <td className="px-4 py-3 text-right space-x-2">
+                                                {it.status === WorkOrderStatus.Open && (
+                                                    <>
+                                                        <Button size="sm" variant="primary" onClick={() => handleAction(it.id, "start")}>Start</Button>
+                                                        <Button size="sm" variant="ghost" className="border border-zinc-600" onClick={() => handleAction(it.id, "cancel")}>Cancel</Button>
+                                                    </>
+                                                )}
+                                                {it.status === WorkOrderStatus.InProgress && (
+                                                    <>
+                                                        <Button size="sm" variant="primary" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => handleAction(it.id, "stop")}>Stop</Button>
+                                                        <Button size="sm" variant="ghost" className="border border-zinc-600" onClick={() => handleAction(it.id, "cancel")}>Cancel</Button>
+                                                    </>
+                                                )}
+                                                {(it.status === WorkOrderStatus.Done || it.status === WorkOrderStatus.Cancelled) && (
+                                                    <Button size="sm" variant="ghost" onClick={() => handleAction(it.id, "reopen")}>Reopen</Button>
+                                                )}
+
                                                 <IconButton
                                                     aria-label="Delete"
                                                     variant="danger"

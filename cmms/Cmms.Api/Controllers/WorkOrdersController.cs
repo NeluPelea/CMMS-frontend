@@ -81,6 +81,7 @@ public sealed class WorkOrdersController : ControllerBase
     public sealed record WorkOrderDto(
         Guid Id,
         WorkOrderType Type,
+        WorkOrderClassification Classification,
         WorkOrderStatus Status,
         string Title,
         string? Description,
@@ -116,6 +117,7 @@ public sealed class WorkOrdersController : ControllerBase
         x => new WorkOrderDto(
             x.Id,
             x.Type,
+            x.Classification,
             x.Status,
             x.Title,
             x.Description,
@@ -169,7 +171,7 @@ public sealed class WorkOrdersController : ControllerBase
 
     private IQueryable<WorkOrder> BaseEntityQuery()
         => _db.WorkOrders.AsNoTracking()
-            .Include(w => w.Asset)!.ThenInclude(a => a.Location)
+            .Include(w => w.Asset)!.ThenInclude(a => a!.Location)
             .Include(w => w.AssignedToPerson);
 
     // ---------------- LIST ----------------
@@ -236,6 +238,65 @@ public sealed class WorkOrdersController : ControllerBase
         return Ok(new PagedResp<WorkOrderDto>(total, take, skip, items));
     }
 
+    [HttpGet("counts")]
+    public async Task<IActionResult> GetCounts(
+        [FromQuery] string? q = null,
+        [FromQuery] WorkOrderType? type = null,
+        [FromQuery] Guid? assetId = null,
+        [FromQuery] Guid? locId = null,
+        [FromQuery] DateTimeOffset? from = null,
+        [FromQuery] DateTimeOffset? to = null
+    )
+    {
+        var fromUtc = ToUtc(from);
+        var toUtc = ToUtc(to);
+
+        IQueryable<WorkOrder> qry = BaseEntityQuery();
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var s = q.Trim();
+            qry = qry.Where(x =>
+                EF.Functions.ILike(x.Title, $"%{s}%") ||
+                (x.Description != null && EF.Functions.ILike(x.Description, $"%{s}%"))
+            );
+        }
+
+        if (type.HasValue) qry = qry.Where(x => x.Type == type.Value);
+        if (assetId.HasValue) qry = qry.Where(x => x.AssetId == assetId.Value);
+
+        if (locId.HasValue)
+            qry = qry.Where(x => x.Asset != null && x.Asset.LocationId == locId.Value);
+
+        // interval intersection [from,to]
+        if (fromUtc.HasValue || toUtc.HasValue)
+        {
+            var f = fromUtc ?? DateTimeOffset.MinValue;
+            var t = toUtc ?? DateTimeOffset.MaxValue;
+
+            qry = qry.Where(x =>
+                (x.StartAt ?? DateTimeOffset.MinValue) <= t &&
+                (x.StopAt ?? DateTimeOffset.MaxValue) >= f
+            );
+        }
+
+        var grouped = await qry
+            .GroupBy(x => x.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        var result = new Dictionary<string, int>
+        {
+            { "All", grouped.Sum(x => x.Count) },
+            { "Open", grouped.FirstOrDefault(x => x.Status == WorkOrderStatus.Open)?.Count ?? 0 },
+            { "InProgress", grouped.FirstOrDefault(x => x.Status == WorkOrderStatus.InProgress)?.Count ?? 0 },
+            { "Done", grouped.FirstOrDefault(x => x.Status == WorkOrderStatus.Done)?.Count ?? 0 },
+            { "Cancelled", grouped.FirstOrDefault(x => x.Status == WorkOrderStatus.Cancelled)?.Count ?? 0 }
+        };
+
+        return Ok(result);
+    }
+
     // ---------------- GET BY ID ----------------
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
@@ -285,6 +346,7 @@ public sealed class WorkOrdersController : ControllerBase
         string Title,
         string? Description,
         WorkOrderType Type,
+        WorkOrderClassification? Classification,
         Guid? AssetId,
         Guid? AssignedToPersonId,
         DateTimeOffset? StartAt,
@@ -325,6 +387,7 @@ public sealed class WorkOrdersController : ControllerBase
             Title = title,
             Description = string.IsNullOrWhiteSpace(req.Description) ? null : req.Description.Trim(),
             Type = req.Type,
+            Classification = req.Classification ?? WorkOrderClassification.Reactive,
             Status = WorkOrderStatus.Open,
             AssetId = req.AssetId,
             AssignedToPersonId = req.AssignedToPersonId,
@@ -367,6 +430,7 @@ public sealed class WorkOrdersController : ControllerBase
         string Title,
         string? Description,
         WorkOrderStatus Status,
+        WorkOrderClassification? Classification,
         Guid? AssetId,
         Guid? AssignedToPersonId,
         DateTimeOffset? StartAt,
@@ -393,6 +457,7 @@ public sealed class WorkOrdersController : ControllerBase
         var oldStart = wo.StartAt;
         var oldStop = wo.StopAt;
         var oldStatus = wo.Status;
+        var oldClassification = wo.Classification;
         var oldDefect = wo.Defect;
         var oldCause = wo.Cause;
         var oldSolution = wo.Solution;
@@ -448,6 +513,9 @@ public sealed class WorkOrdersController : ControllerBase
         wo.Cause = string.IsNullOrWhiteSpace(req.Cause) ? null : req.Cause.Trim();
         wo.Solution = string.IsNullOrWhiteSpace(req.Solution) ? null : req.Solution.Trim();
 
+        if (req.Classification.HasValue)
+            wo.Classification = req.Classification.Value;
+
         // Audit diffs
         if (oldTitle != wo.Title) AddEvent(wo.Id, corr, WorkOrderEventKind.Updated, "title", oldTitle, wo.Title);
         if (oldDesc != wo.Description) AddEvent(wo.Id, corr, WorkOrderEventKind.Updated, "description", oldDesc, wo.Description);
@@ -470,6 +538,7 @@ public sealed class WorkOrdersController : ControllerBase
         if (oldDefect != wo.Defect) AddEvent(wo.Id, corr, WorkOrderEventKind.Updated, "defect", oldDefect, wo.Defect);
         if (oldCause != wo.Cause) AddEvent(wo.Id, corr, WorkOrderEventKind.Updated, "cause", oldCause, wo.Cause);
         if (oldSolution != wo.Solution) AddEvent(wo.Id, corr, WorkOrderEventKind.Updated, "solution", oldSolution, wo.Solution);
+        if (oldClassification != wo.Classification) AddEvent(wo.Id, corr, WorkOrderEventKind.Updated, "classification", oldClassification.ToString(), wo.Classification.ToString());
 
         await _db.SaveChangesAsync();
 

@@ -5,6 +5,7 @@ import RequireAuth from "./RequireAuth";
 import LoginPage from "./pages/LoginPage";
 import WorkOrdersPage from "./pages/WorkOrdersPage";
 import WorkOrderDetailsPage from "./pages/WorkOrderDetailsPage";
+import WorkOrderCardsPage from "./pages/WorkOrderCardsPage";
 import AssetsPage from "./pages/AssetsPage";
 import LocationsPage from "./pages/LocationsPage";
 import PmPlansPage from "./pages/PmPlansPage";
@@ -17,6 +18,7 @@ import CalendarPage from "./pages/CalendarPage";
 import ExtraJobsPage from "./pages/ExtraJobsPage";
 import WorkOrderPrintPage from "./pages/WorkOrderPrintPage";
 import ReportsPage from "./pages/ReportsPage";
+import SettingsPage from "./pages/SettingsPage";
 
 export default function App() {
     return (
@@ -38,6 +40,14 @@ export default function App() {
                 element={
                     <RequireAuth>
                         <WorkOrdersPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/work-orders/cards"
+                element={
+                    <RequireAuth>
+                        <WorkOrderCardsPage />
                     </RequireAuth>
                 }
             />
@@ -140,6 +150,14 @@ export default function App() {
                 element={
                     <RequireAuth>
                         <ReportsPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/settings"
+                element={
+                    <RequireAuth>
+                        <SettingsPage />
                     </RequireAuth>
                 }
             />

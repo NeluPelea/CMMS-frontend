@@ -1,7 +1,7 @@
 // src/api/workOrders.ts
 // UTF-8, fara diacritice
 import { apiFetch } from "./http";
-import { WorkOrderStatus, WorkOrderType } from "../domain/enums";
+import { WorkOrderClassification, WorkOrderStatus, WorkOrderType } from "../domain/enums";
 
 // Backend shape: PagedResp<T>(total, take, skip, items)
 export type PagedResp<T> = {
@@ -14,6 +14,7 @@ export type PagedResp<T> = {
 export type WorkOrderDto = {
     id: string;
     type: WorkOrderType;
+    classification: WorkOrderClassification;
     status: WorkOrderStatus;
     title: string;
     description?: string | null;
@@ -104,6 +105,7 @@ export type CreateWorkOrderReq = {
     title: string;
     description?: string | null;
     type: WorkOrderType;
+    classification?: WorkOrderClassification | null;
     assetId?: string | null;
     assignedToPersonId?: string | null;
     startAt?: string | null; // ISO
@@ -114,6 +116,7 @@ export type UpdateWorkOrderReq = {
     title: string;
     description?: string | null;
     status: WorkOrderStatus;
+    classification?: WorkOrderClassification | null;
     assetId?: string | null;
     assignedToPersonId?: string | null;
     startAt?: string | null; // ISO
@@ -204,4 +207,20 @@ export async function getWorkOrderEvents(
     return apiFetch<PagedResp<WorkOrderEventDto>>(`/api/work-orders/${id}/events?${qs.toString()}`, {
         method: "GET",
     });
+}
+
+export async function getWorkOrderCounts(
+    p: { q?: string; type?: WorkOrderType; locId?: string; assetId?: string; from?: string; to?: string }
+): Promise<Record<string, number>> {
+    const qs = new URLSearchParams();
+    if (p.q) qs.set("q", p.q);
+    if (p.type) qs.set("type", String(p.type));
+    if (p.locId) qs.set("locId", p.locId);
+    if (p.assetId) qs.set("assetId", p.assetId);
+    if (p.from) qs.set("from", p.from);
+    if (p.to) qs.set("to", p.to);
+
+    const s = qs.toString();
+    const query = s ? `?${s}` : "";
+    return apiFetch<Record<string, number>>(`/api/work-orders/counts${query}`, { method: "GET" });
 }

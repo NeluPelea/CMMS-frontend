@@ -118,6 +118,41 @@ namespace Cmms.Infrastructure.Migrations
                     b.ToTable("CompanyBlackoutDays");
                 });
 
+            modelBuilder.Entity("Cmms.Domain.DocumentTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("StoredFilePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Type")
+                        .IsUnique();
+
+                    b.ToTable("document_templates", (string)null);
+                });
+
             modelBuilder.Entity("Cmms.Domain.ExtraJob", b =>
                 {
                     b.Property<Guid>("Id")
@@ -139,6 +174,15 @@ namespace Cmms.Infrastructure.Migrations
                     b.Property<bool>("IsDone")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTimeOffset?>("StartAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("StopAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
@@ -148,6 +192,50 @@ namespace Cmms.Infrastructure.Migrations
                     b.HasIndex("AssignedToPersonId");
 
                     b.ToTable("ExtraJobs");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.ExtraJobEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ExtraJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Field")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("NewValue")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<string>("OldValue")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("ExtraJobId");
+
+                    b.ToTable("extra_job_events", (string)null);
                 });
 
             modelBuilder.Entity("Cmms.Domain.FileAttachment", b =>
@@ -460,6 +548,38 @@ namespace Cmms.Infrastructure.Migrations
                     b.ToTable("PmPlanItems");
                 });
 
+            modelBuilder.Entity("Cmms.Domain.UnitWorkSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<TimeOnly>("MonFriEnd")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly>("MonFriStart")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly?>("SatEnd")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly?>("SatStart")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly?>("SunEnd")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly?>("SunStart")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("unit_work_schedule", (string)null);
+                });
+
             modelBuilder.Entity("Cmms.Domain.WorkOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -474,6 +594,9 @@ namespace Cmms.Infrastructure.Migrations
 
                     b.Property<string>("Cause")
                         .HasColumnType("text");
+
+                    b.Property<int>("Classification")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -706,6 +829,17 @@ namespace Cmms.Infrastructure.Migrations
                     b.Navigation("AssignedToPerson");
                 });
 
+            modelBuilder.Entity("Cmms.Domain.ExtraJobEvent", b =>
+                {
+                    b.HasOne("Cmms.Domain.ExtraJob", "ExtraJob")
+                        .WithMany("ExtraJobEvents")
+                        .HasForeignKey("ExtraJobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ExtraJob");
+                });
+
             modelBuilder.Entity("Cmms.Domain.FileAttachment", b =>
                 {
                     b.HasOne("Cmms.Domain.WorkOrder", "WorkOrder")
@@ -890,6 +1024,11 @@ namespace Cmms.Infrastructure.Migrations
                     b.Navigation("Part");
 
                     b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.ExtraJob", b =>
+                {
+                    b.Navigation("ExtraJobEvents");
                 });
 
             modelBuilder.Entity("Cmms.Domain.Person", b =>

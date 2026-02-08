@@ -5,9 +5,11 @@ import {
   getKpis,
   getAssetsInMaintenance,
   getPersonActivity,
+  getPeopleActiveNow,
   type AssetInMaintDto,
   type KpisDto,
   type PersonActivityDto,
+  type PersonActiveNowDto,
 } from "../api/dashboard";
 
 import { getPeople, type PersonDto } from "../api/people";
@@ -147,6 +149,8 @@ export default function DashboardPage() {
   const [activity, setActivity] =
     useState<PersonActivityDto | null>(null);
 
+  const [activeNow, setActiveNow] = useState<PersonActiveNowDto[]>([]);
+
   const selectedPerson = useMemo(
     () => people.find(p => p.id === personId) ?? null,
     [people, personId]
@@ -155,12 +159,14 @@ export default function DashboardPage() {
   async function loadAll() {
     setErr(null);
     try {
-      const [k, am] = await Promise.all([
+      const [k, am, an] = await Promise.all([
         getKpis(),
         getAssetsInMaintenance(),
+        getPeopleActiveNow(),
       ]);
       setKpis(k);
       setAssetsMaint(am);
+      setActiveNow(an);
     } catch (e) {
       if (e && typeof e === "object") {
         const r = e as Record<string, unknown>;
@@ -229,7 +235,7 @@ export default function DashboardPage() {
 
       {/* KPI grid */}
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <KpiCard label="WO Total" value={kpis?.woTotal} hint="All statuses" />
+        <KpiCard label="WO DESCHISE" value={kpis?.woOpen} hint="Status Open" />
         <KpiCard label="WO Done" value={kpis?.woClosed} hint="Closed" tone="good" />
         <KpiCard label="WO In progress" value={kpis?.woInProgress} hint="Active now" tone="warn" />
         <KpiCard label="PM On time" value={kpis?.pmOnTime} hint="Executed as planned" tone="good" />
@@ -290,6 +296,51 @@ export default function DashboardPage() {
             <div>Nu exista angajati.</div>
           )}
         </div>
+      </div>
+
+      {/* Active Employees */}
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="mb-3 text-sm font-semibold text-zinc-200">
+          Activitate angajati
+        </div>
+
+        {activeNow.length === 0 ? (
+          <div className="text-sm text-zinc-400">Nu exista activitati in desfasurare.</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {activeNow.map((p) => (
+              <div
+                key={p.personId}
+                className="flex flex-col gap-2 rounded-xl border border-white/5 bg-white/5 p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="mb-1 w-full text-sm font-semibold text-zinc-200 sm:mb-0 sm:w-1/4">
+                  {p.personName}
+                </div>
+                <div className="mb-1 flex-1 text-xs text-zinc-300 sm:mb-0 sm:text-sm">
+                  <span
+                    className={cx(
+                      "mr-2 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                      p.activityType === "WO"
+                        ? "bg-teal-500/20 text-teal-300"
+                        : "bg-blue-500/20 text-blue-300"
+                    )}
+                  >
+                    {p.activityType === "WO" ? "WO" : "EXTRA"}
+                  </span>
+                  {p.activityTitle}
+                </div>
+                <div className="w-full text-right font-mono text-xs text-zinc-400 sm:w-auto">
+                  {p.startedAt
+                    ? new Date(p.startedAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                    : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Assets in maintenance */}

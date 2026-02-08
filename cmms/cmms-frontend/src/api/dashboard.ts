@@ -4,6 +4,7 @@ export type KpisDto = {
   woTotal: number;
   woClosed: number;
   woInProgress: number;
+  woOpen: number;
   pmOnTime: number;
   pmLate: number;
   assetsInMaintenance: number;
@@ -72,4 +73,21 @@ export async function getAssetsInMaintenance(locId?: string): Promise<AssetInMai
 export async function getPersonActivity(personId: string, period: "week" | "month" | "quarter"): Promise<PersonActivityDto> {
   const url = `/api/dashboard/people/${personId}/activity?period=${encodeURIComponent(period)}`;
   return apiFetch<PersonActivityDto>(url);
+
+}
+
+export type PersonActiveNowDto = {
+  personId: string;
+  personName: string;
+  activityType: string;
+  activityTitle: string;
+  startedAt: string | null;
+  assetId: string | null;
+  assetName: string | null;
+  locationName: string | null;
+};
+
+export async function getPeopleActiveNow(): Promise<PersonActiveNowDto[]> {
+  const url = `/api/dashboard/people-active-now`;
+  return apiFetch<PersonActiveNowDto[]>(url);
 }

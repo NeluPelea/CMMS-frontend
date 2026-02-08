@@ -31,6 +31,31 @@ public sealed class PeopleController : ControllerBase
         _availability = availability;
     }
 
+    [HttpGet("debug-georgescu")]
+    [AllowAnonymous]
+    public async Task<ActionResult> DebugGeorgescu(CancellationToken ct)
+    {
+        var p = await _db.People.Include(x => x.WorkSchedule).AsNoTracking()
+            .FirstOrDefaultAsync(x => x.FullName.Contains("Georgescu") || x.DisplayName.Contains("Georgescu"), ct);
+        if (p == null) return NotFound("Georgescu not found in DB.");
+
+        return Ok(new
+        {
+            PersonId = p.Id,
+            FullName = p.FullName,
+            DisplayName = p.DisplayName,
+            Schedule = p.WorkSchedule == null ? null : new {
+                p.WorkSchedule.MonFriStart,
+                p.WorkSchedule.MonFriEnd,
+                p.WorkSchedule.SatStart,
+                p.WorkSchedule.SatEnd,
+                p.WorkSchedule.SunStart,
+                p.WorkSchedule.SunEnd,
+                p.WorkSchedule.Timezone
+            }
+        });
+    }
+
     // GET /api/people?take=50&skip=0&q=...&includeInactive=false
     [HttpGet]
     public async Task<ActionResult<Paged<PersonDto>>> List(

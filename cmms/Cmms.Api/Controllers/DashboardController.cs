@@ -20,6 +20,7 @@ public sealed class DashboardController : ControllerBase
         int WoTotal,
         int WoClosed,
         int WoInProgress,
+        int WoOpen,
         int PmOnTime,
         int PmLate,
         int AssetsInMaintenance
@@ -129,6 +130,7 @@ public sealed class DashboardController : ControllerBase
         var woTotal = await wq.CountAsync();
         var woClosed = await wq.CountAsync(x => x.Status == WorkOrderStatus.Done);
         var woInProgress = await wq.CountAsync(x => x.Status == WorkOrderStatus.InProgress);
+        var woOpen = await wq.CountAsync(x => x.Status == WorkOrderStatus.Open);
 
         // PM KPIs (simple, din NextDueAt)
         IQueryable<PmPlan> pq = _db.PmPlans.AsNoTracking().Where(x => x.IsAct);
@@ -156,6 +158,7 @@ public sealed class DashboardController : ControllerBase
             WoTotal: woTotal,
             WoClosed: woClosed,
             WoInProgress: woInProgress,
+            WoOpen: woOpen,
             PmOnTime: pmOnTime,
             PmLate: pmLate,
             AssetsInMaintenance: assetsInMaintenance
@@ -267,6 +270,90 @@ public sealed class DashboardController : ControllerBase
             .ToList();
 
         return Ok(dedup);
+    }
+
+
+    // =====================================================================
+    // 4) ACTIVE PEOPLE NOW
+    // GET /api/dashboard/people-active-now
+    // =====================================================================
+    public sealed record PersonActiveNowDto(
+        Guid PersonId,
+        string PersonName,
+        string ActivityType, // "WO" | "Extra"
+        string ActivityTitle,
+        DateTimeOffset? StartedAt, // Local or UTC? we send UTC usually
+        Guid? AssetId = null,
+        string? AssetName = null,
+        string? LocationName = null
+    );
+
+    [HttpGet("people-active-now")]
+    public async Task<IActionResult> GetPeopleActiveNow()
+    {
+        // 1. WOs InProgress (AssignedToPersonId != null)
+        var wos = await _db.WorkOrders.AsNoTracking()
+            .Where(x => x.Status == WorkOrderStatus.InProgress && x.AssignedToPersonId != null)
+            .Select(x => new
+            {
+                PersonId = x.AssignedToPersonId!.Value,
+                PersonName = x.AssignedToPerson != null ? x.AssignedToPerson.DisplayName : "Unknown",
+                Type = "WO",
+                Title = x.Title,
+                Start = x.StartAt,
+                AssetId = x.AssetId,
+                AssetName = x.Asset != null ? x.Asset.Name : null,
+                LocationName = x.Asset != null && x.Asset.Location != null ? x.Asset.Location.Name : null
+            })
+            .ToListAsync();
+
+        // 2. ExtraJobs InProgress (or Open with StartAt, and no StopAt)
+        // We need to fetch basic fields first because we can't easily merge 2 different queries unless we use a common DTO or anonymous type in memory.
+        // Actually we can project to anonymous types that match structure.
+        var extras = await _db.ExtraJobs.AsNoTracking()
+            .Where(x => (x.Status == WorkOrderStatus.InProgress || x.Status == WorkOrderStatus.Open)
+                        && x.AssignedToPersonId != null
+                        && x.StartAt != null
+                        && x.StopAt == null)
+            .Select(x => new
+            {
+                PersonId = x.AssignedToPersonId!.Value,
+                PersonName = x.AssignedToPerson != null ? x.AssignedToPerson.DisplayName : "Unknown",
+                Type = "Extra",
+                Title = x.Title,
+                Start = x.StartAt,
+                AssetId = (Guid?)null,
+                AssetName = (string?)null,
+                LocationName = (string?)null
+            })
+            .ToListAsync();
+
+        // 3. Merge & Prioritize
+        var all = wos.Concat(extras).ToList();
+
+        var grouped = all.GroupBy(x => x.PersonId);
+        var result = new List<PersonActiveNowDto>();
+
+        foreach (var g in grouped)
+        {
+            // Priority: WO > Extra.
+            // If we sort by Type descending, "WO" > "Extra".
+            // If multiple WOs, maybe take latest start?
+            var best = g.OrderByDescending(x => x.Type).ThenByDescending(x => x.Start).First();
+
+            result.Add(new PersonActiveNowDto(
+                best.PersonId,
+                best.PersonName,
+                best.Type,
+                best.Type == "WO" ? $"WO: {best.Title}" : $"Extra: {best.Title}",
+                best.Start,
+                best.AssetId,
+                best.AssetName,
+                best.LocationName
+            ));
+        }
+
+        return Ok(result.OrderBy(x => x.PersonName));
     }
 
 }

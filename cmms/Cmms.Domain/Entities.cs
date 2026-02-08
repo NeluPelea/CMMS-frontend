@@ -113,6 +113,24 @@ public sealed class CompanyBlackoutDay
     public bool IsAct { get; set; } = true;
 }
 
+public sealed class UnitWorkSchedule
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    // Time-of-day as TimeOnly (maps to TIME in Postgres)
+    public TimeOnly MonFriStart { get; set; } = new TimeOnly(8, 0);
+    public TimeOnly MonFriEnd { get; set; } = new TimeOnly(17, 0);
+
+    // Optional: if null => unit is CLOSED
+    public TimeOnly? SatStart { get; set; }
+    public TimeOnly? SatEnd { get; set; }
+
+    public TimeOnly? SunStart { get; set; }
+    public TimeOnly? SunEnd { get; set; }
+
+    public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
 // =========================
 // Roles & Assignments
 // =========================
@@ -165,6 +183,12 @@ public sealed class PmPlanAssignment
 // Work Orders
 // =========================
 
+public enum WorkOrderClassification
+{
+    Proactive = 1,
+    Reactive = 2
+}
+
 public enum WorkOrderType
 {
     AdHoc = 1,
@@ -188,6 +212,7 @@ public sealed class WorkOrder
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public WorkOrderType Type { get; set; } = WorkOrderType.AdHoc;
+    public WorkOrderClassification Classification { get; set; } = WorkOrderClassification.Reactive;
     public WorkOrderStatus Status { get; set; } = WorkOrderStatus.Open;
 
     public string Title { get; set; } = "";
@@ -218,6 +243,7 @@ public sealed class WorkOrder
 
 
     public ICollection<FileAttachment> Attachments { get; set; } = new List<FileAttachment>();
+    public ICollection<WorkOrderLabor> LaborLogs { get; set; } = new List<WorkOrderLabor>();
 }
 
 // =========================
@@ -326,12 +352,55 @@ public sealed class ExtraJob
     public string Title { get; set; } = "";
     public string? Description { get; set; }
 
-    public bool IsDone { get; set; } = false;
+    public bool IsDone { get; set; } = false; // Legacy, map to Status=Done
+
+    public WorkOrderStatus Status { get; set; } = WorkOrderStatus.Open; // Open / InProgress / Done / Cancelled
+    public DateTimeOffset? StartAt { get; set; }
+    public DateTimeOffset? StopAt { get; set; }
 
     public Guid? AssignedToPersonId { get; set; }
     public Person? AssignedToPerson { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-    public DateTimeOffset? FinishedAt { get; set; }
+    public DateTimeOffset? FinishedAt { get; set; } // Legacy, map to StopAt
+
+    public ICollection<ExtraJobEvent> ExtraJobEvents { get; set; } = new List<ExtraJobEvent>();
 }
 
+public sealed class ExtraJobEvent
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid ExtraJobId { get; set; }
+    public ExtraJob ExtraJob { get; set; } = null!;
+
+    public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    public string? ActorId { get; set; } // who did it
+
+    public WorkOrderEventKind Kind { get; set; } // reuse existing enum or create new if needed. Reusing is fine for mostly same semantics.
+
+    public string? Field { get; set; }
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
+    public string? Message { get; set; }
+}
+
+// =========================
+// Document Templates
+// =========================
+
+public enum DocumentTemplateType
+{
+    Header = 1,
+    Footer = 2
+}
+
+public sealed class DocumentTemplate
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public DocumentTemplateType Type { get; set; }
+    public string StoredFilePath { get; set; } = "";
+    public string OriginalFileName { get; set; } = "";
+    public string ContentType { get; set; } = "image/png";
+    public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+}

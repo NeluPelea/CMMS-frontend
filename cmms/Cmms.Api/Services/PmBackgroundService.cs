@@ -23,7 +23,14 @@ public class PmBackgroundService : BackgroundService
         {
             try
             {
-                await GenerateDuePmPlans(stoppingToken);
+                try
+                {
+                    await GenerateDuePmPlans(stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error in PM generation cycle");
+                }
             }
             catch (Exception ex)
             {

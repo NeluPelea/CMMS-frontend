@@ -9,6 +9,7 @@ import {
     getPeople,
     getRoles,
     getWorkOrders,
+    getWorkOrderCounts,
     reopenWorkOrder,
     startWorkOrder,
     stopWorkOrder,
@@ -44,7 +45,7 @@ import {
 } from "../api";
 
 import { isoToLocalDisplay, isoToLocalInputValue, localInputToIso } from "../domain/datetime";
-import { WorkOrderStatus, WorkOrderType, woStatusLabel } from "../domain/enums";
+import { WorkOrderClassification, WorkOrderStatus, WorkOrderType, woStatusLabel } from "../domain/enums";
 import AppShell from "../components/AppShell";
 import { Button, Card, Drawer, ErrorBox, Input, PageToolbar, Pill, PillButton, Select, Tabs, cx } from "../components/ui";
 
@@ -103,6 +104,15 @@ export default function WorkOrdersPage() {
     const [roles, setRoles] = useState<RoleDto[]>([]);
     const [partsCatalog, setPartsCatalog] = useState<PartDto[]>([]);
 
+    // ---------------- Counts ----------------
+    const [counts, setCounts] = useState({
+        all: 0,
+        open: 0,
+        inProgress: 0,
+        done: 0,
+        cancelled: 0,
+    });
+
     // ---------------- UI state ----------------
     const [createOpen, setCreateOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<TabKey>("details");
@@ -114,6 +124,7 @@ export default function WorkOrdersPage() {
     const [dTitle, setDTitle] = useState("");
     const [dDesc, setDDesc] = useState("");
     const [dStatus, setDStatus] = useState<WorkOrderStatus>(WorkOrderStatus.Open);
+    const [dClassification, setDClassification] = useState<WorkOrderClassification>(WorkOrderClassification.Reactive);
     const [dAssetId, setDAssetId] = useState<string>("");
     const [dAssignedId, setDAssignedId] = useState<string>("");
     const [dStartAt, setDStartAt] = useState<string>("");
@@ -123,6 +134,7 @@ export default function WorkOrdersPage() {
     const [newTitle, setNewTitle] = useState("");
     const [newDesc, setNewDesc] = useState("");
     const [newType, setNewType] = useState<WorkOrderType>(WorkOrderType.Corrective);
+    const [newClassification, setNewClassification] = useState<WorkOrderClassification>(WorkOrderClassification.Reactive);
     const [newAssetId, setNewAssetId] = useState<string>("");
 
     const canCreate = useMemo(() => newTitle.trim().length >= 2 && !actionLoading, [newTitle, actionLoading]);
@@ -379,6 +391,26 @@ export default function WorkOrdersPage() {
         }
     }, [q, status, type, locId, assetId, take, skip, selId]);
 
+    const loadCounts = useCallback(async () => {
+        try {
+            const c = await getWorkOrderCounts({
+                q: q.trim() || undefined,
+                type: type === "" ? undefined : type,
+                locId: locId || undefined,
+                assetId: assetId || undefined,
+            });
+            setCounts({
+                all: c["All"] || 0,
+                open: c["Open"] || 0,
+                inProgress: c["InProgress"] || 0,
+                done: c["Done"] || 0,
+                cancelled: c["Cancelled"] || 0,
+            });
+        } catch (e) {
+            console.error("Counts failed", e);
+        }
+    }, [q, type, locId, assetId]);
+
     // initial load
     useEffect(() => {
         loadAux();
@@ -392,11 +424,18 @@ export default function WorkOrdersPage() {
         loadList(0);
     }, [status, type, locId, assetId, loadList]);
 
+    // Independent effect for counts on filter change
+    useEffect(() => {
+        loadCounts();
+        // eslint-disable-next-line
+    }, [type, locId, assetId]);
+
     // debounce q
     useEffect(() => {
         const t = window.setTimeout(() => {
             setSkip(0);
             loadList(0);
+            loadCounts();
         }, 300);
         return () => window.clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -408,6 +447,7 @@ export default function WorkOrdersPage() {
             setDTitle("");
             setDDesc("");
             setDStatus(WorkOrderStatus.Open);
+            setDClassification(WorkOrderClassification.Reactive);
             setDAssetId("");
             setDAssignedId("");
             setDStartAt("");
@@ -422,6 +462,7 @@ export default function WorkOrdersPage() {
         setDTitle(selected.title || "");
         setDDesc(selected.description || "");
         setDStatus(selected.status);
+        setDClassification(selected.classification || WorkOrderClassification.Reactive);
         setDAssetId(selected.assetId ?? "");
         setDAssignedId(selected.assignedToPersonId ?? "");
         setDStartAt(isoToLocalInputValue(selected.startAt));
@@ -453,6 +494,7 @@ export default function WorkOrdersPage() {
                 title: newTitle.trim(),
                 description: newDesc.trim() ? newDesc.trim() : null,
                 type: newType,
+                classification: newClassification,
                 assetId: newAssetId || null,
                 assignedToPersonId: null,
                 startAt: null,
@@ -464,6 +506,7 @@ export default function WorkOrdersPage() {
             setNewAssetId("");
 
             await loadList(0);
+            loadCounts();
             if (wo?.id) setSelId(wo.id);
             setCreateOpen(false);
         } catch (e) {
@@ -484,6 +527,7 @@ export default function WorkOrdersPage() {
                 title: dTitle.trim(),
                 description: dDesc.trim() ? dDesc.trim() : null,
                 status: dStatus,
+                classification: dClassification,
                 assetId: dAssetId || null,
                 assignedToPersonId: dAssignedId || null,
                 startAt: localInputToIso(dStartAt) || null,
@@ -531,6 +575,7 @@ export default function WorkOrdersPage() {
                 await loadAssignments(updated.id);
                 await loadLabor(updated.id);
             }
+            loadCounts();
         } catch (e) {
             const error = e as Error;
             setErr(error.message || "Eroare la schimbarea starii");
@@ -612,18 +657,11 @@ export default function WorkOrdersPage() {
             return sort === "newest" ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id);
         });
         return arr;
+
+
     }, [items, sort]);
 
-    const counts = useMemo(() => {
-        const c = { all: viewItems.length, open: 0, inProgress: 0, done: 0, cancelled: 0 };
-        for (const w of viewItems) {
-            if (w.status === WorkOrderStatus.Open) c.open++;
-            else if (w.status === WorkOrderStatus.InProgress) c.inProgress++;
-            else if (w.status === WorkOrderStatus.Done) c.done++;
-            else if (w.status === WorkOrderStatus.Cancelled) c.cancelled++;
-        }
-        return c;
-    }, [viewItems]);
+    // Counts removed from here, now in state
 
     const pageInfo = `${total === 0 ? 0 : skip + 1}-${Math.min(skip + take, total)} of ${total}`;
 
@@ -697,6 +735,11 @@ export default function WorkOrdersPage() {
                     <Select label="Type" value={newType} onChange={(e) => setNewType(Number(e.target.value) as WorkOrderType)}>
                         <option value={WorkOrderType.Corrective}>Corrective</option>
                         <option value={WorkOrderType.Preventive}>Preventive</option>
+                    </Select>
+
+                    <Select label="Clasificare" value={newClassification} onChange={(e) => setNewClassification(Number(e.target.value) as WorkOrderClassification)}>
+                        <option value={WorkOrderClassification.Proactive}>Proactiv</option>
+                        <option value={WorkOrderClassification.Reactive}>Reactiv</option>
                     </Select>
 
                     <Select label="Asset (optional)" value={newAssetId} onChange={(e) => setNewAssetId(e.target.value)}>
@@ -783,7 +826,7 @@ export default function WorkOrdersPage() {
                         </div>
                     </div>
 
-                    <div className="max-h-[70vh] overflow-y-auto">
+                    <div className="max-h-[40vh] lg:max-h-[70vh] overflow-y-auto">
                         {viewItems.map((w) => (
                             <button
                                 key={w.id}
@@ -864,6 +907,11 @@ export default function WorkOrdersPage() {
                                                                 {a.name}
                                                             </option>
                                                         ))}
+                                                    </Select>
+
+                                                    <Select label="Clasificare" value={dClassification} onChange={(e) => setDClassification(Number(e.target.value) as WorkOrderClassification)}>
+                                                        <option value={WorkOrderClassification.Proactive}>Proactiv</option>
+                                                        <option value={WorkOrderClassification.Reactive}>Reactiv</option>
                                                     </Select>
 
                                                     <Select label="Assign To" value={dAssignedId} onChange={(e) => setDAssignedId(e.target.value)}>

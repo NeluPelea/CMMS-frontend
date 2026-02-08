@@ -8,6 +8,7 @@ type NavItem = { to: string; label: string };
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/work-orders", label: "Work Orders" },
+  { to: "/work-orders/cards", label: "Carduri Work Orders" },
   { to: "/extra-jobs", label: "Activitati Extra" },
   { to: "/assets", label: "Assets" },
   { to: "/locations", label: "Locations" },
@@ -19,6 +20,7 @@ const NAV: NavItem[] = [
   { to: "/roles", label: "Roles" },
   { to: "/calendar", label: "Calendar" },
   { to: "/reports", label: "Rapoarte" },
+  { to: "/settings", label: "Setari" },
 ];
 
 

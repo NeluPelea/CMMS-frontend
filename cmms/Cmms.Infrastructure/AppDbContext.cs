@@ -37,6 +37,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<FileAttachment> FileAttachments => Set<FileAttachment>();
     public DbSet<WorkOrderLabor> WorkOrderLaborLogs => Set<WorkOrderLabor>();
     public DbSet<ExtraJob> ExtraJobs => Set<ExtraJob>();
+    public DbSet<ExtraJobEvent> ExtraJobEvents => Set<ExtraJobEvent>();
+    public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
+    public DbSet<UnitWorkSchedule> UnitWorkSchedule => Set<UnitWorkSchedule>();
 
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -107,6 +110,12 @@ public sealed class AppDbContext : DbContext
             .HasForeignKey(w => w.AssignedToPersonId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        b.Entity<WorkOrderLabor>()
+            .HasOne(x => x.WorkOrder)
+            .WithMany(w => w.LaborLogs)
+            .HasForeignKey(x => x.WorkOrderId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // ---------------- NEW: People ----------------
 
         b.Entity<Person>()
@@ -168,9 +177,13 @@ public sealed class AppDbContext : DbContext
         // ---------------- NEW: Calendar ----------------
         b.Entity<NationalHoliday>()
             .HasKey(x => x.Date);
+        b.Entity<NationalHoliday>()
+            .HasQueryFilter(x => x.IsAct);
 
         b.Entity<CompanyBlackoutDay>()
             .HasKey(x => x.Date);
+        b.Entity<CompanyBlackoutDay>()
+            .HasQueryFilter(x => x.IsAct);
 
         // ---------------- NEW: Roles ----------------
         b.Entity<AssignmentRole>()
@@ -317,6 +330,42 @@ public sealed class AppDbContext : DbContext
 
             e.HasIndex(x => new { x.AssetId, x.PartId }).IsUnique();
             e.HasIndex(x => new { x.AssetId, x.IsAct });
+        });
+
+        // ---------------- ExtraJobs ----------------
+        b.Entity<ExtraJobEvent>(e =>
+        {
+            e.ToTable("extra_job_events");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ActorId).HasMaxLength(200);
+            e.Property(x => x.Field).HasMaxLength(80);
+            e.Property(x => x.OldValue).HasMaxLength(400);
+            e.Property(x => x.NewValue).HasMaxLength(400);
+            e.Property(x => x.Message).HasMaxLength(2000);
+
+            e.HasIndex(x => x.ExtraJobId);
+            e.HasIndex(x => x.CreatedAtUtc);
+
+            e.HasOne(x => x.ExtraJob)
+             .WithMany(j => j.ExtraJobEvents)
+             .HasForeignKey(x => x.ExtraJobId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<DocumentTemplate>(e =>
+        {
+            e.ToTable("document_templates");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.StoredFilePath).IsRequired().HasMaxLength(500);
+            e.Property(x => x.OriginalFileName).IsRequired().HasMaxLength(255);
+            e.Property(x => x.ContentType).IsRequired().HasMaxLength(100);
+            e.HasIndex(x => x.Type).IsUnique();
+        });
+
+        b.Entity<UnitWorkSchedule>(e =>
+        {
+            e.ToTable("unit_work_schedule");
+            e.HasKey(x => x.Id);
         });
     }
 }

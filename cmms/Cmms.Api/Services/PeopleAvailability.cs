@@ -8,8 +8,13 @@ public sealed class PeopleAvailability
 {
     private const string DefaultTzId = "Europe/Bucharest";
     private readonly AppDbContext _db;
+    private readonly IUnitScheduleService _unitSchedule;
 
-    public PeopleAvailability(AppDbContext db) => _db = db;
+    public PeopleAvailability(AppDbContext db, IUnitScheduleService unitSchedule)
+    {
+        _db = db;
+        _unitSchedule = unitSchedule;
+    }
 
     /// <summary>
     /// v1 rules:
@@ -55,7 +60,7 @@ public sealed class PeopleAvailability
             return AvailabilityResult.Fail(reason);
 
         // company closed? (holiday/blackout)
-        if (await IsCompanyClosedOnLocalDateAsync(localDate, ct))
+        if (await _unitSchedule.IsFactoryClosedAsync(localDate.ToDateTime(TimeOnly.MinValue), ct))
             return AvailabilityResult.Fail("Date is a national holiday or company blackout day.");
 
         // leave? (CO/CM)
@@ -114,7 +119,7 @@ public sealed class PeopleAvailability
             // company closed cache
             if (!companyClosedCache.TryGetValue(localDate, out var isClosed))
             {
-                isClosed = await IsCompanyClosedOnLocalDateAsync(localDate, ct);
+                isClosed = await _unitSchedule.IsFactoryClosedAsync(localDate.ToDateTime(TimeOnly.MinValue), ct);
                 companyClosedCache[localDate] = isClosed;
             }
             if (isClosed)
@@ -205,18 +210,7 @@ public sealed class PeopleAvailability
 
     // Your DB uses DateTime for holidays/blackouts; you store "date-only semantics at 00:00 UTC".
     // So we compare against UTC midnight for that calendar date.
-    private async Task<bool> IsCompanyClosedOnLocalDateAsync(DateOnly localDate, CancellationToken ct)
-    {
-        var dayUtc = new DateTime(localDate.Year, localDate.Month, localDate.Day, 0, 0, 0, DateTimeKind.Utc);
 
-        var isHoliday = await _db.NationalHolidays.AsNoTracking()
-            .AnyAsync(x => x.Date == dayUtc, ct);
-        if (isHoliday) return true;
-
-        var isBlackout = await _db.CompanyBlackoutDays.AsNoTracking()
-            .AnyAsync(x => x.Date == dayUtc, ct);
-        return isBlackout;
-    }
 
     private async Task<bool> IsOnLeaveAsync(Guid personId, DateOnly day, CancellationToken ct)
     {
@@ -260,8 +254,9 @@ public sealed class PeopleAvailability
 
     private static AvailabilityResult CheckWindow(int fromMin, int toMin, int startMin, int endMin)
     {
-        if (fromMin < startMin || toMin > endMin)
-            return AvailabilityResult.Fail("Outside working hours.");
+        // Only validate start time against working hours (allow overrunning end of shift)
+        if (fromMin < startMin || fromMin >= endMin)
+            return AvailabilityResult.Fail("Start time is outside working hours.");
 
         return AvailabilityResult.Ok();
     }
