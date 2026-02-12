@@ -22,6 +22,7 @@ public sealed class DocumentTemplatesController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = "Perm:DOC_TEMPLATES_READ")]
     public async Task<ActionResult<List<TemplateDto>>> GetTemplates()
     {
         var templates = await _db.DocumentTemplates
@@ -37,9 +38,11 @@ public sealed class DocumentTemplatesController : ControllerBase
     }
 
     [HttpPost("header-png")]
+    [Authorize(Policy = "Perm:DOC_TEMPLATES_UPDATE")]
     public async Task<IActionResult> UploadHeader(IFormFile file) => await HandleUpload(file, DocumentTemplateType.Header);
-
+    
     [HttpPost("footer-png")]
+    [Authorize(Policy = "Perm:DOC_TEMPLATES_UPDATE")]
     public async Task<IActionResult> UploadFooter(IFormFile file) => await HandleUpload(file, DocumentTemplateType.Footer);
 
     [HttpGet("header-png")]

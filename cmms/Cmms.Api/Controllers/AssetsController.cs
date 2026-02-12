@@ -15,6 +15,7 @@ public class AssetsController : ControllerBase
     public AssetsController(AppDbContext db) => _db = db;
 
     [HttpGet]
+    [Authorize(Policy = "Perm:ASSET_READ")]
     public async Task<IActionResult> List([FromQuery] string? q = null, [FromQuery] Guid? locId = null, [FromQuery] int take = 200, [FromQuery] bool ia = false)
     {
         if (take <= 0) take = 200;
@@ -56,6 +57,7 @@ public class AssetsController : ControllerBase
     public record CreateReq(string Name, string? Code, Guid? LocId);
 
     [HttpPost]
+    [Authorize(Policy = "Perm:ASSET_CREATE")]
     public async Task<IActionResult> Create(CreateReq req)
     {
         var name = (req.Name ?? "").Trim();
@@ -81,6 +83,7 @@ public class AssetsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "Perm:ASSET_DELETE")]
     public async Task<IActionResult> SoftDelete(Guid id)
     {
         var x = await _db.Assets.FirstOrDefaultAsync(a => a.Id == id);

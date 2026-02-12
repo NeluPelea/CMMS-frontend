@@ -58,6 +58,7 @@ public sealed class PeopleController : ControllerBase
 
     // GET /api/people?take=50&skip=0&q=...&includeInactive=false
     [HttpGet]
+    [Authorize(Policy = "Perm:PEOPLE_READ")]
     public async Task<ActionResult<Paged<PersonDto>>> List(
         [FromQuery] int take = 50,
         [FromQuery] int skip = 0,
@@ -245,6 +246,7 @@ public sealed class PeopleController : ControllerBase
 
     // POST /api/people
     [HttpPost]
+    [Authorize(Policy = "Perm:PEOPLE_CREATE")]
     public async Task<ActionResult<PersonDto>> Create([FromBody] CreatePersonReq req, CancellationToken ct = default)
     {
         if (!NormalizeAndValidate(req, out var fullName, out var displayName, out var jobTitle,
@@ -290,6 +292,7 @@ public sealed class PeopleController : ControllerBase
 
     // PUT /api/people/{id}
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "Perm:PEOPLE_UPDATE")]
     public async Task<ActionResult<PersonDto>> Update(Guid id, [FromBody] UpdatePersonReq req, CancellationToken ct = default)
     {
         var p = await _db.People.FirstOrDefaultAsync(x => x.Id == id, ct);

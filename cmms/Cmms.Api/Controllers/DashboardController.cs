@@ -8,7 +8,7 @@ namespace Cmms.Api.Controllers;
 
 [ApiController]
 [Route("api/dashboard")]
-[Authorize]
+[Authorize(Policy = "Perm:DASHBOARD_VIEW")]
 public sealed class DashboardController : ControllerBase
 {
     private readonly AppDbContext _db;

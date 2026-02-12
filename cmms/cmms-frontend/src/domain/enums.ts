@@ -52,3 +52,26 @@ export function woClassificationLabel(c: WorkOrderClassification): string {
         default: return "Reactiv";
     }
 }
+
+export const NcOrderStatus = {
+    Draft: 0,
+    Sent: 1,
+    Confirmed: 2,
+    PartiallyReceived: 3,
+    Received: 4,
+    Cancelled: 5
+} as const;
+
+export type NcOrderStatus = typeof NcOrderStatus[keyof typeof NcOrderStatus];
+
+export function ncStatusLabel(s: NcOrderStatus): string {
+    switch (s) {
+        case NcOrderStatus.Draft: return "Draft";
+        case NcOrderStatus.Sent: return "Trimis";
+        case NcOrderStatus.Confirmed: return "Confirmat";
+        case NcOrderStatus.PartiallyReceived: return "Receptionat Partial";
+        case NcOrderStatus.Received: return "Receptionat Total";
+        case NcOrderStatus.Cancelled: return "Anulat";
+        default: return "Draft";
+    }
+}

@@ -9,4 +9,10 @@ public sealed class Part
     public string? Uom { get; set; }
 
     public bool IsAct { get; set; } = true;
+    
+    // New fields
+    public decimal? PurchasePrice { get; set; }
+    public string PurchaseCurrency { get; set; } = "RON";
+
+    public decimal MinQty { get; set; } = 0;
 }

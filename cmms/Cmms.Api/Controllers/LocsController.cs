@@ -20,6 +20,7 @@ public sealed class LocsController : ControllerBase
 
     // GET /api/locs?q=...&take=200&ia=true|false
     [HttpGet]
+    [Authorize(Policy = "Perm:LOC_READ")]
     public async Task<IActionResult> List(
         [FromQuery] string? q = null,
         [FromQuery] int take = 200,
@@ -55,6 +56,7 @@ public sealed class LocsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "Perm:LOC_CREATE")]
     public async Task<IActionResult> Create([FromBody] CreateReq req)
     {
         var name = (req.Name ?? "").Trim();
@@ -83,6 +85,7 @@ public sealed class LocsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "Perm:LOC_UPDATE")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateReq req)
     {
         var loc = await _db.Locations.FirstOrDefaultAsync(x => x.Id == id);
@@ -111,6 +114,7 @@ public sealed class LocsController : ControllerBase
 
     // soft delete
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "Perm:LOC_DELETE")]
     public async Task<IActionResult> SoftDelete(Guid id)
     {
         var loc = await _db.Locations.FirstOrDefaultAsync(x => x.Id == id);

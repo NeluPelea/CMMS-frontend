@@ -16,6 +16,7 @@ public sealed class RolesController : ControllerBase
 
     // GET /api/roles?take=200&includeInactive=0&q=...
     [HttpGet]
+    [Authorize(Policy = "Perm:SETTINGS_READ")]
     public async Task<ActionResult<List<RoleDto>>> List(
         [FromQuery] int take = 200,
         [FromQuery] int includeInactive = 0,
@@ -49,6 +50,7 @@ public sealed class RolesController : ControllerBase
 
     // POST /api/roles
     [HttpPost]
+    [Authorize(Policy = "Perm:SETTINGS_UPDATE")]
     public async Task<ActionResult<RoleDto>> Create([FromBody] CreateRoleReq req, CancellationToken ct)
     {
         var name = (req.Name ?? "").Trim();

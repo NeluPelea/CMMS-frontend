@@ -16,6 +16,7 @@ public sealed class PeopleLeavesController : ControllerBase
 
     // GET /api/people/{id}/leaves?from=2026-02-01&to=2026-02-28
     [HttpGet("{id:guid}/leaves")]
+    [Authorize(Policy = "Perm:PEOPLE_READ")]
     public async Task<ActionResult<List<LeaveDto>>> List(
         Guid id,
         [FromQuery] DateOnly? from = null,
@@ -53,6 +54,7 @@ public sealed class PeopleLeavesController : ControllerBase
 
     // POST /api/people/{id}/leaves
     [HttpPost("{id:guid}/leaves")]
+    [Authorize(Policy = "Perm:PEOPLE_UPDATE")]
     public async Task<ActionResult<LeaveDto>> Create(
         Guid id,
         [FromBody] CreateLeaveReq req,
@@ -109,6 +111,7 @@ public sealed class PeopleLeavesController : ControllerBase
 
     // DELETE /api/people/{personId}/leaves/{leaveId}
     [HttpDelete("{personId:guid}/leaves/{leaveId:guid}")]
+    [Authorize(Policy = "Perm:PEOPLE_UPDATE")]
     public async Task<IActionResult> Delete(Guid personId, Guid leaveId, CancellationToken ct = default)
     {
         var e = await _db.PersonLeaves.FirstOrDefaultAsync(x => x.Id == leaveId && x.PersonId == personId, ct);

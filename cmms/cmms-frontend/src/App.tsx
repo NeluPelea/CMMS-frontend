@@ -1,6 +1,7 @@
 // src/App.tsx
 import { Navigate, Route, Routes } from "react-router-dom";
 import RequireAuth from "./RequireAuth";
+import RequirePermission from "./RequirePermission";
 
 import LoginPage from "./pages/LoginPage";
 import WorkOrdersPage from "./pages/WorkOrdersPage";
@@ -20,6 +21,13 @@ import WorkOrderPrintPage from "./pages/WorkOrderPrintPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import AiCopilotPage from "./pages/AiCopilotPage";
+import SecurityUsersPage from "./pages/SecurityUsersPage";
+import SecurityRolesPage from "./pages/SecurityRolesPage";
+import NcListPage from "./pages/NcListPage";
+import NcDetailsPage from "./pages/NcDetailsPage";
+import SuppliersPage from "./pages/SuppliersPage";
+import GoodsReceiptsPage from "./pages/GoodsReceiptsPage";
+import GoodsReceiptDetailsPage from "./pages/GoodsReceiptDetailsPage";
 
 export default function App() {
     return (
@@ -128,6 +136,54 @@ export default function App() {
                     </RequireAuth>
                 }
             />
+            <Route
+                path="/goods-receipts"
+                element={
+                    <RequireAuth>
+                        <GoodsReceiptsPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/goods-receipts/:id"
+                element={
+                    <RequireAuth>
+                        <GoodsReceiptDetailsPage />
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/suppliers"
+                element={
+                    <RequireAuth>
+                        <RequirePermission permission="SUPPLIERS_READ">
+                            <SuppliersPage />
+                        </RequirePermission>
+                    </RequireAuth>
+                }
+            />
+
+            {/* Note de Comandă */}
+            <Route
+                path="/nc"
+                element={
+                    <RequireAuth>
+                        <RequirePermission permission="NC_READ">
+                            <NcListPage />
+                        </RequirePermission>
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/nc/:id"
+                element={
+                    <RequireAuth>
+                        <RequirePermission permission="NC_READ">
+                            <NcDetailsPage />
+                        </RequirePermission>
+                    </RequireAuth>
+                }
+            />
 
             {/* Administrare Utilizatori si Roluri */}
             <Route
@@ -146,6 +202,29 @@ export default function App() {
                     </RequireAuth>
                 }
             />
+
+            {/* Securitate si Admin (Prompt 3) */}
+            <Route
+                path="/security/users"
+                element={
+                    <RequireAuth>
+                        <RequirePermission permission="SECURITY_USERS_READ">
+                            <SecurityUsersPage />
+                        </RequirePermission>
+                    </RequireAuth>
+                }
+            />
+            <Route
+                path="/security/roles"
+                element={
+                    <RequireAuth>
+                        <RequirePermission permission="SECURITY_ROLES_READ">
+                            <SecurityRolesPage />
+                        </RequirePermission>
+                    </RequireAuth>
+                }
+            />
+
             <Route
                 path="/reports"
                 element={

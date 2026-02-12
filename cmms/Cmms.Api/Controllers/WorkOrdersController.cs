@@ -176,6 +176,7 @@ public sealed class WorkOrdersController : ControllerBase
 
     // ---------------- LIST ----------------
     [HttpGet]
+    [Authorize(Policy = "Perm:WO_READ")]
     public async Task<IActionResult> List(
         [FromQuery] string? q = null,
         [FromQuery] WorkOrderStatus? status = null,
@@ -354,6 +355,7 @@ public sealed class WorkOrdersController : ControllerBase
     );
 
     [HttpPost]
+    [Authorize(Policy = "Perm:WO_CREATE")]
     public async Task<IActionResult> Create([FromBody] CreateReq req)
     {
         if (req == null) return BadRequest("req null");
@@ -441,6 +443,7 @@ public sealed class WorkOrdersController : ControllerBase
     );
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "Perm:WO_UPDATE")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateReq req)
     {
         if (req == null) return BadRequest("req null");
@@ -553,6 +556,7 @@ public sealed class WorkOrdersController : ControllerBase
     // ---------------- ACTIONS (STATE MACHINE) ----------------
 
     [HttpPost("{id:guid}/start")]
+    [Authorize(Policy = "Perm:WO_EXECUTE")]
     public async Task<IActionResult> Start(Guid id)
     {
         var wo = await _db.WorkOrders.FirstOrDefaultAsync(x => x.Id == id);
@@ -587,6 +591,7 @@ public sealed class WorkOrdersController : ControllerBase
     }
 
     [HttpPost("{id:guid}/stop")]
+    [Authorize(Policy = "Perm:WO_EXECUTE")]
     public async Task<IActionResult> Stop(Guid id)
     {
         var wo = await _db.WorkOrders.FirstOrDefaultAsync(x => x.Id == id);

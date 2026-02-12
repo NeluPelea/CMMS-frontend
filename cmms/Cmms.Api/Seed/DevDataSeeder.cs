@@ -34,6 +34,7 @@ namespace Cmms.Api.Seed
             await db.Database.MigrateAsync();
 
             await TrySeedAdminUserAsync(sp, log);
+            await TrySeedSuppliersAsync(db, log);
 
             // --- discover entities by CLR/table ---
             var locEntity = FindEntity(db, log,
@@ -520,5 +521,308 @@ namespace Cmms.Api.Seed
 
         private static string QuoteIdent(string ident)
             => "\"" + ident.Replace("\"", "\"\"") + "\"";
+        private static async Task TrySeedSuppliersAsync(AppDbContext db, ILogger log)
+        {
+            if (await db.Suppliers.AnyAsync())
+            {
+                log.LogInformation("Suppliers already exist, skipping seed.");
+                return;
+            }
+
+            log.LogInformation("Seeding 10 complete suppliers with contacts...");
+
+            var now = DateTime.UtcNow;
+
+            // Supplier 1: TEHNO-PARTS SRL (Active, Preferred)
+            var s1 = new Cmms.Domain.Supplier
+            {
+                Name = "TEHNO-PARTS SRL",
+                Code = "TEHNO-001",
+                IsActive = true,
+                IsPreferred = true,
+                WebsiteUrl = "https://www.tehno-parts.ro",
+                TaxId = "RO11223344",
+                RegCom = "J40/1234/2015",
+                AddressLine1 = "Str. Industriala Nr. 10",
+                City = "București",
+                County = "Ilfov",
+                Country = "România",
+                PostalCode = "077190",
+                PaymentTermsDays = 30,
+                Currency = "RON",
+                Iban = "RO49AAAA1B31007593840000",
+                BankName = "BCR",
+                Notes = "Distribuitor principal piese mecanice și componente industriale. Livrare rapidă.",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            s1.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Ionescu Maria", RoleTitle = "Manager Vânzări", Email = "maria.ionescu@tehno-parts.ro", Phone = "0722-111-222", IsPrimary = true, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s1.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Popescu Dan", RoleTitle = "Suport Tehnic", Email = "dan.popescu@tehno-parts.ro", Phone = "0722-111-223", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s1.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Georgescu Ana", RoleTitle = "Contabilitate", Email = "ana.georgescu@tehno-parts.ro", Phone = "0722-111-224", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            db.Suppliers.Add(s1);
+
+            // Supplier 2: GLOBAL LOGISTICS S.A. (Active, Preferred)
+            var s2 = new Cmms.Domain.Supplier
+            {
+                Name = "GLOBAL LOGISTICS S.A.",
+                Code = "GLOBAL-002",
+                IsActive = true,
+                IsPreferred = true,
+                WebsiteUrl = "https://www.global-logistics.com",
+                TaxId = "RO99887766",
+                RegCom = "J23/5678/2012",
+                AddressLine1 = "Șos. București-Ploiești Km 15",
+                City = "Otopeni",
+                County = "Ilfov",
+                Country = "România",
+                PostalCode = "075100",
+                PaymentTermsDays = 45,
+                Currency = "EUR",
+                Iban = "RO49BBBB1B31007593840001",
+                BankName = "BRD",
+                Notes = "Importator echipamente industriale. Prețuri competitive pentru comenzi mari.",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            s2.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Schmidt Klaus", RoleTitle = "Sales Director", Email = "klaus.schmidt@global-logistics.com", Phone = "0733-222-333", IsPrimary = true, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s2.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Dumitrescu Elena", RoleTitle = "Account Manager", Email = "elena.dumitrescu@global-logistics.com", Phone = "0733-222-334", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            db.Suppliers.Add(s2);
+
+            // Supplier 3: ELECTRO-INDUSTRIAL SRL (Active, Preferred)
+            var s3 = new Cmms.Domain.Supplier
+            {
+                Name = "ELECTRO-INDUSTRIAL SRL",
+                Code = "ELECTRO-003",
+                IsActive = true,
+                IsPreferred = true,
+                WebsiteUrl = "https://www.electro-industrial.ro",
+                TaxId = "RO55667788",
+                RegCom = "J35/9012/2018",
+                AddressLine1 = "Calea Aradului Nr. 45",
+                City = "Timișoara",
+                County = "Timiș",
+                Country = "România",
+                PostalCode = "300645",
+                PaymentTermsDays = 30,
+                Currency = "RON",
+                Iban = "RO49CCCC1B31007593840002",
+                BankName = "ING Bank",
+                Notes = "Specialist în componente electrice și automatizări. Garanție extinsă.",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            s3.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Moldovan Cristian", RoleTitle = "Director Comercial", Email = "cristian.moldovan@electro-industrial.ro", Phone = "0744-333-444", IsPrimary = true, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s3.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Rus Ioana", RoleTitle = "Inginer Vânzări", Email = "ioana.rus@electro-industrial.ro", Phone = "0744-333-445", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s3.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Popa Mihai", RoleTitle = "Service", Email = "mihai.popa@electro-industrial.ro", Phone = "0744-333-446", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s3.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Stan Laura", RoleTitle = "Facturare", Email = "laura.stan@electro-industrial.ro", Phone = "0744-333-447", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            db.Suppliers.Add(s3);
+
+            // Supplier 4: HYDRAULIC SYSTEMS SRL (Active)
+            var s4 = new Cmms.Domain.Supplier
+            {
+                Name = "HYDRAULIC SYSTEMS SRL",
+                Code = "HYDRO-004",
+                IsActive = true,
+                IsPreferred = false,
+                WebsiteUrl = "https://www.hydraulic-systems.ro",
+                TaxId = "RO33445566",
+                RegCom = "J10/3456/2016",
+                AddressLine1 = "Bd. Republicii Nr. 88",
+                City = "Brașov",
+                County = "Brașov",
+                Country = "România",
+                PostalCode = "500030",
+                PaymentTermsDays = 60,
+                Currency = "EUR",
+                Iban = "RO49DDDD1B31007593840003",
+                BankName = "Raiffeisen Bank",
+                Notes = "Furnizor sisteme hidraulice și pneumatice. Consultanță tehnică gratuită.",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            s4.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Vasilescu Adrian", RoleTitle = "CEO", Email = "adrian.vasilescu@hydraulic-systems.ro", Phone = "0755-444-555", IsPrimary = true, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s4.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Nistor Carmen", RoleTitle = "Ofertare", Email = "carmen.nistor@hydraulic-systems.ro", Phone = "0755-444-556", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            db.Suppliers.Add(s4);
+
+            // Supplier 5: BEARING SOLUTIONS SRL (Active)
+            var s5 = new Cmms.Domain.Supplier
+            {
+                Name = "BEARING SOLUTIONS SRL",
+                Code = "BEARING-005",
+                IsActive = true,
+                IsPreferred = false,
+                WebsiteUrl = "https://www.bearing-solutions.ro",
+                TaxId = "RO77889900",
+                RegCom = "J12/7890/2019",
+                AddressLine1 = "Str. Fabricii Nr. 22",
+                City = "Cluj-Napoca",
+                County = "Cluj",
+                Country = "România",
+                PostalCode = "400632",
+                PaymentTermsDays = 30,
+                Currency = "RON",
+                Iban = "RO49EEEE1B31007593840004",
+                BankName = "UniCredit Bank",
+                Notes = "Specialist rulmenți și transmisii. Stoc permanent pentru dimensiuni standard.",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            s5.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Mureșan Florin", RoleTitle = "Manager Vânzări", Email = "florin.muresan@bearing-solutions.ro", Phone = "0766-555-666", IsPrimary = true, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s5.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Todor Gabriela", RoleTitle = "Asistent Vânzări", Email = "gabriela.todor@bearing-solutions.ro", Phone = "0766-555-667", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s5.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Luca Andrei", RoleTitle = "Logistică", Email = "andrei.luca@bearing-solutions.ro", Phone = "0766-555-668", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            db.Suppliers.Add(s5);
+
+            // Supplier 6: AUTOMATION TECH SRL (Inactive)
+            var s6 = new Cmms.Domain.Supplier
+            {
+                Name = "AUTOMATION TECH SRL",
+                Code = "AUTO-006",
+                IsActive = false,
+                IsPreferred = false,
+                WebsiteUrl = "https://www.automation-tech.ro",
+                TaxId = "RO22334455",
+                RegCom = "J29/4567/2017",
+                AddressLine1 = "Str. Petrolului Nr. 15",
+                City = "Ploiești",
+                County = "Prahova",
+                Country = "România",
+                PostalCode = "100089",
+                PaymentTermsDays = 45,
+                Currency = "EUR",
+                Iban = "RO49FFFF1B31007593840005",
+                BankName = "Alpha Bank",
+                Notes = "Furnizor inactiv temporar - restructurare internă. Contact reactivare în T2 2026.",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            s6.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Dobre Sorin", RoleTitle = "Director General", Email = "sorin.dobre@automation-tech.ro", Phone = "0777-666-777", IsPrimary = true, IsActive = false, CreatedAt = now, UpdatedAt = now });
+            s6.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Matei Raluca", RoleTitle = "Vânzări", Email = "raluca.matei@automation-tech.ro", Phone = "0777-666-778", IsPrimary = false, IsActive = false, CreatedAt = now, UpdatedAt = now });
+            db.Suppliers.Add(s6);
+
+            // Supplier 7: TOOLS & EQUIPMENT SRL (Active)
+            var s7 = new Cmms.Domain.Supplier
+            {
+                Name = "TOOLS & EQUIPMENT SRL",
+                Code = "TOOLS-007",
+                IsActive = true,
+                IsPreferred = false,
+                WebsiteUrl = "https://www.tools-equipment.ro",
+                TaxId = "RO66778899",
+                RegCom = "J13/2345/2020",
+                AddressLine1 = "Bd. Tomis Nr. 255",
+                City = "Constanța",
+                County = "Constanța",
+                Country = "România",
+                PostalCode = "900178",
+                PaymentTermsDays = 30,
+                Currency = "RON",
+                Iban = "RO49GGGG1B31007593840006",
+                BankName = "CEC Bank",
+                Notes = "Scule și echipamente pentru mentenanță. Reduceri pentru comenzi recurente.",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            s7.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Constantinescu Victor", RoleTitle = "Proprietar", Email = "victor.constantinescu@tools-equipment.ro", Phone = "0788-777-888", IsPrimary = true, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s7.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Barbu Simona", RoleTitle = "Vânzări", Email = "simona.barbu@tools-equipment.ro", Phone = "0788-777-889", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s7.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Enache Paul", RoleTitle = "Depozit", Email = "paul.enache@tools-equipment.ro", Phone = "0788-777-890", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            db.Suppliers.Add(s7);
+
+            // Supplier 8: INDUSTRIAL SUPPLIES S.A. (Active)
+            var s8 = new Cmms.Domain.Supplier
+            {
+                Name = "INDUSTRIAL SUPPLIES S.A.",
+                Code = "INDSUP-008",
+                IsActive = true,
+                IsPreferred = false,
+                WebsiteUrl = "https://www.industrial-supplies.ro",
+                TaxId = "RO44556677",
+                RegCom = "J05/6789/2014",
+                AddressLine1 = "Str. Bihorului Nr. 33",
+                City = "Oradea",
+                County = "Bihor",
+                Country = "România",
+                PostalCode = "410605",
+                PaymentTermsDays = 60,
+                Currency = "EUR",
+                Iban = "RO49HHHH1B31007593840007",
+                BankName = "Banca Transilvania",
+                Notes = "Distribuitor materiale consumabile industriale. Program de fidelizare.",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            s8.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Nagy Attila", RoleTitle = "Key Account Manager", Email = "attila.nagy@industrial-supplies.ro", Phone = "0799-888-999", IsPrimary = true, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s8.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Crișan Monica", RoleTitle = "Customer Service", Email = "monica.crisan@industrial-supplies.ro", Phone = "0799-888-990", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            db.Suppliers.Add(s8);
+
+            // Supplier 9: PRECISION PARTS SRL (Inactive)
+            var s9 = new Cmms.Domain.Supplier
+            {
+                Name = "PRECISION PARTS SRL",
+                Code = "PREC-009",
+                IsActive = false,
+                IsPreferred = false,
+                WebsiteUrl = "https://www.precision-parts.ro",
+                TaxId = "RO88990011",
+                RegCom = "J32/8901/2021",
+                AddressLine1 = "Str. Fabricilor Nr. 7",
+                City = "Sibiu",
+                County = "Sibiu",
+                Country = "România",
+                PostalCode = "550005",
+                PaymentTermsDays = 30,
+                Currency = "RON",
+                Iban = "RO49IIII1B31007593840008",
+                BankName = "OTP Bank",
+                Notes = "Furnizor suspendat - probleme de calitate. Re-evaluare în Q3 2026.",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            s9.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Stoica Radu", RoleTitle = "Manager Calitate", Email = "radu.stoica@precision-parts.ro", Phone = "0700-999-000", IsPrimary = true, IsActive = false, CreatedAt = now, UpdatedAt = now });
+            s9.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Lungu Diana", RoleTitle = "Relații Clienți", Email = "diana.lungu@precision-parts.ro", Phone = "0700-999-001", IsPrimary = false, IsActive = false, CreatedAt = now, UpdatedAt = now });
+            db.Suppliers.Add(s9);
+
+            // Supplier 10: SAFETY EQUIPMENT SRL (Active)
+            var s10 = new Cmms.Domain.Supplier
+            {
+                Name = "SAFETY EQUIPMENT SRL",
+                Code = "SAFETY-010",
+                IsActive = true,
+                IsPreferred = false,
+                WebsiteUrl = "https://www.safety-equipment.ro",
+                TaxId = "RO11223355",
+                RegCom = "J26/1234/2022",
+                AddressLine1 = "Str. Principală Nr. 100",
+                City = "Târgu Mureș",
+                County = "Mureș",
+                Country = "România",
+                PostalCode = "540139",
+                PaymentTermsDays = 45,
+                Currency = "RON",
+                Iban = "RO49JJJJ1B31007593840009",
+                BankName = "Garanti BBVA",
+                Notes = "Echipamente de protecție și siguranță. Certificări ISO complete.",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            s10.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Toma Alexandru", RoleTitle = "Director Vânzări", Email = "alexandru.toma@safety-equipment.ro", Phone = "0711-000-111", IsPrimary = true, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s10.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Marin Adriana", RoleTitle = "Specialist Produse", Email = "adriana.marin@safety-equipment.ro", Phone = "0711-000-112", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            s10.Contacts.Add(new Cmms.Domain.SupplierContact { FullName = "Badea Cosmin", RoleTitle = "Livrări", Email = "cosmin.badea@safety-equipment.ro", Phone = "0711-000-113", IsPrimary = false, IsActive = true, CreatedAt = now, UpdatedAt = now });
+            db.Suppliers.Add(s10);
+
+            await db.SaveChangesAsync();
+
+            log.LogInformation("Successfully seeded 10 suppliers with contacts:");
+            log.LogInformation("  1. TEHNO-PARTS SRL (București) - 3 contacts");
+            log.LogInformation("  2. GLOBAL LOGISTICS S.A. (Otopeni) - 2 contacts");
+            log.LogInformation("  3. ELECTRO-INDUSTRIAL SRL (Timișoara) - 4 contacts");
+            log.LogInformation("  4. HYDRAULIC SYSTEMS SRL (Brașov) - 2 contacts");
+            log.LogInformation("  5. BEARING SOLUTIONS SRL (Cluj-Napoca) - 3 contacts");
+            log.LogInformation("  6. AUTOMATION TECH SRL (Ploiești) - 2 contacts [INACTIVE]");
+            log.LogInformation("  7. TOOLS & EQUIPMENT SRL (Constanța) - 3 contacts");
+            log.LogInformation("  8. INDUSTRIAL SUPPLIES S.A. (Oradea) - 2 contacts");
+            log.LogInformation("  9. PRECISION PARTS SRL (Sibiu) - 2 contacts [INACTIVE]");
+            log.LogInformation(" 10. SAFETY EQUIPMENT SRL (Târgu Mureș) - 3 contacts");
+            log.LogInformation("Total: 8 active, 2 inactive | 3 preferred | 26 total contacts");
+        }
     }
 }

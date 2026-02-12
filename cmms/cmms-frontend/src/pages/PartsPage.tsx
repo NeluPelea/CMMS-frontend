@@ -1,7 +1,7 @@
-﻿// src/pages/PartsPage.tsx
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
-import { createPart, getParts, type PartDto } from "../api";
+import { StockAdjustmentTile } from "../components/StockAdjustmentTile";
+import { createPart, getParts, setPartStatus, updatePart, type PartDto } from "../api";
 import {
   Button,
   Card,
@@ -11,6 +11,7 @@ import {
   PageToolbar,
   Pill,
   TableShell,
+  Select,
 } from "../components/ui";
 
 // ---------------- helpers ----------------
@@ -29,9 +30,11 @@ function StatusPill({ active }: { active: boolean }) {
 
 export default function PartsPage() {
   const [items, setItems] = useState<PartDto[]>([]);
+  // ... (existing search state)
   const [q, setQ] = useState("");
   const [ia, setIa] = useState(false);
 
+  // ... (existing ui state)
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -39,16 +42,21 @@ export default function PartsPage() {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [uom, setUom] = useState("");
+  const [price, setPrice] = useState("");
+  const [currency, setCurrency] = useState("RON"); // NEW State
+  const [minQty, setMinQty] = useState("");
 
   const canCreate = useMemo(() => name.trim().length >= 2, [name]);
 
   const stats = useMemo(() => {
+    // ... existing stats logic
     const total = items.length;
     const inactive = items.filter((x) => x.isAct === false).length;
     return { total, inactive };
   }, [items]);
 
   async function load(nextQ?: string, nextIa?: boolean) {
+    // ... existing load function
     const qq = (typeof nextQ === "string" ? nextQ : q).trim();
     const includeInactive = typeof nextIa === "boolean" ? nextIa : ia;
 
@@ -73,18 +81,65 @@ export default function PartsPage() {
     if (!canCreate) return;
     setErr(null);
     try {
+      const p = parseFloat(price);
+      const mq = parseFloat(minQty);
+
       const created = await createPart({
         name: name.trim(),
         code: code.trim() ? code.trim() : null,
         uom: uom.trim() ? uom.trim() : null,
+        purchasePrice: !isNaN(p) ? p : null,
+        purchaseCurrency: currency, // USE State
+        minQty: !isNaN(mq) ? mq : 0,
       });
 
       setName("");
       setCode("");
       setUom("");
+      setPrice("");
+      setMinQty("");
+      setCurrency("RON"); // Reset
 
       // keep behavior: prepend created row
       setItems((prev) => [created, ...prev]);
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    }
+  }
+
+  // ... (existing onUpdateMinQty and onToggle)
+  async function onUpdateMinQty(id: string, newVal: string) {
+    const v = parseFloat(newVal);
+    if (isNaN(v) || v < 0) return; // ignore invalid
+
+    try {
+      await updatePart(id, { minQty: v });
+      // update local state
+      setItems(prev => prev.map(x => x.id === id ? { ...x, minQty: v } : x));
+    } catch (e: any) {
+      setErr("Failed to update min qty: " + e.message);
+    }
+  }
+
+  async function onToggle(p: PartDto) {
+    if (loading) return;
+
+    // Client-side validation for quick feedback
+    if (p.isAct) {
+      if (p.hasStock) {
+        alert("Nu se poate inactiva: piesa are stoc.");
+        return;
+      }
+      if (p.hasConsumption) {
+        alert("Nu se poate inactiva: piesa are istoric de consum.");
+        return;
+      }
+    }
+
+    try {
+      await setPartStatus(p.id, !p.isAct);
+      // Refresh to reflect changes
+      await load();
     } catch (e: any) {
       setErr(e?.message || String(e));
     }
@@ -98,6 +153,7 @@ export default function PartsPage() {
   return (
     <AppShell title="Piese de schimb">
       <PageToolbar
+        // ... (existing toolbar)
         left={
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <div className="w-full sm:w-80">
@@ -107,7 +163,7 @@ export default function PartsPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") load(e.currentTarget.value);
                 }}
-                placeholder="Search name / code..."
+                placeholder="Cautare dupa Articol / SKU"
               />
             </div>
 
@@ -118,12 +174,11 @@ export default function PartsPage() {
                 onChange={(e) => {
                   const v = e.target.checked;
                   setIa(v);
-                  // optional: immediate refresh when toggled
                   load(undefined, v);
                 }}
                 className="h-4 w-4 rounded border-white/20 bg-white/10"
               />
-              Include inactive
+              Include articole inactive
             </label>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -151,8 +206,11 @@ export default function PartsPage() {
       {err ? <ErrorBox message={err} /> : null}
 
       <Card title="Creeaza Piesa">
-        <div className="grid gap-3 lg:grid-cols-12">
-          <div className="lg:col-span-6">
+        <div className="grid gap-3 lg:grid-cols-12 items-end">
+          <div className="lg:col-span-4">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Nume Piesa
+            </div>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -160,61 +218,142 @@ export default function PartsPage() {
             />
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Cod SKU
+            </div>
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="Code (optional)"
+              placeholder="Cod SKU"
             />
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-1">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              U.M.
+            </div>
             <Input
               value={uom}
               onChange={(e) => setUom(e.target.value)}
-              placeholder="UoM (buc, m, kg...)"
+              placeholder="U.M"
             />
           </div>
 
-          <div className="lg:col-span-12 flex justify-end">
-            <Button onClick={onCreate} disabled={!canCreate} variant="primary">
-              Create
-            </Button>
+          <div className="lg:col-span-1">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Min Qty
+            </div>
+            <Input
+              type="number"
+              min="0"
+              value={minQty}
+              onChange={e => setMinQty(e.target.value)}
+              placeholder="0"
+            />
           </div>
 
-          <div className="lg:col-span-12 text-xs text-zinc-500">
-            Tip: Code si UoM sunt optionale. Dupa creare, randul apare primul in lista (MVP).
+          <div className="lg:col-span-2">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Pret Intrare
+            </div>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+
+          <div className="lg:col-span-1">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Moneda
+            </div>
+            <Select value={currency} onChange={e => setCurrency(e.target.value)}>
+              <option value="RON">RON</option>
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+            </Select>
+          </div>
+
+          <div className="lg:col-span-1 flex justify-end">
+            <Button onClick={onCreate} disabled={!canCreate} variant="primary">
+              +
+            </Button>
           </div>
         </div>
       </Card>
 
       <div className="mt-6" />
 
-      <TableShell minWidth={820}>
+      <StockAdjustmentTile />
+
+      <div className="mt-6" />
+
+      <TableShell minWidth={900}>
         <table className="w-full border-collapse text-sm">
           <thead className="bg-white/5 text-zinc-300">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold">Name</th>
-              <th className="px-4 py-3 text-left font-semibold">Code</th>
-              <th className="px-4 py-3 text-left font-semibold">UoM</th>
-              <th className="px-4 py-3 text-right font-semibold">Status</th>
+              <th className="px-4 py-1 text-left font-semibold">Articol</th>
+              <th className="px-4 py-1 text-left font-semibold">Cod SKU</th>
+              <th className="px-4 py-1 text-left font-semibold">Cant minima</th>
+              <th className="px-4 py-1 text-left font-semibold">U.M.</th>
+              <th className="px-4 py-1 text-right font-semibold">Pret / U.M</th>
+              <th className="px-4 py-1 text-left font-semibold w-20">Moneda</th>
+              <th className="px-4 py-1 text-right font-semibold">Status</th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-white/10">
             {items.map((x) => (
-              <tr key={x.id} className="hover:bg-white/5">
-                <td className="px-4 py-3 text-zinc-100 font-medium">{x.name}</td>
-                <td className="px-4 py-3 text-zinc-300">{x.code ?? "—"}</td>
-                <td className="px-4 py-3 text-zinc-300">{x.uom ?? "—"}</td>
-                <td className="px-4 py-3 text-right">
-                  <StatusPill active={x.isAct !== false} />
+              <tr key={x.id} className="hover:bg-white/5 odd:bg-white/[0.02]">
+                <td className="px-4 py-1 text-zinc-100 font-medium">{x.name}</td>
+                <td className="px-4 py-1 text-zinc-300">{x.code ?? "—"}</td>
+                <td className="px-4 py-1 text-zinc-300">
+                  <input
+                    type="number"
+                    defaultValue={x.minQty}
+                    className="w-20 bg-transparent border border-white/10 rounded px-2 py-0.5 text-zinc-300 focus:border-indigo-500 outline-none h-7 text-sm"
+                    onBlur={(e) => {
+                      if (parseFloat(e.target.value) !== x.minQty) {
+                        onUpdateMinQty(x.id, e.target.value);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur();
+                      }
+                    }}
+                  />
+                </td>
+                <td className="px-4 py-1 text-zinc-300">{x.uom ?? "—"}</td>
+                <td className="px-4 py-1 text-right text-zinc-300">
+                  {x.purchasePrice != null ? x.purchasePrice.toFixed(2) : "—"}
+                </td>
+                <td className="px-4 py-1 text-zinc-400 text-xs uppercase">
+                  {x.purchaseCurrency || "RON"}
+                </td>
+                <td className="px-4 py-1 text-right">
+                  <button
+                    onClick={() => onToggle(x)}
+                    disabled={x.isAct && (!!x.hasStock || !!x.hasConsumption)}
+                    title={
+                      x.isAct && (!!x.hasStock || !!x.hasConsumption)
+                        ? "Nu se poate inactiva: exista stoc/consum."
+                        : "Click pentru a schimba statusul"
+                    }
+                    className="disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-80 transition-opacity"
+                  >
+                    <StatusPill active={x.isAct !== false} />
+                  </button>
                 </td>
               </tr>
             ))}
 
             {!loading && items.length === 0 ? (
-              <EmptyRow colSpan={4} text="Nu exista piese." />
+              <EmptyRow colSpan={7} text="Nu exista piese." />
             ) : null}
           </tbody>
         </table>

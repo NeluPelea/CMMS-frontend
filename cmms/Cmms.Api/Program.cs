@@ -1,7 +1,10 @@
 using System.Text;
 using Cmms.Infrastructure;
 using Cmms.Api.Auth;
+using Cmms.Domain;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -15,6 +18,8 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. SERVICII DE BAZA (Controllers & Swagger)
 // ---------------------------------------------------------
 builder.Services.AddControllers();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient();
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(c =>
@@ -66,8 +71,11 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(cs));
 
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<Cmms.Api.Services.SecurityService>();
+builder.Services.AddScoped<Cmms.Api.Services.NcPdfService>();
 builder.Services.AddScoped<Cmms.Api.Services.PeopleAvailability>();
 builder.Services.AddScoped<Cmms.Api.Services.IUnitScheduleService, Cmms.Api.Services.UnitScheduleService>();
+builder.Services.AddScoped<PasswordHasher<User>>();
 builder.Services.AddHostedService<Cmms.Api.Services.PmBackgroundService>();
 
 // AI Services
@@ -106,6 +114,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 
 // ---------------------------------------------------------
 // 5. CONSTRUIRE APLICATIE (Middleware Pipeline)
@@ -117,7 +127,11 @@ if (app.Environment.IsDevelopment())
 {
     using (var scope = app.Services.CreateScope())
     {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
+        var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         await Cmms.Api.Seed.DevDataSeeder.SeedAsync(scope.ServiceProvider);
+        await Cmms.Api.Seed.SecurityDataSeeder.SeedAsync(db, env, config);
     }
 
     app.UseSwagger();

@@ -73,6 +73,7 @@ public sealed class PmPlansController : ControllerBase
     // ---------------- Endpoints ----------------
 
     [HttpGet]
+    [Authorize(Policy = "Perm:PM_READ")]
     public async Task<IActionResult> List([FromQuery] Guid? assetId = null, [FromQuery] int take = 200)
     {
         if (take <= 0) take = 200;
@@ -95,6 +96,7 @@ public sealed class PmPlansController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "Perm:PM_CREATE")]
     public async Task<IActionResult> Create([FromBody] CreateReq req)
     {
         if (req == null) return BadRequest("req null");
@@ -151,6 +153,7 @@ public sealed class PmPlansController : ControllerBase
 
     // Manual generator: creeaza WO Preventive pentru planurile scadente
     [HttpPost("generate-due")]
+    [Authorize(Policy = "Perm:PM_EXECUTE")]
     public async Task<IActionResult> GenerateDue([FromQuery] int take = 200)
     {
         if (take <= 0) take = 200;

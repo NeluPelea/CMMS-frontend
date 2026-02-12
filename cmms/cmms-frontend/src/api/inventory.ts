@@ -6,9 +6,14 @@ export type InventoryRowDto = {
   partId: string;
   partName: string;
   partCode?: string | null;
+  skuCode?: string | null;
   uom?: string | null;
-  qtyOnHand: number; // backend returns numeric -> JS number
-  minQty?: number | null;
+  qtyOnHand: number;
+  minQty?: number;
+  purchasePrice?: number | null;
+  purchaseCurrency?: string | null;
+  unitPriceRon: number;
+  valueRon: number;
 };
 
 export async function getInventory(p?: { q?: string; take?: number }): Promise<InventoryRowDto[]> {

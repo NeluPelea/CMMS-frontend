@@ -41,6 +41,29 @@ public sealed class AppDbContext : DbContext
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
     public DbSet<UnitWorkSchedule> UnitWorkSchedule => Set<UnitWorkSchedule>();
 
+    // NC (Nota de Comanda)
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<NcOrder> NcOrders => Set<NcOrder>();
+    public DbSet<NcOrderLine> NcOrderLines => Set<NcOrderLine>();
+    public DbSet<NcOrderAttachment> NcOrderAttachments => Set<NcOrderAttachment>();
+    public DbSet<SupplierContact> SupplierContacts => Set<SupplierContact>();
+    public DbSet<SupplierPart> SupplierParts => Set<SupplierPart>();
+
+    // Inventory Docs
+    public DbSet<GoodsReceipt> GoodsReceipts => Set<GoodsReceipt>();
+    public DbSet<GoodsReceiptLine> GoodsReceiptLines => Set<GoodsReceiptLine>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+
+    // Security
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<UserPermissionOverride> UserPermissionOverrides => Set<UserPermissionOverride>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+
 
     protected override void OnModelCreating(ModelBuilder b)
 
@@ -272,6 +295,10 @@ public sealed class AppDbContext : DbContext
 
             e.Property(x => x.Name).IsRequired();
             e.HasIndex(x => x.Name);
+
+            e.Property(x => x.PurchasePrice).HasColumnType("decimal(18,2)");
+            e.Property(x => x.PurchaseCurrency).IsRequired().HasMaxLength(3).HasDefaultValue("RON");
+            e.Property(x => x.MinQty).HasColumnType("decimal(18,2)");
         });
 
         b.Entity<InventoryItem>(e =>
@@ -366,6 +393,158 @@ public sealed class AppDbContext : DbContext
         {
             e.ToTable("unit_work_schedule");
             e.HasKey(x => x.Id);
+        });
+
+        // Security Configurations
+        b.Entity<User>(e =>
+        {
+            e.ToTable("users");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Username).IsUnique();
+            e.Property(x => x.Username).HasMaxLength(100).IsRequired();
+            e.Property(x => x.DisplayName).HasMaxLength(200);
+            e.Property(x => x.PasswordHash).IsRequired();
+        });
+
+        b.Entity<Role>(e =>
+        {
+            e.ToTable("roles");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Code).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+        });
+
+        b.Entity<Permission>(e =>
+        {
+            e.ToTable("permissions");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Code).HasMaxLength(100).IsRequired();
+            e.Property(x => x.GroupName).HasMaxLength(50);
+        });
+
+        b.Entity<UserRole>(e =>
+        {
+            e.ToTable("user_roles");
+            e.HasKey(x => new { x.UserId, x.RoleId });
+            e.HasOne(x => x.User).WithMany(u => u.UserRoles).HasForeignKey(x => x.UserId);
+            e.HasOne(x => x.Role).WithMany(r => r.UserRoles).HasForeignKey(x => x.RoleId);
+        });
+
+        b.Entity<RolePermission>(e =>
+        {
+            e.ToTable("role_permissions");
+            e.HasKey(x => new { x.RoleId, x.PermissionId });
+            e.HasOne(x => x.Role).WithMany(r => r.RolePermissions).HasForeignKey(x => x.RoleId);
+            e.HasOne(x => x.Permission).WithMany().HasForeignKey(x => x.PermissionId);
+        });
+
+        b.Entity<UserPermissionOverride>(e =>
+        {
+            e.ToTable("user_permission_overrides");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.UserId, x.PermissionId }).IsUnique();
+            e.HasOne(x => x.User).WithMany(u => u.PermissionOverrides).HasForeignKey(x => x.UserId);
+            e.HasOne(x => x.Permission).WithMany().HasForeignKey(x => x.PermissionId);
+        });
+
+        b.Entity<AuditLog>(e =>
+        {
+            e.ToTable("security_audit_logs");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Action).HasMaxLength(100);
+            e.Property(x => x.TargetType).HasMaxLength(100);
+            e.HasIndex(x => x.CreatedAt);
+        });
+
+        // ---------------- NC / Suppliers ----------------
+        b.Entity<Supplier>(e =>
+        {
+            e.ToTable("suppliers");
+            e.HasIndex(x => x.Name);
+            e.HasIndex(x => x.Code).IsUnique();
+        });
+
+        b.Entity<NcOrder>(e =>
+        {
+            e.ToTable("nc_orders");
+            e.HasIndex(x => x.NcNumber).IsUnique();
+            e.HasIndex(x => x.OrderDate);
+            e.HasIndex(x => x.Status);
+
+            e.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.DeliveryLocation).WithMany().HasForeignKey(x => x.DeliveryLocationId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.ReceiverPerson).WithMany().HasForeignKey(x => x.ReceiverPersonId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<NcOrderLine>(e =>
+        {
+            e.ToTable("nc_order_lines");
+            e.HasOne(x => x.NcOrder).WithMany(o => o.Lines).HasForeignKey(x => x.NcOrderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Part).WithMany().HasForeignKey(x => x.PartId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.SupplierPart).WithMany().HasForeignKey(x => x.SupplierPartId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<NcOrderAttachment>(e =>
+        {
+            e.ToTable("nc_order_attachments");
+            e.HasOne(x => x.NcOrder).WithMany(o => o.Attachments).HasForeignKey(x => x.NcOrderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.UploadedByUser).WithMany().HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<SupplierContact>(e =>
+        {
+            e.ToTable("supplier_contacts");
+            e.HasOne(x => x.Supplier).WithMany(s => s.Contacts).HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<SupplierPart>(e =>
+        {
+            e.ToTable("supplier_parts");
+            e.HasOne(x => x.Supplier).WithMany(s => s.SupplierParts).HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Part).WithMany().HasForeignKey(x => x.PartId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.SupplierId, x.PartId }).IsUnique();
+        });
+
+        // ---------------- Inventory Docs ----------------
+        b.Entity<GoodsReceipt>(e =>
+        {
+            e.ToTable("goods_receipts");
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<GoodsReceiptLine>(e =>
+        {
+            e.ToTable("goods_receipt_lines");
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.GoodsReceipt).WithMany(r => r.Lines).HasForeignKey(x => x.GoodsReceiptId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Part).WithMany().HasForeignKey(x => x.PartId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<StockMovement>(e =>
+        {
+            e.ToTable("stock_movements");
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.Part).WithMany().HasForeignKey(x => x.PartId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.CreatedAt);
+        });
+
+
+        b.Entity<AppSetting>(e =>
+        {
+            e.ToTable("app_settings");
+            e.HasKey(x => x.Key);
+            e.Property(x => x.Key).HasMaxLength(50);
+
+            e.HasData(
+                new AppSetting { Key = "VAT_RATE", Value = "19", Description = "Cota TVA (%)" },
+                new AppSetting { Key = "FX_RON_EUR", Value = "4.950000", Description = "Curs RON/EUR" },
+                new AppSetting { Key = "FX_RON_USD", Value = "4.600000", Description = "Curs RON/USD" }
+            );
         });
     }
 }

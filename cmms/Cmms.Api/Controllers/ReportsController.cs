@@ -17,7 +17,7 @@ namespace Cmms.Api.Controllers;
 
 [ApiController]
 [Route("api/reports")]
-[Authorize]
+[Authorize(Policy = "Perm:REPORTS_VIEW")]
 public sealed class ReportsController : ControllerBase
 {
     private readonly AppDbContext _db;
@@ -781,6 +781,7 @@ public sealed class ReportsController : ControllerBase
     }
 
     [HttpGet("extra-jobs/export/pdf")]
+    [Authorize(Policy = "Perm:REPORTS_EXPORT")]
     public async Task<IActionResult> ExportExtraJobsPdf(
         [FromQuery(Name = "from")] string? fromStr = null,
         [FromQuery(Name = "to")] string? toStr = null)

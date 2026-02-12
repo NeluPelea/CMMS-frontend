@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Cmms.Domain;
 
 namespace Cmms.Api.Auth;
 
@@ -15,7 +16,7 @@ public class JwtTokenService
         _cfg = cfg;
     }
 
-    public string CreateToken(string email)
+    public string CreateToken(User user, IEnumerable<string> roles, IEnumerable<string> permissions)
     {
         var keyStr = _cfg["Jwt:Key"] ?? "";
         if (Encoding.UTF8.GetByteCount(keyStr) < 32)
@@ -27,11 +28,20 @@ public class JwtTokenService
         var issuer = _cfg["Jwt:Issuer"] ?? "cmms";
         var audience = _cfg["Jwt:Audience"] ?? "cmms";
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.Name, email),
-            new Claim(ClaimTypes.Email, email),
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.Username),
+            new Claim("display_name", user.DisplayName ?? user.Username),
         };
+
+        foreach (var r in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, r));
+        }
+
+        // We are NOT packing permissions into JWT anymore per Prompt 2 recommendation.
+        // PermissionHandler uses SecurityService (cached) instead.
 
         var token = new JwtSecurityToken(
             issuer: issuer,

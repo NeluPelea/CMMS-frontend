@@ -1,9 +1,9 @@
 // src/components/AppShell.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { logout } from "../api";
+import { logout, hasPerm } from "../api";
 
-type NavItem = { to: string; label: string };
+type NavItem = { to: string; label: string; perm?: string };
 
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Tablou de bord" },
@@ -13,18 +13,25 @@ const NAV: NavItem[] = [
   { to: "/assets", label: "Utilaje" },
   { to: "/locations", label: "Locatii" },
   { to: "/pm-plans", label: "Planuri Mentenanta" },
+  { to: "/goods-receipts", label: "Receptie marfa" },
   { to: "/parts", label: "Piese de schimb" },
   { to: "/inventory", label: "Inventar" },
-
-  { to: "/people", label: "Angajati" },
-  { to: "/roles", label: "Roluri" },
+  { to: "/suppliers", label: "Furnizori", perm: "SUPPLIERS_READ" },
+  { to: "/nc", label: "Note de Comandă", perm: "NC_READ" },
   { to: "/calendar", label: "Calendar" },
   { to: "/reports", label: "Rapoarte" },
   { to: "/ai-copilot", label: "AI Copilot" },
+
+  // Admin
+  { to: "/people", label: "Angajati" },
+  { to: "/roles", label: "Pozitii/Roluri master" },
+
+  // Security
+  { to: "/security/users", label: "Acces Utilizatori", perm: "SECURITY_USERS_READ" },
+  { to: "/security/roles", label: "Configurare Roluri", perm: "SECURITY_ROLES_READ" },
+
   { to: "/settings", label: "Setari" },
 ];
-
-
 
 function cx(...xs: Array<string | false | undefined>) {
   return xs.filter(Boolean).join(" ");
@@ -70,6 +77,10 @@ function Sidebar(props: {
 }) {
   const loc = useLocation();
 
+  const filteredNav = useMemo(() => {
+    return NAV.filter(it => !it.perm || hasPerm(it.perm));
+  }, []);
+
   return (
     <div className="h-full rounded-2xl border border-white/10 bg-white/5 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.35)]">
       <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -77,7 +88,7 @@ function Sidebar(props: {
       </div>
 
       <nav className="space-y-1 p-1">
-        {NAV.map((it) => {
+        {filteredNav.map((it) => {
           const active =
             loc.pathname === it.to || loc.pathname.startsWith(it.to + "/");
           return (

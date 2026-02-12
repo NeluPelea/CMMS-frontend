@@ -7,8 +7,8 @@ export default function LoginPage() {
   const nav = useNavigate();
   const loc = useLocation() as any;
 
-  const [email, setEmail] = useState("admin@local");
-  const [password, setPassword] = useState("admin");
+  const [username, setUsername] = useState("admin@cmms.local");
+  const [password, setPassword] = useState("Parola123");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -17,7 +17,7 @@ export default function LoginPage() {
     setErr(null);
     setLoading(true);
     try {
-      await login(email.trim(), password);
+      await login(username.trim(), password);
       const to = loc?.state?.from || "/work-orders";
       nav(to, { replace: true });
     } catch (ex: any) {
@@ -33,9 +33,9 @@ export default function LoginPage() {
 
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
         <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Utilizator"
           style={{ padding: 10 }}
         />
         <input

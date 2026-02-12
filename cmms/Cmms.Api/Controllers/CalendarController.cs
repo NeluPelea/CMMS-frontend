@@ -18,6 +18,7 @@ public sealed class CalendarController : ControllerBase
 
     // GET /api/calendar/holidays?year=2026
     [HttpGet("holidays")]
+    [Authorize(Policy = "Perm:CALENDAR_READ")]
     public async Task<ActionResult<List<DayDto>>> ListHolidays(
         [FromQuery] int? year = null, 
         [FromQuery] bool includeDeleted = false,
@@ -41,6 +42,7 @@ public sealed class CalendarController : ControllerBase
 
     // POST /api/calendar/holidays
     [HttpPost("holidays")]
+    [Authorize(Policy = "Perm:CALENDAR_UPDATE")]
     public async Task<IActionResult> AddHoliday([FromBody] AddDayReq req, CancellationToken ct)
     {
         var d = DateTime.SpecifyKind(req.Date.Date, DateTimeKind.Utc);

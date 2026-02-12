@@ -8,6 +8,11 @@ export type PartDto = {
     code?: string | null;
     uom?: string | null;
     isAct: boolean;
+    hasStock?: boolean;
+    hasConsumption?: boolean;
+    purchasePrice?: number | null;
+    purchaseCurrency: string; // was optional, now required (default RON)
+    minQty: number;
 };
 
 export type GetPartsParams = {
@@ -20,6 +25,13 @@ export type CreatePartReq = {
     name: string;
     code?: string | null;
     uom?: string | null;
+    purchasePrice?: number | null;
+    purchaseCurrency?: string | null;
+    minQty?: number;
+};
+
+export type UpdatePartReq = {
+    minQty?: number;
 };
 
 function normQuery(q?: string): string | undefined {
@@ -64,11 +76,28 @@ export async function createPart(req: CreatePartReq): Promise<PartDto> {
             name,
             code: req.code ?? null,
             uom: req.uom ?? null,
+            purchasePrice: req.purchasePrice ?? null,
+            purchaseCurrency: req.purchaseCurrency ?? null,
+            minQty: req.minQty ?? 0,
         }),
+    });
+}
+
+export async function updatePart(id: string, req: UpdatePartReq): Promise<void> {
+    return apiFetch(`/api/parts/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(req),
     });
 }
 
 // helper (non-breaking)
 export async function searchParts(q: string, take = 50, ia = true): Promise<PartDto[]> {
     return getParts({ q, take, ia });
+}
+
+export async function setPartStatus(id: string, isActive: boolean): Promise<void> {
+    return apiFetch(`/api/parts/${id}/status`, {
+        method: "PUT",
+        body: JSON.stringify(isActive),
+    });
 }

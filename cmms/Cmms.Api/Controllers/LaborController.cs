@@ -8,7 +8,7 @@ namespace Cmms.Api.Controllers;
 
 [ApiController]
 [Route("api/work-orders/{woId:guid}/labor")]
-[Authorize]
+[Authorize(Policy = "Perm:WO_EXECUTE")]
 public sealed class LaborController : ControllerBase
 {
     private readonly AppDbContext _db;

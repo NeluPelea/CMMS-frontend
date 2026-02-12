@@ -48,6 +48,7 @@ public sealed class ExtraJobsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = "Perm:EXTRA_READ")]
     public async Task<ActionResult<List<ExtraJobDto>>> List(
         [FromQuery] bool? done = null, 
         [FromQuery] int take = 50, 
@@ -87,6 +88,7 @@ public sealed class ExtraJobsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "Perm:EXTRA_CREATE")]
     public async Task<ActionResult<ExtraJobDto>> Create([FromBody] CreateExtraJobReq req)
     {
         if (string.IsNullOrWhiteSpace(req.Title)) return BadRequest("Title required");
@@ -113,6 +115,7 @@ public sealed class ExtraJobsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "Perm:EXTRA_UPDATE")]
     public async Task<ActionResult<ExtraJobDto>> Update(Guid id, [FromBody] CreateExtraJobReq req)
     {
          var ent = await _db.ExtraJobs.FirstOrDefaultAsync(x => x.Id == id);
@@ -137,6 +140,7 @@ public sealed class ExtraJobsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "Perm:EXTRA_DELETE")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var ent = await _db.ExtraJobs.FirstOrDefaultAsync(x => x.Id == id);
@@ -150,6 +154,7 @@ public sealed class ExtraJobsController : ControllerBase
     // ACTIONS
 
     [HttpPost("{id:guid}/start")]
+    [Authorize(Policy = "Perm:EXTRA_EXECUTE")]
     public async Task<IActionResult> Start(Guid id)
     {
         var ent = await _db.ExtraJobs.FirstOrDefaultAsync(x => x.Id == id);
