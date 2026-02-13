@@ -1,0 +1,25 @@
+﻿  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Cmms.Domain -> E:\CMMS\cmms\Cmms.Domain\bin\Debug\net8.0\Cmms.Domain.dll
+  Cmms.Infrastructure -> E:\CMMS\cmms\Cmms.Infrastructure\bin\Debug\net8.0\Cmms.Infrastructure.dll
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(430,5): error CS0106: The modifier 'private' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(461,5): error CS0106: The modifier 'public' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(557,5): error CS0106: The modifier 'public' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(593,5): error CS0106: The modifier 'public' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(628,5): error CS0106: The modifier 'public' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(655,5): error CS0106: The modifier 'public' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(687,2): error CS1513: } expected [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+
+Build FAILED.
+
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(430,5): error CS0106: The modifier 'private' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(461,5): error CS0106: The modifier 'public' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(557,5): error CS0106: The modifier 'public' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(593,5): error CS0106: The modifier 'public' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(628,5): error CS0106: The modifier 'public' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(655,5): error CS0106: The modifier 'public' is not valid for this item [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+E:\CMMS\cmms\Cmms.Api\Controllers\WorkOrdersController.cs(687,2): error CS1513: } expected [E:\CMMS\cmms\Cmms.Api\Cmms.Api.csproj]
+    0 Warning(s)
+    7 Error(s)
+
+Time Elapsed 00:00:01.30

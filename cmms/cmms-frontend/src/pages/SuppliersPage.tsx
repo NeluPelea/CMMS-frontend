@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
 import {
     suppliersApi,
@@ -25,6 +26,7 @@ import {
 
 
 export default function SuppliersPage() {
+    const navigate = useNavigate();
     const [list, setList] = useState<SupplierSummaryDto[]>([]);
     const [, setTotal] = useState(0);
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -119,6 +121,11 @@ export default function SuppliersPage() {
                 <PageToolbar
                     left={
                         <div className="flex gap-2 items-center flex-wrap">
+                            <Button variant="ghost" onClick={() => navigate("/procurement")} className="px-2">
+                                <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                </svg>
+                            </Button>
                             <Input
                                 placeholder="Cauta nume, localitate, contact..."
                                 value={q}

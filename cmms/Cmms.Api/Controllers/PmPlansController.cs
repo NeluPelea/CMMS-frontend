@@ -1,5 +1,6 @@
 ﻿using Cmms.Domain;
 using Cmms.Infrastructure;
+using Cmms.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +14,15 @@ namespace Cmms.Api.Controllers;
 public sealed class PmPlansController : ControllerBase
 {
     private readonly AppDbContext _db;
-    public PmPlansController(AppDbContext db) => _db = db;
+    private readonly PmSchedulingService _scheduler;
+    private readonly IWorkingCalendar _calendar;
+
+    public PmPlansController(AppDbContext db, PmSchedulingService scheduler, IWorkingCalendar calendar)
+    {
+        _db = db;
+        _scheduler = scheduler;
+        _calendar = calendar;
+    }
 
     // ---------------- DTOs (NO CYCLES) ----------------
 
@@ -39,6 +48,15 @@ public sealed class PmPlansController : ControllerBase
 
     public sealed record GenerateResp(int Created, int UpdatedPlans);
 
+    public sealed record UpdateReq(
+        Guid AssetId,
+        string Name,
+        PmFrequency Frequency,
+        DateTimeOffset? NextDueAt,
+        bool IsAct,
+        List<string>? Items
+    );
+
     // EF-translatable projection (reutilizabil)
     private static readonly Expression<Func<PmPlan, PmPlanDto>> PlanToDto =
         p => new PmPlanDto(
@@ -59,15 +77,20 @@ public sealed class PmPlansController : ControllerBase
     private static DateTimeOffset Utc(DateTimeOffset x) => x.ToUniversalTime();
     private static DateTimeOffset UtcNow() => DateTimeOffset.UtcNow;
 
-    private static DateTimeOffset NextAfterBump(DateTimeOffset currentUtc, PmFrequency f)
+    private async Task<DateTimeOffset> NormalizeScheduleTime(DateTimeOffset inputDate)
     {
-        // currentUtc trebuie sa fie UTC
-        return f switch
-        {
-            PmFrequency.Daily => currentUtc.AddDays(1),
-            PmFrequency.Weekly => currentUtc.AddDays(7),
-            _ => currentUtc.AddMonths(1)
-        };
+        // 1. Convert to Local
+        var roZone = TimeZoneInfo.FindSystemTimeZoneById("E. Europe Standard Time");
+        var localTime = TimeZoneInfo.ConvertTime(inputDate, roZone);
+        var localDate = DateOnly.FromDateTime(localTime.DateTime);
+        
+        // 2. Ensure Working Day
+        var validDate = await _calendar.GetNextWorkingDay(localDate);
+        
+        // 3. Set 08:00
+        var validLocal = validDate.ToDateTime(new TimeOnly(8, 0, 0));
+        var validUtc = TimeZoneInfo.ConvertTimeToUtc(validLocal, roZone);
+        return new DateTimeOffset(validUtc, TimeSpan.Zero);
     }
 
     // ---------------- Endpoints ----------------
@@ -80,7 +103,7 @@ public sealed class PmPlansController : ControllerBase
         if (take > 500) take = 500;
 
         var qry = _db.PmPlans.AsNoTracking()
-            .Where(x => x.IsAct)
+            //.Where(x => x.IsAct) // Allow seeing inactive plans
             .AsQueryable();
 
         if (assetId.HasValue)
@@ -93,6 +116,19 @@ public sealed class PmPlansController : ControllerBase
             .ToListAsync();
 
         return Ok(items);
+    }
+
+    [HttpGet("{id:guid}")]
+    [Authorize(Policy = "Perm:PM_READ")]
+    public async Task<IActionResult> Get(Guid id)
+    {
+        var item = await _db.PmPlans.AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(PlanToDto)
+            .FirstOrDefaultAsync();
+
+        if (item == null) return NotFound();
+        return Ok(item);
     }
 
     [HttpPost]
@@ -112,14 +148,15 @@ public sealed class PmPlansController : ControllerBase
         if (name.Length > 200) return BadRequest("name too long");
 
         // normalize time
-        var nextDueAtUtc = Utc(req.NextDueAt ?? UtcNow());
+        var inputDate = req.NextDueAt ?? UtcNow();
+        var validUtc = await NormalizeScheduleTime(inputDate);
 
         var plan = new PmPlan
         {
             AssetId = req.AssetId,
             Name = name,
             Frequency = req.Frequency,
-            NextDueAt = nextDueAtUtc,
+            NextDueAt = validUtc,
             IsAct = true
         };
 
@@ -129,7 +166,6 @@ public sealed class PmPlansController : ControllerBase
             var i = 0;
             foreach (var t in req.Items.Select(x => (x ?? "").Trim()).Where(x => x.Length > 0))
             {
-                // OPTIONAL: limit length to keep DB sane
                 var text = t.Length > 300 ? t.Substring(0, 300) : t;
                 plan.Items.Add(new PmPlanItem
                 {
@@ -142,13 +178,101 @@ public sealed class PmPlansController : ControllerBase
         _db.PmPlans.Add(plan);
         await _db.SaveChangesAsync();
 
-        // return DTO (no cycles)
         var dto = await _db.PmPlans.AsNoTracking()
             .Where(x => x.Id == plan.Id)
             .Select(PlanToDto)
             .FirstAsync();
 
         return Ok(dto);
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = "Perm:PM_UPDATE")]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateReq req)
+    {
+        if (req == null) return BadRequest("req null");
+
+        // Validate basic inputs
+        var name = (req.Name ?? "").Trim();
+        if (name.Length < 2) return BadRequest("name too short");
+
+        // Use a transaction + pessimistic locking (SELECT FOR UPDATE) to serialize edits.
+        // This prevents "DbUpdateConcurrencyException" on child items because
+        // the second request will wait for the first to commit.
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            // 1. Lock the row
+            // We use a raw query to acquire the lock. 
+            // Postgres syntax: SELECT 1 FROM "PmPlans" WHERE "Id" = @id FOR UPDATE
+            await _db.Database.ExecuteSqlRawAsync(
+                "SELECT 1 FROM \"PmPlans\" WHERE \"Id\" = {0} FOR UPDATE", id);
+
+            // 2. Load entity (now we own the lock)
+            var plan = await _db.PmPlans
+                .Include(p => p.Items)
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (plan == null) return NotFound();
+
+            // validate asset (if changed)
+            if (plan.AssetId != req.AssetId)
+            {
+                var ok = await _db.Assets.AsNoTracking()
+                    .AnyAsync(a => a.Id == req.AssetId && a.IsAct);
+                if (!ok) return BadRequest("bad assetId");
+            }
+
+            // normalize time
+            DateTimeOffset validUtc;
+            if (req.NextDueAt.HasValue)
+            {
+                validUtc = await NormalizeScheduleTime(req.NextDueAt.Value);
+            }
+            else
+            {
+                validUtc = plan.NextDueAt;
+            }
+
+            // 4. Update parent
+            plan.Name = name;
+            plan.AssetId = req.AssetId;
+            plan.Frequency = req.Frequency;
+            plan.NextDueAt = validUtc;
+            plan.IsAct = req.IsAct;
+
+            // 5. Update items (Full Replace)
+            // Since we have a lock, no one else can be deleting/adding items to THIS plan right now.
+            _db.PmPlanItems.RemoveRange(plan.Items);
+            
+            if (req.Items != null && req.Items.Count > 0)
+            {
+                var newItems = req.Items.Select((text, idx) => new PmPlanItem
+                {
+                    PmPlanId = plan.Id,
+                    Text = text,
+                    Sort = idx
+                }).ToList();
+                _db.PmPlanItems.AddRange(newItems);
+            }
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            var dto = await _db.PmPlans.AsNoTracking()
+                .Where(x => x.Id == plan.Id)
+                .Select(PlanToDto)
+                .FirstAsync();
+
+            return Ok(dto);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            Console.WriteLine($"Error updating plan {id}: {ex}");
+            // Use 500 for unexpected errors; 
+            return StatusCode(500, new { message = "Eroare interna la salvare: " + ex.Message });
+        }
     }
 
     // Manual generator: creeaza WO Preventive pentru planurile scadente
@@ -159,44 +283,8 @@ public sealed class PmPlansController : ControllerBase
         if (take <= 0) take = 200;
         if (take > 500) take = 500;
 
-        var now = UtcNow();
-
-        // luam planurile scadente
-        var duePlans = await _db.PmPlans
-            .Include(x => x.Items) // avem nevoie de items pentru descriere
-            .Where(x => x.IsAct && x.NextDueAt <= now)
-            .OrderBy(x => x.NextDueAt)
-            .Take(take)
-            .ToListAsync();
-
-        var created = 0;
-
-        foreach (var p in duePlans)
-        {
-            // Description din checklist
-            var desc = (p.Items == null || p.Items.Count == 0)
-                ? null
-                : string.Join("\n", p.Items.OrderBy(i => i.Sort).Select(i => "- " + i.Text));
-
-            var wo = new WorkOrder
-            {
-                Title = $"PM: {p.Name}",
-                Description = desc,
-                Type = WorkOrderType.Preventive,
-                Status = WorkOrderStatus.Open,
-                AssetId = p.AssetId,
-                PmPlanId = p.Id
-            };
-
-            _db.WorkOrders.Add(wo);
-            created++;
-
-            // bump NextDueAt; asiguram UTC
-            p.NextDueAt = NextAfterBump(Utc(p.NextDueAt), p.Frequency);
-        }
-
-        await _db.SaveChangesAsync();
-
-        return Ok(new GenerateResp(created, duePlans.Count));
+        var count = await _scheduler.GenerateDuePlans(take, User.Identity?.Name ?? "Manual");
+        
+        return Ok(new GenerateResp(count, 0)); // UpdatedPlans logic is internal now
     }
 }

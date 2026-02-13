@@ -29,10 +29,13 @@ import {
     setWorkOrderPartQty,
     type PartDto,
     type WorkOrderPartDto,
+    type TeamDto,
+    getTeams,
 } from "../api";
 
-import { WorkOrderStatus } from "../domain/enums";
+import WorkOrderJournal from "../components/WorkOrderJournal";
 
+import { WorkOrderStatus } from "../domain/enums";
 import {
     Button,
     Card,
@@ -90,6 +93,8 @@ type FormState = {
     defect: string;
     cause: string;
     solution: string;
+    teamId: string;
+    coordinatorPersonId: string;
 };
 
 export default function WorkOrderDetailsPage() {
@@ -102,6 +107,7 @@ export default function WorkOrderDetailsPage() {
     const [wo, setWo] = useState<WorkOrderDto | null>(null);
     const [assets, setAssets] = useState<AssetDto[]>([]);
     const [people, setPeople] = useState<PersonSimpleDto[]>([]);
+    const [teams, setTeams] = useState<TeamDto[]>([]);
 
     const [form, setForm] = useState<FormState>({
         title: "",
@@ -114,6 +120,8 @@ export default function WorkOrderDetailsPage() {
         defect: "",
         cause: "",
         solution: "",
+        teamId: "",
+        coordinatorPersonId: "",
     });
 
     const canSave = useMemo(() => form.title.trim().length >= 2 && !actionLoading, [form.title, actionLoading]);
@@ -137,15 +145,17 @@ export default function WorkOrderDetailsPage() {
         setErr(null);
 
         try {
-            const [woData, assetsData, peopleData] = await Promise.all([
+            const [woData, assetsData, peopleData, teamsData] = await Promise.all([
                 getWorkOrderById(id),
                 getAssets({ take: 500, ia: true }),
                 getPeopleSimple({ take: 500, includeInactive: true }),
+                getTeams(),
             ]);
 
             setWo(woData);
             setAssets(safeArray<AssetDto>(assetsData));
             setPeople(safeArray<PersonSimpleDto>(peopleData));
+            setTeams(safeArray<TeamDto>(teamsData));
 
             setForm({
                 title: woData.title || "",
@@ -158,6 +168,8 @@ export default function WorkOrderDetailsPage() {
                 defect: woData.defect || "",
                 cause: woData.cause || "",
                 solution: woData.solution || "",
+                teamId: woData.teamId || "",
+                coordinatorPersonId: woData.coordinatorPersonId || "",
             });
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : "Eroare la incarcarea datelor";
@@ -190,6 +202,8 @@ export default function WorkOrderDetailsPage() {
                 defect: form.defect?.trim() ? form.defect.trim() : null,
                 cause: form.cause?.trim() ? form.cause.trim() : null,
                 solution: form.solution?.trim() ? form.solution.trim() : null,
+                teamId: form.teamId || null,
+                coordinatorPersonId: form.coordinatorPersonId || null,
             });
             await loadAll();
         } catch (e: unknown) {
@@ -294,10 +308,45 @@ export default function WorkOrderDetailsPage() {
                             </div>
 
                             <div className="lg:col-span-6">
+                                <Field label="Echipa">
+                                    <Select
+                                        value={form.teamId}
+                                        onChange={(e) => setForm((s) => ({ ...s, teamId: e.target.value, coordinatorPersonId: "" }))}
+                                    >
+                                        <option value="">(Fara echipa)</option>
+                                        {teams.map((t) => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.name}
+                                            </option>
+                                        ))}
+                                    </Select>
+                                </Field>
+                            </div>
+
+                            {form.teamId && (
+                                <div className="lg:col-span-6">
+                                    <Field label="Coordonator (Obligatoriu)">
+                                        <Select
+                                            value={form.coordinatorPersonId}
+                                            onChange={(e) => setForm((s) => ({ ...s, coordinatorPersonId: e.target.value }))}
+                                        >
+                                            <option value="">(Selecteaza)</option>
+                                            {teams.find(t => t.id === form.teamId)?.members.map((m) => (
+                                                <option key={m.personId} value={m.personId}>
+                                                    {m.displayName}
+                                                </option>
+                                            ))}
+                                        </Select>
+                                    </Field>
+                                </div>
+                            )}
+
+                            <div className="lg:col-span-6">
                                 <Field label="Responsabil Principal (Legacy)">
                                     <Select
                                         value={form.assignedToPersonId}
                                         onChange={(e) => setForm((s) => ({ ...s, assignedToPersonId: e.target.value }))}
+                                        disabled={!!form.teamId}
                                     >
                                         <option value="">(Nealocat)</option>
                                         {sortedPeople.map((p) => (
@@ -455,6 +504,10 @@ export default function WorkOrderDetailsPage() {
 
                     <PartsManager workOrderId={id!} disabled={actionLoading} />
                     <LaborLogsManager workOrderId={id!} />
+
+                    <Card title="Jurnal Evenimente">
+                        <WorkOrderJournal workOrderId={id!} />
+                    </Card>
                 </div>
             ) : null}
         </AppShell>

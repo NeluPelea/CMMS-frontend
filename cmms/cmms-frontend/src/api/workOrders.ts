@@ -27,6 +27,7 @@ export type WorkOrderDto = {
         locationId?: string | null;
         location?: { id: string; name: string; code?: string | null; isAct: boolean } | null;
         isAct: boolean;
+        ranking?: string | null;
     } | null;
 
     assignedToPersonId?: string | null;
@@ -42,6 +43,11 @@ export type WorkOrderDto = {
     defect?: string | null;
     cause?: string | null;
     solution?: string | null;
+
+    workOrderGroupId?: string | null;
+    teamId?: string | null;
+    coordinatorPersonId?: string | null;
+    coordinatorPerson?: { id: string; displayName: string } | null;
 };
 
 export interface WorkOrdersParams {
@@ -110,6 +116,8 @@ export type CreateWorkOrderReq = {
     assignedToPersonId?: string | null;
     startAt?: string | null; // ISO
     stopAt?: string | null; // ISO
+    teamId?: string | null;
+    coordinatorPersonId?: string | null;
 };
 
 export type UpdateWorkOrderReq = {
@@ -124,6 +132,8 @@ export type UpdateWorkOrderReq = {
     defect?: string | null;
     cause?: string | null;
     solution?: string | null;
+    teamId?: string | null;
+    coordinatorPersonId?: string | null;
 };
 
 export async function createWorkOrder(req: CreateWorkOrderReq): Promise<WorkOrderDto> {
@@ -138,6 +148,8 @@ export async function createWorkOrder(req: CreateWorkOrderReq): Promise<WorkOrde
             assignedToPersonId: req.assignedToPersonId ?? null,
             startAt: req.startAt ?? null,
             stopAt: req.stopAt ?? null,
+            teamId: req.teamId ?? null,
+            coordinatorPersonId: req.coordinatorPersonId ?? null,
         }),
     });
 }
@@ -157,6 +169,8 @@ export async function updateWorkOrder(id: string, req: UpdateWorkOrderReq): Prom
             defect: req.defect ?? null,
             cause: req.cause ?? null,
             solution: req.solution ?? null,
+            teamId: req.teamId ?? null,
+            coordinatorPersonId: req.coordinatorPersonId ?? null,
         }),
     });
 }
@@ -194,6 +208,9 @@ export type WorkOrderEventDto = {
     newValue?: string | null;
     message?: string | null;
     correlationId?: string | null;
+    fromStatus?: string | null;
+    toStatus?: string | null;
+    metadata?: string | null;
 };
 
 export async function getWorkOrderEvents(

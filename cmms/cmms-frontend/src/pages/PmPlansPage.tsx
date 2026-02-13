@@ -6,10 +6,12 @@ import {
   createPmPlan,
   generateDuePmPlans,
   getPmPlans,
+  getPmPlan,
+  updatePmPlan,
   PmFrequency,
   type PmPlanDto,
 } from "../api/pmPlans";
-import { isoToLocalDisplay, localInputToIso } from "../domain/datetime";
+import { isoToLocalDisplay, localInputToIso, isoToLocalInputValue } from "../domain/datetime";
 import {
   Button,
   Card,
@@ -21,6 +23,7 @@ import {
   Select,
   TableShell,
   cx,
+  Modal,
 } from "../components/ui";
 
 function safeArray<T>(x: any): T[] {
@@ -120,6 +123,16 @@ export default function PmPlansPage() {
   const [cNextDueLocal, setCNextDueLocal] = useState<string>("");
   const [cChecklist, setCChecklist] = useState<string>("");
 
+  // edit
+  const [editId, setEditId] = useState<string | null>(null);
+  const [eAssetId, setEAssetId] = useState("");
+  const [eName, setEName] = useState("");
+  const [eFreq, setEFreq] = useState<number>(PmFrequency.Weekly);
+  const [eNextDueLocal, setENextDueLocal] = useState<string>("");
+  const [eChecklist, setEChecklist] = useState<string>("");
+  const [eIsAct, setEIsAct] = useState(true);
+  const [editLoading, setEditLoading] = useState(false);
+
   const filteredAssets = useMemo(() => {
     if (!locId) return assets;
     return assets.filter((a) => (a.locId || "") === locId);
@@ -210,6 +223,74 @@ export default function PmPlansPage() {
       alert(`Ordine de lucru generate: ${res.created}\nPlanuri actualizate: ${res.updatedPlans}`);
     } catch (e: any) {
       setErr(e?.message || String(e));
+    }
+  }
+
+  // Edit Logic
+  async function openEdit(id: string) {
+    setEditId(id);
+    setEditLoading(true);
+    setErr(null);
+    try {
+      const p = await getPmPlan(id);
+      setEAssetId(p.assetId);
+      setEName(p.name);
+      setEFreq(p.frequency);
+      setENextDueLocal(p.nextDueAt ? isoToLocalInputValue(p.nextDueAt) : "");
+      setEIsAct(p.isAct);
+
+      const txt = p.items
+        .slice()
+        .sort((a, b) => a.sort - b.sort)
+        .map(x => x.text)
+        .join("\n");
+      setEChecklist(txt);
+
+    } catch (e: any) {
+      setErr("Failed to load plan: " + (e?.message || String(e)));
+      setEditId(null);
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  const [saving, setSaving] = useState(false);
+
+  async function onSaveEdit() {
+    if (!editId) return;
+    setSaving(true);
+    try {
+      const nextIso = eNextDueLocal ? localInputToIso(eNextDueLocal) : null;
+      if (eNextDueLocal && !nextIso) {
+        alert("Data scadenta invalida");
+        return;
+      }
+
+      const lines = eChecklist
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      await updatePmPlan(editId, {
+        assetId: eAssetId,
+        name: eName.trim(),
+        frequency: eFreq,
+        nextDueAt: nextIso,
+        isAct: eIsAct,
+        items: lines
+      });
+
+      setEditId(null);
+      await load(); // reload list
+    } catch (e: any) {
+      if (e?.status === 409 || e?.message?.includes("409")) {
+        alert("Planul a fost modificat intre timp. Datele vor fi reincarcate.");
+        await openEdit(editId); // Reload data
+      } else {
+        alert("Eroare la salvare: " + (e?.message || String(e)));
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -336,13 +417,19 @@ export default function PmPlansPage() {
               <th className="px-4 py-3 text-left font-semibold">Frecventa</th>
               <th className="px-4 py-3 text-left font-semibold">Urmatoarea scadenta</th>
               <th className="px-4 py-3 text-left font-semibold">Lista sarcini</th>
+              <th className="px-4 py-3 text-right font-semibold">Actiuni</th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-white/10">
             {items.map((p) => (
               <tr key={p.id} className="hover:bg-white/5">
-                <td className="px-4 py-3 text-zinc-100 font-medium">{p.name}</td>
+                <td className="px-4 py-3 text-zinc-100 font-medium">
+                  <div className="flex items-center gap-2">
+                    {!p.isAct && <div className="h-2 w-2 rounded-full bg-red-500" title="Inactiv"></div>}
+                    {p.name}
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-zinc-300">
                   {assetNameById.get(p.assetId) ?? p.assetId}
                 </td>
@@ -357,15 +444,87 @@ export default function PmPlansPage() {
                     {checklistPreview(p.items as any)}
                   </span>
                 </td>
+                <td className="px-4 py-3 text-right">
+                  <Button variant="ghost" onClick={() => openEdit(p.id)}>
+                    Edit
+                  </Button>
+                </td>
               </tr>
             ))}
 
             {!loading && items.length === 0 ? (
-              <EmptyRow colSpan={5} text="Nu exista planuri de mentenanta." />
+              <EmptyRow colSpan={6} text="Nu exista planuri de mentenanta." />
             ) : null}
           </tbody>
         </table>
       </TableShell>
+
+      {/* Edit Modal */}
+      {editId && (
+        <Modal title="Editeaza Plan" onClose={() => setEditId(null)}>
+          {editLoading ? <div className="p-4 text-zinc-400">Se incarca...</div> : (
+            <div className="space-y-4">
+              <div>
+                <FieldLabel>Nume</FieldLabel>
+                <Input value={eName} onChange={e => setEName(e.target.value)} />
+              </div>
+
+              <div>
+                <FieldLabel>Utilaj</FieldLabel>
+                <Select value={eAssetId} onChange={(e) => setEAssetId(e.target.value)}>
+                  <option value="">Selecteaza utilaj...</option>
+                  {assets.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} {a.code ? `(${a.code})` : ""}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <FieldLabel>Frecventa</FieldLabel>
+                  <Select value={eFreq} onChange={(e) => setEFreq(Number(e.target.value))}>
+                    <option value={PmFrequency.Daily}>Zilnic</option>
+                    <option value={PmFrequency.Weekly}>Saptamanal</option>
+                    <option value={PmFrequency.Monthly}>Lunar</option>
+                  </Select>
+                </div>
+                <div>
+                  <FieldLabel>Status</FieldLabel>
+                  <Select value={eIsAct ? "1" : "0"} onChange={e => setEIsAct(e.target.value === "1")}>
+                    <option value="1">Activ</option>
+                    <option value="0">Inactiv</option>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <FieldLabel>Urmatoarea scadenta (Regenerata auto daca modificati)</FieldLabel>
+                <DateTimeLocalInput value={eNextDueLocal} onChange={e => setENextDueLocal(e.target.value)} />
+              </div>
+
+              <div>
+                <FieldLabel>Lista sarcini</FieldLabel>
+                <TextArea
+                  value={eChecklist}
+                  onChange={(e) => setEChecklist(e.target.value)}
+                  rows={6}
+                  placeholder={"Un item pe linie"}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" onClick={() => setEditId(null)} disabled={saving}>Anuleaza</Button>
+                <Button variant="primary" onClick={onSaveEdit} disabled={saving}>
+                  {saving ? "Se salveaza..." : "Salveaza"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+
     </AppShell>
   );
 }

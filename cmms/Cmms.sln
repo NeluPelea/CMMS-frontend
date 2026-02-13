@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cmms.Api", "Cmms.Api\Cmms.A
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "frontend", "cmms-frontend\frontend.esproj", "{585E4004-BAC4-53C9-FD50-F35265DE664F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cmms.Tests", "Cmms.Tests\Cmms.Tests.csproj", "{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -75,6 +77,18 @@ Global
 		{585E4004-BAC4-53C9-FD50-F35265DE664F}.Release|x86.ActiveCfg = Release|Any CPU
 		{585E4004-BAC4-53C9-FD50-F35265DE664F}.Release|x86.Build.0 = Release|Any CPU
 		{585E4004-BAC4-53C9-FD50-F35265DE664F}.Release|x86.Deploy.0 = Release|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Debug|x64.Build.0 = Debug|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Debug|x86.Build.0 = Debug|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Release|x64.ActiveCfg = Release|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Release|x64.Build.0 = Release|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Release|x86.ActiveCfg = Release|Any CPU
+		{57D797AD-ECA1-43E2-9373-D5FFD9EE3819}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -13,6 +13,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<Person> People => Set<Person>();
     public DbSet<PersonWorkSchedule> PersonWorkSchedules => Set<PersonWorkSchedule>();
     public DbSet<PersonLeave> PersonLeaves => Set<PersonLeave>();
+    public DbSet<Team> Teams => Set<Team>();
+    public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
 
     public DbSet<NationalHoliday> NationalHolidays => Set<NationalHoliday>();
     public DbSet<CompanyBlackoutDay> CompanyBlackoutDays => Set<CompanyBlackoutDay>();
@@ -26,6 +28,7 @@ public sealed class AppDbContext : DbContext
     // PM
     public DbSet<PmPlan> PmPlans => Set<PmPlan>();
     public DbSet<PmPlanItem> PmPlanItems => Set<PmPlanItem>();
+    public DbSet<PmPlanExecutionLog> PmPlanExecutionLogs => Set<PmPlanExecutionLog>();
 
     // Parts + Inventory (conform migratiei InitFull)
     public DbSet<Part> Parts => Set<Part>();
@@ -126,12 +129,26 @@ public sealed class AppDbContext : DbContext
             .HasForeignKey(w => w.AssetId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // legacy single-assign
         b.Entity<WorkOrder>()
             .HasOne(w => w.AssignedToPerson)
             .WithMany()
             .HasForeignKey(w => w.AssignedToPersonId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // New Team / Coordinator
+        b.Entity<WorkOrder>()
+            .HasOne(w => w.Team)
+            .WithMany()
+            .HasForeignKey(w => w.TeamId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<WorkOrder>()
+            .HasOne(w => w.CoordinatorPerson)
+            .WithMany()
+            .HasForeignKey(w => w.CoordinatorPersonId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<WorkOrder>().HasIndex(w => w.WorkOrderGroupId);
 
         b.Entity<WorkOrderLabor>()
             .HasOne(x => x.WorkOrder)
@@ -197,6 +214,33 @@ public sealed class AppDbContext : DbContext
             e.HasIndex(x => new { x.PersonId, x.StartDate, x.EndDate });
         });
 
+        // ---------------- NEW: Teams ----------------
+        b.Entity<Team>(e =>
+        {
+            e.ToTable("teams");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.Name).IsUnique();
+        });
+
+        b.Entity<TeamMember>(e =>
+        {
+            e.ToTable("team_members");
+            e.HasKey(x => x.Id);
+            
+            e.HasOne(x => x.Team)
+                .WithMany(t => t.Members)
+                .HasForeignKey(x => x.TeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Person)
+                .WithMany()
+                .HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => new { x.TeamId, x.PersonId }).IsUnique();
+        });
+
         // ---------------- NEW: Calendar ----------------
         b.Entity<NationalHoliday>()
             .HasKey(x => x.Date);
@@ -250,6 +294,18 @@ public sealed class AppDbContext : DbContext
             .Property(x => x.CreatedAt)
             .HasColumnType("timestamptz")
             .HasDefaultValueSql("now()");
+        
+        // ---------------- NEW: WorkOrder ScheduledForUtc ----------------
+        b.Entity<WorkOrder>()
+            .HasIndex(x => new { x.PmPlanId, x.ScheduledForUtc })
+            .IsUnique()
+            .HasFilter("\"PmPlanId\" IS NOT NULL AND \"ScheduledForUtc\" IS NOT NULL"); // PG syntax specific, but EF Core might handle filter automatically if HasFilter used. Actually, let's use IsUnique with nulls handling if possible, or just the index.
+            // Postgres treats nulls as distinct, so we need a filter if we want uniqueness on (PlanId, ScheduledTime). 
+            // However, ScheduledForUtc is nullable.
+            // Let's just add the index. If ScheduledForUtc is null (AdHoc), it won't conflict. 
+            // If PmPlanId is null, it won't conflict.
+            // Uniqueness is only needed when BOTH are present.
+
 
         // ---------------- PM (existing) ----------------
         b.Entity<PmPlan>()
@@ -286,6 +342,25 @@ public sealed class AppDbContext : DbContext
         b.Entity<PmPlanAssignment>()
             .HasIndex(x => new { x.PmPlanId, x.PersonId, x.RoleId })
             .IsUnique();
+        
+        // ---------------- NEW: PmPlanExecutionLog ----------------
+        b.Entity<PmPlanExecutionLog>(e =>
+        {
+            e.ToTable("pm_plan_execution_logs");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.ScheduledForUtc);
+            e.HasIndex(x => x.PmPlanId);
+
+            e.HasOne(x => x.PmPlan)
+                .WithMany()
+                .HasForeignKey(x => x.PmPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.WorkOrder)
+                .WithMany()
+                .HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
 
         // ---------------- Parts (existing) ----------------
         b.Entity<Part>(e =>

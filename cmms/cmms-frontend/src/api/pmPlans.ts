@@ -29,11 +29,24 @@ export type GenerateDueResp = {
   updatedPlans: number;
 };
 
+export type UpdatePmPlanReq = {
+  assetId: string;
+  name: string;
+  frequency: number;
+  nextDueAt?: string | null;
+  isAct: boolean;
+  items?: string[] | null;
+};
+
 export async function getPmPlans(p?: { assetId?: string; take?: number }) {
   const qs = new URLSearchParams();
   if (p?.assetId) qs.set("assetId", p.assetId);
   if (p?.take != null) qs.set("take", String(p.take));
   return apiFetch<PmPlanDto[]>(`/api/pm-plans?${qs.toString()}`, { method: "GET" });
+}
+
+export async function getPmPlan(id: string) {
+  return apiFetch<PmPlanDto>(`/api/pm-plans/${id}`, { method: "GET" });
 }
 
 export async function createPmPlan(req: {
@@ -45,6 +58,13 @@ export async function createPmPlan(req: {
 }) {
   return apiFetch<PmPlanDto>(`/api/pm-plans`, {
     method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+export async function updatePmPlan(id: string, req: UpdatePmPlanReq) {
+  return apiFetch<PmPlanDto>(`/api/pm-plans/${id}`, {
+    method: "PUT",
     body: JSON.stringify(req),
   });
 }

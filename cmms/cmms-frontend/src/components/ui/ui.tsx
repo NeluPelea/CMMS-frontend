@@ -61,6 +61,10 @@ export function Select({ label, children, ...props }: SelectProps) {
     );
 }
 
+export function FieldLabel(props: { children: React.ReactNode }) {
+    return <label className="mb-1 block text-xs font-medium text-zinc-400">{props.children}</label>;
+}
+
 // ---------------- Buttons ----------------
 
 // Am adaugat "size" in interfata
@@ -325,6 +329,45 @@ export function Drawer(props: {
 
                     {props.footer ? <div className="border-t border-white/10 p-4">{props.footer}</div> : null}
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ---------------- Modal ----------------
+
+export function Modal(props: {
+    title?: string;
+    children: React.ReactNode;
+    onClose: () => void;
+    widthClassName?: string;
+}) {
+    useOnEscape(true, props.onClose);
+    useLockBodyScroll(true);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onMouseDown={(e) => {
+                    if (e.target === e.currentTarget) props.onClose();
+                }}
+            />
+            <div
+                className={cx(
+                    "relative flex max-h-full w-full flex-col rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl",
+                    props.widthClassName ?? "max-w-lg"
+                )}
+                role="dialog"
+                aria-modal="true"
+            >
+                <div className="flex items-center justify-between border-b border-white/10 p-4">
+                    <h3 className="text-lg font-semibold text-zinc-100">{props.title ?? "Modal"}</h3>
+                    <IconButton aria-label="Close" onClick={props.onClose}>
+                        ✕
+                    </IconButton>
+                </div>
+                <div className="flex-1 overflow-auto p-4">{props.children}</div>
             </div>
         </div>
     );

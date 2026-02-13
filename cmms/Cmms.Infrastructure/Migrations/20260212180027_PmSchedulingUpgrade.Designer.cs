@@ -3,6 +3,7 @@ using System;
 using Cmms.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Cmms.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260212180027_PmSchedulingUpgrade")]
+    partial class PmSchedulingUpgrade
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -46,21 +49,21 @@ namespace Cmms.Infrastructure.Migrations
                         {
                             Key = "VAT_RATE",
                             Description = "Cota TVA (%)",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 13, 8, 38, 30, 919, DateTimeKind.Unspecified).AddTicks(7969), new TimeSpan(0, 0, 0, 0, 0)),
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 12, 18, 0, 25, 315, DateTimeKind.Unspecified).AddTicks(1446), new TimeSpan(0, 0, 0, 0, 0)),
                             Value = "19"
                         },
                         new
                         {
                             Key = "FX_RON_EUR",
                             Description = "Curs RON/EUR",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 13, 8, 38, 30, 919, DateTimeKind.Unspecified).AddTicks(7976), new TimeSpan(0, 0, 0, 0, 0)),
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 12, 18, 0, 25, 315, DateTimeKind.Unspecified).AddTicks(1452), new TimeSpan(0, 0, 0, 0, 0)),
                             Value = "4.950000"
                         },
                         new
                         {
                             Key = "FX_RON_USD",
                             Description = "Curs RON/USD",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 13, 8, 38, 30, 919, DateTimeKind.Unspecified).AddTicks(7977), new TimeSpan(0, 0, 0, 0, 0)),
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 12, 18, 0, 25, 315, DateTimeKind.Unspecified).AddTicks(1453), new TimeSpan(0, 0, 0, 0, 0)),
                             Value = "4.600000"
                         });
                 });
@@ -83,12 +86,6 @@ namespace Cmms.Infrastructure.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<string>("Ranking")
-                        .HasColumnType("text");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -1277,56 +1274,6 @@ namespace Cmms.Infrastructure.Migrations
                     b.ToTable("supplier_parts", (string)null);
                 });
 
-            modelBuilder.Entity("Cmms.Domain.Team", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("teams", (string)null);
-                });
-
-            modelBuilder.Entity("Cmms.Domain.TeamMember", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("PersonId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PersonId");
-
-                    b.HasIndex("TeamId", "PersonId")
-                        .IsUnique();
-
-                    b.ToTable("team_members", (string)null);
-                });
-
             modelBuilder.Entity("Cmms.Domain.UnitWorkSchedule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1460,9 +1407,6 @@ namespace Cmms.Infrastructure.Migrations
                     b.Property<int>("Classification")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("CoordinatorPersonId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1496,9 +1440,6 @@ namespace Cmms.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("StopAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("TeamId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1506,20 +1447,11 @@ namespace Cmms.Infrastructure.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("WorkOrderGroupId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("AssetId");
 
                     b.HasIndex("AssignedToPersonId");
-
-                    b.HasIndex("CoordinatorPersonId");
-
-                    b.HasIndex("TeamId");
-
-                    b.HasIndex("WorkOrderGroupId");
 
                     b.HasIndex("PmPlanId", "ScheduledForUtc")
                         .IsUnique()
@@ -1591,18 +1523,12 @@ namespace Cmms.Infrastructure.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
-                    b.Property<string>("FromStatus")
-                        .HasColumnType("text");
-
                     b.Property<int>("Kind")
                         .HasColumnType("integer");
 
                     b.Property<string>("Message")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("Metadata")
-                        .HasColumnType("text");
 
                     b.Property<string>("NewValue")
                         .HasMaxLength(400)
@@ -1611,9 +1537,6 @@ namespace Cmms.Infrastructure.Migrations
                     b.Property<string>("OldValue")
                         .HasMaxLength(400)
                         .HasColumnType("character varying(400)");
-
-                    b.Property<string>("ToStatus")
-                        .HasColumnType("text");
 
                     b.Property<Guid>("WorkOrderId")
                         .HasColumnType("uuid");
@@ -2016,25 +1939,6 @@ namespace Cmms.Infrastructure.Migrations
                     b.Navigation("Supplier");
                 });
 
-            modelBuilder.Entity("Cmms.Domain.TeamMember", b =>
-                {
-                    b.HasOne("Cmms.Domain.Person", "Person")
-                        .WithMany()
-                        .HasForeignKey("PersonId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Cmms.Domain.Team", "Team")
-                        .WithMany("Members")
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Person");
-
-                    b.Navigation("Team");
-                });
-
             modelBuilder.Entity("Cmms.Domain.UserPermissionOverride", b =>
                 {
                     b.HasOne("Cmms.Domain.Permission", "Permission")
@@ -2085,23 +1989,9 @@ namespace Cmms.Infrastructure.Migrations
                         .HasForeignKey("AssignedToPersonId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Cmms.Domain.Person", "CoordinatorPerson")
-                        .WithMany()
-                        .HasForeignKey("CoordinatorPersonId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Cmms.Domain.Team", "Team")
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Asset");
 
                     b.Navigation("AssignedToPerson");
-
-                    b.Navigation("CoordinatorPerson");
-
-                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("Cmms.Domain.WorkOrderAssignment", b =>
@@ -2223,11 +2113,6 @@ namespace Cmms.Infrastructure.Migrations
                     b.Navigation("Contacts");
 
                     b.Navigation("SupplierParts");
-                });
-
-            modelBuilder.Entity("Cmms.Domain.Team", b =>
-                {
-                    b.Navigation("Members");
                 });
 
             modelBuilder.Entity("Cmms.Domain.User", b =>

@@ -1,5 +1,5 @@
 import { apiFetch } from "./http";
-import type { SupplierSummaryDto } from "./suppliers";
+
 
 export interface GoodsReceiptDto {
     id: string;

@@ -75,6 +75,8 @@ builder.Services.AddScoped<Cmms.Api.Services.SecurityService>();
 builder.Services.AddScoped<Cmms.Api.Services.NcPdfService>();
 builder.Services.AddScoped<Cmms.Api.Services.PeopleAvailability>();
 builder.Services.AddScoped<Cmms.Api.Services.IUnitScheduleService, Cmms.Api.Services.UnitScheduleService>();
+builder.Services.AddScoped<Cmms.Api.Services.IWorkingCalendar, Cmms.Api.Services.WorkingCalendarService>();
+builder.Services.AddSingleton<Cmms.Api.Services.PmSchedulingService>();
 builder.Services.AddScoped<PasswordHasher<User>>();
 builder.Services.AddHostedService<Cmms.Api.Services.PmBackgroundService>();
 

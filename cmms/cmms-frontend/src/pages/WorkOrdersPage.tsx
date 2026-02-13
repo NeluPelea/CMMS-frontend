@@ -42,8 +42,11 @@ import {
     type AssignmentDto,
     type CreateAssignmentReq,
     type LaborLogDto,
+    getTeams,
+    type TeamDto,
 } from "../api";
 
+import { getWorkOrderDecoration, getResponsibleDisplayName } from "../domain/workOrderDecorations";
 import { isoToLocalDisplay, isoToLocalInputValue, localInputToIso } from "../domain/datetime";
 import { WorkOrderClassification, WorkOrderStatus, WorkOrderType, woStatusLabel } from "../domain/enums";
 import AppShell from "../components/AppShell";
@@ -103,6 +106,7 @@ export default function WorkOrdersPage() {
     const [people, setPeople] = useState<PersonDto[]>([]);
     const [roles, setRoles] = useState<RoleDto[]>([]);
     const [partsCatalog, setPartsCatalog] = useState<PartDto[]>([]);
+    const [teams, setTeams] = useState<TeamDto[]>([]);
 
     // ---------------- Counts ----------------
     const [counts, setCounts] = useState({
@@ -136,8 +140,15 @@ export default function WorkOrdersPage() {
     const [newType, setNewType] = useState<WorkOrderType>(WorkOrderType.Corrective);
     const [newClassification, setNewClassification] = useState<WorkOrderClassification>(WorkOrderClassification.Reactive);
     const [newAssetId, setNewAssetId] = useState<string>("");
+    const [newTeamId, setNewTeamId] = useState("");
+    const [newCoordId, setNewCoordId] = useState("");
 
-    const canCreate = useMemo(() => newTitle.trim().length >= 2 && !actionLoading, [newTitle, actionLoading]);
+    const canCreate = useMemo(() => {
+        if (newTitle.trim().length < 2) return false;
+        if (actionLoading) return false;
+        if (newTeamId && !newCoordId) return false;
+        return true;
+    }, [newTitle, actionLoading, newTeamId, newCoordId]);
     const canSave = useMemo(() => dTitle.trim().length >= 2 && !!selected && !actionLoading, [dTitle, selected, actionLoading]);
 
     // ---------------- Parts (WO Parts) ----------------
@@ -339,18 +350,20 @@ export default function WorkOrdersPage() {
     // ---------------- Aux + list loading ----------------
     const loadAux = useCallback(async () => {
         try {
-            const [locData, assetData, peopleData, roleData, partsData] = await Promise.all([
+            const [locData, assetData, peopleData, roleData, partsData, teamsData] = await Promise.all([
                 getLocs({ take: 1000, ia: true }),
                 getAssets({ take: 1000, ia: true }),
                 getPeople(),
                 getRoles(),
                 getParts({ take: 1000, ia: true }),
+                getTeams(),
             ]);
             setLocs(safeArray<LocDto>(locData));
             setAssets(safeArray<AssetDto>(assetData));
             setPeople(safeArray<PersonDto>(peopleData));
             setRoles(safeArray<RoleDto>(roleData).filter((r) => r.isActive).sort((a, b) => a.sortOrder - b.sortOrder));
             setPartsCatalog(safeArray<PartDto>(partsData));
+            setTeams(safeArray<TeamDto>(teamsData));
         } catch (e) {
             // aux failure should not block page
             console.error("Aux data failed", e);
@@ -499,11 +512,15 @@ export default function WorkOrdersPage() {
                 assignedToPersonId: null,
                 startAt: null,
                 stopAt: null,
+                teamId: newTeamId || null,
+                coordinatorPersonId: newCoordId || null,
             });
 
             setNewTitle("");
             setNewDesc("");
             setNewAssetId("");
+            setNewTeamId("");
+            setNewCoordId("");
 
             await loadList(0);
             loadCounts();
@@ -751,6 +768,27 @@ export default function WorkOrdersPage() {
                         ))}
                     </Select>
 
+                    <Select label="Echipa (Explodeaza WO)" value={newTeamId} onChange={(e) => {
+                        setNewTeamId(e.target.value);
+                        setNewCoordId("");
+                    }}>
+                        <option value="">(Individual / Fara Echipa)</option>
+                        {teams.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                    </Select>
+
+                    {newTeamId && (
+                        <Select label="Coordonator (Obligatoriu)" value={newCoordId} onChange={(e) => setNewCoordId(e.target.value)}>
+                            <option value="">(Selecteaza Coordonator)</option>
+                            {teams.find(t => t.id === newTeamId)?.members.map((m) => (
+                                <option key={m.personId} value={m.personId}>
+                                    {m.displayName}
+                                </option>
+                            ))}
+                        </Select>
+                    )}
+
                     <div>
                         <label className="mb-1 block text-xs font-medium text-zinc-400">Descriere (optional)</label>
                         <textarea
@@ -827,25 +865,44 @@ export default function WorkOrdersPage() {
                     </div>
 
                     <div className="max-h-[40vh] lg:max-h-[70vh] overflow-y-auto">
-                        {viewItems.map((w) => (
-                            <button
-                                key={w.id}
-                                onClick={() => setSelId(w.id)}
-                                className={cx(
-                                    "w-full border-b border-white/5 p-4 text-left transition hover:bg-white/5",
-                                    selId === w.id && "border-l-2 border-l-teal-500 bg-teal-500/10"
-                                )}
-                            >
-                                <div className="mb-1 flex items-start justify-between">
-                                    <span className="truncate pr-2 font-medium text-zinc-100">{w.title}</span>
-                                    <StatusPill status={w.status} />
-                                </div>
-                                <div className="flex justify-between text-xs text-zinc-400">
-                                    <span>{w.asset?.name ?? "Fara Utilaj"}</span>
-                                    <span>{isoToLocalDisplay(w.startAt)}</span>
-                                </div>
-                            </button>
-                        ))}
+                        {viewItems.map((w) => {
+                            const style = getWorkOrderDecoration(w);
+                            return (
+                                <button
+                                    key={w.id}
+                                    onClick={() => setSelId(w.id)}
+                                    className={cx(
+                                        "w-full border-b border-white/5 p-4 text-left transition hover:bg-white/5",
+                                        style.borderClass,
+                                        selId === w.id && "bg-teal-500/10"
+                                    )}
+                                >
+                                    <div className="mb-1 flex items-start justify-between">
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                            <span className="truncate pr-2 font-medium text-zinc-100">{w.title}</span>
+                                            {style.showReactiveBadge && (
+                                                <span className="shrink-0 rounded bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                                                    Reactiv
+                                                </span>
+                                            )}
+                                        </div>
+                                        <StatusPill status={w.status} />
+                                    </div>
+                                    <div className="flex justify-between text-xs text-zinc-400">
+                                        <span>{w.asset?.name ?? "Fara Utilaj"}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="flex items-center gap-1 text-zinc-500">
+                                                <span className="i-lucide-user text-[10px]">👤</span>
+                                                <span className="truncate max-w-[80px]">
+                                                    {getResponsibleDisplayName(w)}
+                                                </span>
+                                            </span>
+                                            <span>{isoToLocalDisplay(w.startAt)}</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
 
                         {viewItems.length === 0 ? (
                             <div className="p-6 text-center text-sm text-zinc-400">{loading ? "Se incarca..." : "Nu exista ordine de lucru."}</div>

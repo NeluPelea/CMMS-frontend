@@ -16,7 +16,12 @@ export type AssetDto = {
     locName?: string | null;
 
     // Active flag
+    // Active flag
     isAct: boolean;
+
+    // A-Z ranking
+    ranking?: string | null;
+    status?: number;
 };
 
 export interface GetAssetsParams {
@@ -50,6 +55,14 @@ export interface CreateAssetRequest {
     name: string;
     code?: string | null;
     locId?: string | null;
+    ranking?: string | null;
+}
+
+export interface UpdateAssetRequest {
+    name: string;
+    code?: string | null;
+    locId?: string | null;
+    ranking?: string | null;
 }
 
 /**
@@ -65,6 +78,22 @@ export async function createAsset(req: CreateAssetRequest): Promise<AssetDto> {
             name,
             code: req.code ?? null,
             locId: req.locId ?? null,
+            ranking: req.ranking,
+        }),
+    });
+}
+
+/**
+ * PUT /api/as/{id}
+ */
+export async function updateAsset(id: string, req: UpdateAssetRequest): Promise<AssetDto> {
+    return apiFetch<AssetDto>(`/api/as/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+            name: req.name,
+            code: req.code ?? null,
+            locId: req.locId ?? null,
+            ranking: req.ranking,
         }),
     });
 }

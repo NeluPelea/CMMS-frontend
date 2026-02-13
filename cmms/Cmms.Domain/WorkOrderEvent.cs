@@ -39,4 +39,11 @@ public sealed class WorkOrderEvent
 
     // optional: group events in same operation
     public Guid? CorrelationId { get; set; }
+
+    // Status transition tracking
+    public string? FromStatus { get; set; }
+    public string? ToStatus { get; set; }
+
+    // JSON Metadata for extensibility
+    public string? Metadata { get; set; }
 }

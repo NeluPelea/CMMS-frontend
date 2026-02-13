@@ -3,6 +3,7 @@ using System;
 using Cmms.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Cmms.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260212193105_AddAssetStatus")]
+    partial class AddAssetStatus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -46,21 +49,21 @@ namespace Cmms.Infrastructure.Migrations
                         {
                             Key = "VAT_RATE",
                             Description = "Cota TVA (%)",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 13, 8, 38, 30, 919, DateTimeKind.Unspecified).AddTicks(7969), new TimeSpan(0, 0, 0, 0, 0)),
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 12, 19, 31, 3, 42, DateTimeKind.Unspecified).AddTicks(8839), new TimeSpan(0, 0, 0, 0, 0)),
                             Value = "19"
                         },
                         new
                         {
                             Key = "FX_RON_EUR",
                             Description = "Curs RON/EUR",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 13, 8, 38, 30, 919, DateTimeKind.Unspecified).AddTicks(7976), new TimeSpan(0, 0, 0, 0, 0)),
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 12, 19, 31, 3, 42, DateTimeKind.Unspecified).AddTicks(8842), new TimeSpan(0, 0, 0, 0, 0)),
                             Value = "4.950000"
                         },
                         new
                         {
                             Key = "FX_RON_USD",
                             Description = "Curs RON/USD",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 13, 8, 38, 30, 919, DateTimeKind.Unspecified).AddTicks(7977), new TimeSpan(0, 0, 0, 0, 0)),
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 12, 19, 31, 3, 42, DateTimeKind.Unspecified).AddTicks(8843), new TimeSpan(0, 0, 0, 0, 0)),
                             Value = "4.600000"
                         });
                 });
@@ -82,9 +85,6 @@ namespace Cmms.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Ranking")
                         .HasColumnType("text");
 
                     b.Property<int>("Status")

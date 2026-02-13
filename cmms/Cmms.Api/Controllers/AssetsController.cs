@@ -48,13 +48,16 @@ public class AssetsController : ControllerBase
             code = x.Code,
             locId = x.LocationId,
             locName = x.Location != null ? x.Location.Name : null,
-            isAct = x.IsAct
+            isAct = x.IsAct,
+            ranking = x.Ranking,
+            status = (int)x.Status
         });
 
         return Ok(dto);
     }
 
-    public record CreateReq(string Name, string? Code, Guid? LocId);
+    public record CreateReq(string Name, string? Code, Guid? LocId, string? Ranking);
+    public record UpdateReq(string Name, string? Code, Guid? LocId, string? Ranking);
 
     [HttpPost]
     [Authorize(Policy = "Perm:ASSET_CREATE")]
@@ -62,6 +65,15 @@ public class AssetsController : ControllerBase
     {
         var name = (req.Name ?? "").Trim();
         if (name.Length < 2) return BadRequest("name too short");
+
+        // Validate Ranking
+        string? ranking = null;
+        if (!string.IsNullOrWhiteSpace(req.Ranking))
+        {
+            ranking = req.Ranking.Trim().ToUpper();
+            if (ranking.Length != 1 || ranking[0] < 'A' || ranking[0] > 'Z')
+                return BadRequest("Ranking must be a single letter A-Z");
+        }
 
         if (req.LocId.HasValue)
         {
@@ -73,13 +85,68 @@ public class AssetsController : ControllerBase
         {
             Name = name,
             Code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code.Trim(),
-            LocationId = req.LocId
+            LocationId = req.LocId,
+            Ranking = ranking,
+            Status = AssetStatus.Operational
         };
 
         _db.Assets.Add(x);
         await _db.SaveChangesAsync();
 
-        return Ok(new { id = x.Id, name = x.Name, code = x.Code, locId = x.LocationId, locName = (string?)null, isAct = x.IsAct });
+        return Ok(new { 
+            id = x.Id, 
+            name = x.Name, 
+            code = x.Code, 
+            locId = x.LocationId, 
+            locName = (string?)null, 
+            isAct = x.IsAct,
+            ranking = x.Ranking,
+            status = (int)x.Status
+        });
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = "Perm:ASSET_UPDATE")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateReq req)
+    {
+        var name = (req.Name ?? "").Trim();
+        if (name.Length < 2) return BadRequest("name too short");
+
+        // Validate Ranking
+        string? ranking = null;
+        if (!string.IsNullOrWhiteSpace(req.Ranking))
+        {
+            ranking = req.Ranking.Trim().ToUpper();
+            if (ranking.Length != 1 || ranking[0] < 'A' || ranking[0] > 'Z')
+                return BadRequest("Ranking must be a single letter A-Z");
+        }
+
+        var x = await _db.Assets.FirstOrDefaultAsync(a => a.Id == id);
+        if (x == null) return NotFound();
+
+        if (req.LocId.HasValue && req.LocId != x.LocationId)
+        {
+            var ok = await _db.Locations.AsNoTracking().AnyAsync(l => l.Id == req.LocId.Value && l.IsAct);
+            if (!ok) return BadRequest("bad locId");
+        }
+
+        x.Name = name;
+        x.Code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code.Trim();
+        x.LocationId = req.LocId;
+        x.Ranking = ranking;
+        
+        await _db.SaveChangesAsync();
+
+        return Ok(new { 
+            id = x.Id, 
+            name = x.Name, 
+            code = x.Code, 
+            locId = x.LocationId, 
+            locName = (string?)null, 
+            isAct = x.IsAct,
+            ranking = x.Ranking,
+            status = (int)x.Status
+        });
     }
 
     [HttpDelete("{id:guid}")]

@@ -22,6 +22,17 @@ public sealed class Asset
     public Location? Location { get; set; }
 
     public bool IsAct { get; set; } = true;
+
+    // A/B/C/D... (single char)
+    public string? Ranking { get; set; }
+
+    public AssetStatus Status { get; set; } = AssetStatus.Operational;
+}
+
+public enum AssetStatus
+{
+    Operational = 1,
+    InMaintenance = 2
 }
 
 // =========================
@@ -30,6 +41,7 @@ public sealed class Asset
 
 public sealed class Person
 {
+// ... (skip unchanged) ...
     public Guid Id { get; set; } = Guid.NewGuid();
 
     // Legacy field (exists in DB) - keep for backward compatibility.
@@ -211,6 +223,8 @@ public sealed class WorkOrder
     // Creation timestamp (used by reports)
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    public DateTimeOffset? ScheduledForUtc { get; set; }
+
     public WorkOrderType Type { get; set; } = WorkOrderType.AdHoc;
     public WorkOrderClassification Classification { get; set; } = WorkOrderClassification.Reactive;
     public WorkOrderStatus Status { get; set; } = WorkOrderStatus.Open;
@@ -227,6 +241,14 @@ public sealed class WorkOrder
 
     // New multi-assign
     public ICollection<WorkOrderAssignment> Assignments { get; set; } = new List<WorkOrderAssignment>();
+
+    // Team / Group Logic
+    public Guid? WorkOrderGroupId { get; set; } // Group identifier for exploded team WOs
+    public Guid? TeamId { get; set; }
+    public Team? Team { get; set; }
+
+    public Guid? CoordinatorPersonId { get; set; }
+    public Person? CoordinatorPerson { get; set; }
 
     public DateTimeOffset? StartAt { get; set; }
     public DateTimeOffset? StopAt { get; set; }
@@ -403,4 +425,22 @@ public sealed class DocumentTemplate
     public string OriginalFileName { get; set; } = "";
     public string ContentType { get; set; } = "image/png";
     public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class PmPlanExecutionLog
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid PmPlanId { get; set; }
+    public PmPlan? PmPlan { get; set; }
+
+    public Guid? WorkOrderId { get; set; }
+    public WorkOrder? WorkOrder { get; set; }
+
+    public DateTimeOffset ScheduledForUtc { get; set; }
+    public DateTimeOffset GeneratedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+
+    public string TriggeredBy { get; set; } = "Background";
+    public string Result { get; set; } = "Success";
+    public string? Error { get; set; }
 }

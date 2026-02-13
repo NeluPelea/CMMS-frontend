@@ -1,5 +1,6 @@
 ﻿// src/pages/InventoryPage.tsx
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
 import { getInventory, type InventoryRowDto } from "../api";
 import {
@@ -21,6 +22,7 @@ function safeArray<T>(x: any): T[] {
 // ---------------- page ----------------
 
 export default function InventoryPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<InventoryRowDto[]>([]);
   const [q, setQ] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -67,6 +69,11 @@ export default function InventoryPage() {
       <PageToolbar
         left={
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <Button variant="ghost" onClick={() => navigate("/procurement")} className="px-2">
+              <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </Button>
             <div className="w-full sm:w-80">
               <Input
                 value={q}

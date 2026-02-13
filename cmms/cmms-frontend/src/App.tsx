@@ -28,6 +28,7 @@ import NcDetailsPage from "./pages/NcDetailsPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import GoodsReceiptsPage from "./pages/GoodsReceiptsPage";
 import GoodsReceiptDetailsPage from "./pages/GoodsReceiptDetailsPage";
+import ProcurementPage from "./pages/ProcurementPage";
 
 export default function App() {
     return (
@@ -119,7 +120,17 @@ export default function App() {
                 }
             />
 
+
+
             {/* Gestiune Stocuri si Piese */}
+            <Route
+                path="/procurement"
+                element={
+                    <RequireAuth>
+                        <ProcurementPage />
+                    </RequireAuth>
+                }
+            />
             <Route
                 path="/parts"
                 element={

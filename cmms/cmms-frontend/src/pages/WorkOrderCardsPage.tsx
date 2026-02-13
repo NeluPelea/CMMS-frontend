@@ -18,8 +18,10 @@ import {
     Drawer,
     ErrorBox,
     PageToolbar,
-    Pill
+    Pill,
+    cx,
 } from "../components/ui";
+import { getWorkOrderDecoration, getResponsibleDisplayName } from "../domain/workOrderDecorations";
 
 function StatusPill({ status }: { status: WorkOrderStatus }) {
     const label = woStatusLabel(status);
@@ -171,40 +173,64 @@ export default function WorkOrderCardsPage() {
                     {title} <span className="text-zinc-500 text-sm font-normal">({items.length})</span>
                 </h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {items.map((w) => (
-                        <div
-                            key={w.id}
-                            onClick={() => onCardClick(w)}
-                            className="group relative flex cursor-pointer flex-col justify-between rounded-xl border border-white/5 bg-white/5 p-4 transition hover:border-teal-500/30 hover:bg-white/10 active:scale-[0.98]"
-                        >
-                            <div className="mb-3">
-                                <div className="mb-2 flex items-start justify-between gap-2">
-                                    <StatusPill status={w.status} />
-                                    {w.classification === WorkOrderClassification.Proactive && (
-                                        <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-200">
-                                            Proactiv
-                                        </span>
-                                    )}
+                    {items.map((w) => {
+                        const style = getWorkOrderDecoration(w);
+                        return (
+                            <div
+                                key={w.id}
+                                onClick={() => onCardClick(w)}
+                                className={cx(
+                                    "group relative flex cursor-pointer flex-col justify-between rounded-xl border border-white/5 bg-white/5 p-4 transition hover:bg-white/10 active:scale-[0.98]",
+                                    style.borderClass
+                                )}
+                            >
+                                <div className="mb-3">
+                                    <div className="mb-2 flex items-start justify-between gap-2">
+                                        <StatusPill status={w.status} />
+                                        <div className="flex gap-1">
+                                            {w.classification === WorkOrderClassification.Proactive && (
+                                                <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-200">
+                                                    Proactiv
+                                                </span>
+                                            )}
+                                            {style.showReactiveBadge && (
+                                                <span className="rounded bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                                                    Reactiv
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="font-semibold text-zinc-100 line-clamp-2 leading-snug">
+                                        {w.title}
+                                    </div>
                                 </div>
-                                <div className="font-semibold text-zinc-100 line-clamp-2 leading-snug">
-                                    {w.title}
-                                </div>
-                            </div>
 
-                            <div className="text-xs text-zinc-400 space-y-1">
-                                <div className="flex items-center gap-1">
-                                    <span className="i-lucide-map-pin opacity-70">📍</span>
-                                    <span className="truncate">
-                                        {w.asset?.name ?? "Fara Utilaj"}
-                                        {w.asset?.location ? ` · ${w.asset.location.name}` : ""}
-                                    </span>
-                                </div>
-                                <div>
-                                    📅 {isoToLocalDisplay(w.startAt || w.id /* fallback to something if needed */)}
+                                <div className="text-xs text-zinc-400 space-y-1">
+                                    <div className="flex items-center gap-1">
+                                        <span className="i-lucide-map-pin opacity-70">📍</span>
+                                        <span className="truncate">
+                                            {w.asset?.name ?? "Fara Utilaj"}
+                                            {w.asset?.ranking ? (
+                                                <span className="ml-2 inline-flex items-center rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-bold text-indigo-200 ring-1 ring-indigo-500/40">
+                                                    {w.asset.ranking}
+                                                </span>
+                                            ) : null}
+                                            {w.asset?.location ? ` · ${w.asset.location.name}` : ""}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <span className="i-lucide-user opacity-70">👤</span>
+                                        <span className="truncate text-zinc-300">
+                                            {getResponsibleDisplayName(w)}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        📅 {isoToLocalDisplay(w.startAt || w.id /* fallback */)}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         );
