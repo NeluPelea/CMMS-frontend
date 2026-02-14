@@ -29,19 +29,23 @@ import SuppliersPage from "./pages/SuppliersPage";
 import GoodsReceiptsPage from "./pages/GoodsReceiptsPage";
 import GoodsReceiptDetailsPage from "./pages/GoodsReceiptDetailsPage";
 import ProcurementPage from "./pages/ProcurementPage";
+import ImpersonatePage from "./pages/ImpersonatePage";
 
 export default function App() {
     return (
         <Routes>
             {/* Ruta pentru autentificare */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/impersonate" element={<ImpersonatePage />} />
 
             {/* Rute protejate - Mentenanta si Operatiuni */}
             <Route
                 path="/dashboard"
                 element={
                     <RequireAuth>
-                        <DashboardPage />
+                        <RequirePermission permission="DASHBOARD_VIEW">
+                            <DashboardPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -49,7 +53,9 @@ export default function App() {
                 path="/work-orders"
                 element={
                     <RequireAuth>
-                        <WorkOrdersPage />
+                        <RequirePermission permission="WO_READ">
+                            <WorkOrdersPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -57,7 +63,9 @@ export default function App() {
                 path="/work-orders/cards"
                 element={
                     <RequireAuth>
-                        <WorkOrderCardsPage />
+                        <RequirePermission permission="WO_READ">
+                            <WorkOrderCardsPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -65,7 +73,9 @@ export default function App() {
                 path="/work-orders/:id"
                 element={
                     <RequireAuth>
-                        <WorkOrderDetailsPage />
+                        <RequirePermission permission="WO_READ">
+                            <WorkOrderDetailsPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -73,7 +83,9 @@ export default function App() {
                 path="/work-orders/:id/print"
                 element={
                     <RequireAuth>
-                        <WorkOrderPrintPage />
+                        <RequirePermission permission="WO_READ">
+                            <WorkOrderPrintPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -81,7 +93,9 @@ export default function App() {
                 path="/calendar"
                 element={
                     <RequireAuth>
-                        <CalendarPage />
+                        <RequirePermission permission="CALENDAR_READ">
+                            <CalendarPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -89,7 +103,9 @@ export default function App() {
                 path="/extra-jobs"
                 element={
                     <RequireAuth>
-                        <ExtraJobsPage />
+                        <RequirePermission permission="EXTRA_READ">
+                            <ExtraJobsPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -97,7 +113,9 @@ export default function App() {
                 path="/pm-plans"
                 element={
                     <RequireAuth>
-                        <PmPlansPage />
+                        <RequirePermission permission="PM_READ">
+                            <PmPlansPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -107,7 +125,9 @@ export default function App() {
                 path="/assets"
                 element={
                     <RequireAuth>
-                        <AssetsPage />
+                        <RequirePermission permission="ASSET_READ">
+                            <AssetsPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -115,7 +135,9 @@ export default function App() {
                 path="/locations"
                 element={
                     <RequireAuth>
-                        <LocationsPage />
+                        <RequirePermission permission="LOC_READ">
+                            <LocationsPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -127,7 +149,9 @@ export default function App() {
                 path="/procurement"
                 element={
                     <RequireAuth>
-                        <ProcurementPage />
+                        <RequirePermission permission="INV_READ">
+                            <ProcurementPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -135,7 +159,9 @@ export default function App() {
                 path="/parts"
                 element={
                     <RequireAuth>
-                        <PartsPage />
+                        <RequirePermission permission="PART_READ">
+                            <PartsPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -143,7 +169,9 @@ export default function App() {
                 path="/inventory"
                 element={
                     <RequireAuth>
-                        <InventoryPage />
+                        <RequirePermission permission="INV_READ">
+                            <InventoryPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -151,7 +179,9 @@ export default function App() {
                 path="/goods-receipts"
                 element={
                     <RequireAuth>
-                        <GoodsReceiptsPage />
+                        <RequirePermission permission="INV_READ">
+                            <GoodsReceiptsPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -159,7 +189,9 @@ export default function App() {
                 path="/goods-receipts/:id"
                 element={
                     <RequireAuth>
-                        <GoodsReceiptDetailsPage />
+                        <RequirePermission permission="INV_READ">
+                            <GoodsReceiptDetailsPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -201,7 +233,9 @@ export default function App() {
                 path="/people"
                 element={
                     <RequireAuth>
-                        <PeoplePage />
+                        <RequirePermission permission="PEOPLE_READ">
+                            <PeoplePage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -209,7 +243,9 @@ export default function App() {
                 path="/roles"
                 element={
                     <RequireAuth>
-                        <RolesPage />
+                        <RequirePermission permission="SETTINGS_READ">
+                            <RolesPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -240,7 +276,9 @@ export default function App() {
                 path="/reports"
                 element={
                     <RequireAuth>
-                        <ReportsPage />
+                        <RequirePermission permission="REPORTS_VIEW">
+                            <ReportsPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -248,7 +286,9 @@ export default function App() {
                 path="/settings"
                 element={
                     <RequireAuth>
-                        <SettingsPage />
+                        <RequirePermission permission="SETTINGS_READ">
+                            <SettingsPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />
@@ -256,7 +296,9 @@ export default function App() {
                 path="/ai-copilot"
                 element={
                     <RequireAuth>
-                        <AiCopilotPage />
+                        <RequirePermission permission="AI_COPILOT_VIEW">
+                            <AiCopilotPage />
+                        </RequirePermission>
                     </RequireAuth>
                 }
             />

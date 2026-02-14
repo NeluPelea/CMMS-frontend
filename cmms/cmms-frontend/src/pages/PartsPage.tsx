@@ -2,7 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
 import { StockAdjustmentTile } from "../components/StockAdjustmentTile";
-import { createPart, getParts, setPartStatus, updatePart, type PartDto } from "../api";
+import { createPart, getParts, setPartStatus, updatePart, type PartDto, hasPerm } from "../api";
 import {
   Button,
   Card,
@@ -212,86 +212,88 @@ export default function PartsPage() {
 
       {err ? <ErrorBox message={err} /> : null}
 
-      <Card title="Creeaza Piesa">
-        <div className="grid gap-3 lg:grid-cols-12 items-end">
-          <div className="lg:col-span-4">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Nume Piesa
+      {hasPerm("PARTS_CREATE") && (
+        <Card title="Creeaza Piesa">
+          <div className="grid gap-3 lg:grid-cols-12 items-end">
+            <div className="lg:col-span-4">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Nume Piesa
+              </div>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Name"
+              />
             </div>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Name"
-            />
-          </div>
 
-          <div className="lg:col-span-2">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Cod SKU
+            <div className="lg:col-span-2">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Cod SKU
+              </div>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="Cod SKU"
+              />
             </div>
-            <Input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Cod SKU"
-            />
-          </div>
 
-          <div className="lg:col-span-1">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              U.M.
+            <div className="lg:col-span-1">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                U.M.
+              </div>
+              <Input
+                value={uom}
+                onChange={(e) => setUom(e.target.value)}
+                placeholder="U.M"
+              />
             </div>
-            <Input
-              value={uom}
-              onChange={(e) => setUom(e.target.value)}
-              placeholder="U.M"
-            />
-          </div>
 
-          <div className="lg:col-span-1">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Min Qty
+            <div className="lg:col-span-1">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Min Qty
+              </div>
+              <Input
+                type="number"
+                min="0"
+                value={minQty}
+                onChange={e => setMinQty(e.target.value)}
+                placeholder="0"
+              />
             </div>
-            <Input
-              type="number"
-              min="0"
-              value={minQty}
-              onChange={e => setMinQty(e.target.value)}
-              placeholder="0"
-            />
-          </div>
 
-          <div className="lg:col-span-2">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Pret Intrare
+            <div className="lg:col-span-2">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Pret Intrare
+              </div>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="0.00"
+              />
             </div>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
 
-          <div className="lg:col-span-1">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Moneda
+            <div className="lg:col-span-1">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Moneda
+              </div>
+              <Select value={currency} onChange={e => setCurrency(e.target.value)}>
+                <option value="RON">RON</option>
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+              </Select>
             </div>
-            <Select value={currency} onChange={e => setCurrency(e.target.value)}>
-              <option value="RON">RON</option>
-              <option value="EUR">EUR</option>
-              <option value="USD">USD</option>
-            </Select>
-          </div>
 
-          <div className="lg:col-span-1 flex justify-end">
-            <Button onClick={onCreate} disabled={!canCreate} variant="primary">
-              +
-            </Button>
+            <div className="lg:col-span-1 flex justify-end">
+              <Button onClick={onCreate} disabled={!canCreate} variant="primary">
+                +
+              </Button>
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <div className="mt-6" />
 
@@ -319,21 +321,25 @@ export default function PartsPage() {
                 <td className="px-4 py-1 text-zinc-100 font-medium">{x.name}</td>
                 <td className="px-4 py-1 text-zinc-300">{x.code ?? "—"}</td>
                 <td className="px-4 py-1 text-zinc-300">
-                  <input
-                    type="number"
-                    defaultValue={x.minQty}
-                    className="w-20 bg-transparent border border-white/10 rounded px-2 py-0.5 text-zinc-300 focus:border-indigo-500 outline-none h-7 text-sm"
-                    onBlur={(e) => {
-                      if (parseFloat(e.target.value) !== x.minQty) {
-                        onUpdateMinQty(x.id, e.target.value);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.currentTarget.blur();
-                      }
-                    }}
-                  />
+                  {hasPerm("PARTS_UPDATE") ? (
+                    <input
+                      type="number"
+                      defaultValue={x.minQty}
+                      className="w-20 bg-transparent border border-white/10 rounded px-2 py-0.5 text-zinc-300 focus:border-indigo-500 outline-none h-7 text-sm"
+                      onBlur={(e) => {
+                        if (parseFloat(e.target.value) !== x.minQty) {
+                          onUpdateMinQty(x.id, e.target.value);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur();
+                        }
+                      }}
+                    />
+                  ) : (
+                    x.minQty ?? 0
+                  )}
                 </td>
                 <td className="px-4 py-1 text-zinc-300">{x.uom ?? "—"}</td>
                 <td className="px-4 py-1 text-right text-zinc-300">
@@ -343,18 +349,22 @@ export default function PartsPage() {
                   {x.purchaseCurrency || "RON"}
                 </td>
                 <td className="px-4 py-1 text-right">
-                  <button
-                    onClick={() => onToggle(x)}
-                    disabled={x.isAct && (!!x.hasStock || !!x.hasConsumption)}
-                    title={
-                      x.isAct && (!!x.hasStock || !!x.hasConsumption)
-                        ? "Nu se poate inactiva: exista stoc/consum."
-                        : "Click pentru a schimba statusul"
-                    }
-                    className="disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-80 transition-opacity"
-                  >
+                  {hasPerm("PARTS_UPDATE") ? (
+                    <button
+                      onClick={() => onToggle(x)}
+                      disabled={x.isAct && (!!x.hasStock || !!x.hasConsumption)}
+                      title={
+                        x.isAct && (!!x.hasStock || !!x.hasConsumption)
+                          ? "Nu se poate inactiva: exista stoc/consum."
+                          : "Click pentru a schimba statusul"
+                      }
+                      className="disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-80 transition-opacity"
+                    >
+                      <StatusPill active={x.isAct !== false} />
+                    </button>
+                  ) : (
                     <StatusPill active={x.isAct !== false} />
-                  </button>
+                  )}
                 </td>
               </tr>
             ))}

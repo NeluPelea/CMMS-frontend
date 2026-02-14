@@ -13,7 +13,8 @@ public record UserSummaryDto(
     string Username,
     string DisplayName,
     List<RoleLiteDto> Roles,
-    bool MustChangePassword
+    bool MustChangePassword,
+    Guid? PersonId
 );
 
 public record RoleLiteDto(

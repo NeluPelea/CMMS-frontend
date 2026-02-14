@@ -10,6 +10,7 @@ import {
     updatePerson,
     updatePersonSchedule,
     type PersonDto,
+    hasPerm,
 } from "../api";
 import { Button, Card, EmptyRow, ErrorBox, Input, PageToolbar, Pill, Select, TableShell, IconButton } from "../components/ui";
 
@@ -387,51 +388,53 @@ export default function PeoplePage() {
 
             {err ? <ErrorBox message={err} /> : null}
 
-            <Card title={editingId ? "Editare persoana" : "Adauga persoana noua"}>
-                <div className="grid gap-3 lg:grid-cols-12">
-                    <div className="lg:col-span-4">
-                        <FieldLabel>Nume complet</FieldLabel>
-                        <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ex: Popescu Ion" />
-                    </div>
+            {hasPerm("PEOPLE_CREATE") && (
+                <Card title={editingId ? "Editare persoana" : "Adauga persoana noua"}>
+                    <div className="grid gap-3 lg:grid-cols-12">
+                        <div className="lg:col-span-4">
+                            <FieldLabel>Nume complet</FieldLabel>
+                            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ex: Popescu Ion" />
+                        </div>
 
-                    <div className="lg:col-span-3">
-                        <FieldLabel>Functie</FieldLabel>
-                        <Input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="Ex: Electrician" />
-                    </div>
+                        <div className="lg:col-span-3">
+                            <FieldLabel>Functie</FieldLabel>
+                            <Input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="Ex: Electrician" />
+                        </div>
 
-                    <div className="lg:col-span-3">
-                        <FieldLabel>Specializare</FieldLabel>
-                        <Input value={specialization} onChange={(e) => setSpecialization(e.target.value)} placeholder="Ex: Mentenanta" />
-                    </div>
+                        <div className="lg:col-span-3">
+                            <FieldLabel>Specializare</FieldLabel>
+                            <Input value={specialization} onChange={(e) => setSpecialization(e.target.value)} placeholder="Ex: Mentenanta" />
+                        </div>
 
-                    <div className="lg:col-span-2">
-                        <FieldLabel>Telefon</FieldLabel>
-                        <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07xx..." />
-                    </div>
+                        <div className="lg:col-span-2">
+                            <FieldLabel>Telefon</FieldLabel>
+                            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07xx..." />
+                        </div>
 
-                    <div className="lg:col-span-4">
-                        <FieldLabel>Email</FieldLabel>
-                        <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="optional" />
-                    </div>
+                        <div className="lg:col-span-4">
+                            <FieldLabel>Email</FieldLabel>
+                            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="optional" />
+                        </div>
 
-                    <div className="lg:col-span-8 flex items-end justify-end gap-2">
-                        {editingId ? (
-                            <>
-                                <Button variant="ghost" onClick={cancelEdit}>
-                                    Cancel
+                        <div className="lg:col-span-8 flex items-end justify-end gap-2">
+                            {editingId ? (
+                                <>
+                                    <Button variant="ghost" onClick={cancelEdit}>
+                                        Cancel
+                                    </Button>
+                                    <Button variant="primary" onClick={onSubmit} disabled={loading}>
+                                        Save
+                                    </Button>
+                                </>
+                            ) : (
+                                <Button variant="primary" onClick={onSubmit} disabled={!canCreate || loading}>
+                                    Adauga
                                 </Button>
-                                <Button variant="primary" onClick={onSubmit} disabled={loading}>
-                                    Save
-                                </Button>
-                            </>
-                        ) : (
-                            <Button variant="primary" onClick={onSubmit} disabled={!canCreate || loading}>
-                                Adauga
-                            </Button>
-                        )}
+                            )}
+                        </div>
                     </div>
-                </div>
-            </Card>
+                </Card>
+            )}
 
             <Card className="mt-4" title="Lista angajati">
                 <div className="grid gap-3 lg:grid-cols-12">
@@ -554,21 +557,25 @@ export default function PeoplePage() {
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Button variant="ghost" onClick={() => openSchedule(p)}>
-                                                                Program
-                                                            </Button>
-                                                            <Button variant="ghost" onClick={() => startEdit(p)}>
-                                                                Modifica
-                                                            </Button>
+                                                            {hasPerm("PEOPLE_UPDATE") && (
+                                                                <>
+                                                                    <Button variant="ghost" onClick={() => openSchedule(p)}>
+                                                                        Program
+                                                                    </Button>
+                                                                    <Button variant="ghost" onClick={() => startEdit(p)}>
+                                                                        Modifica
+                                                                    </Button>
 
-                                                            {p.isActive ? (
-                                                                <IconButton aria-label="Deactivate" variant="danger" onClick={() => handleDeactivate(p.id)}>
-                                                                    🗑️
-                                                                </IconButton>
-                                                            ) : (
-                                                                <Button variant="ghost" onClick={() => handleActivate(p.id)}>
-                                                                    Activeaza
-                                                                </Button>
+                                                                    {p.isActive ? (
+                                                                        <IconButton aria-label="Deactivate" variant="danger" onClick={() => handleDeactivate(p.id)}>
+                                                                            🗑️
+                                                                        </IconButton>
+                                                                    ) : (
+                                                                        <Button variant="ghost" onClick={() => handleActivate(p.id)}>
+                                                                            Activeaza
+                                                                        </Button>
+                                                                    )}
+                                                                </>
                                                             )}
                                                         </>
                                                     )}

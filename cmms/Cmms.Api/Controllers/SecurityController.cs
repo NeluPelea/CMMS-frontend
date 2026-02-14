@@ -16,12 +16,14 @@ public class SecurityController : ControllerBase
     private readonly AppDbContext _db;
     private readonly PasswordHasher<User> _hasher;
     private readonly SecurityService _securityService;
+    private readonly JwtTokenService _jwt;
 
-    public SecurityController(AppDbContext db, PasswordHasher<User> hasher, SecurityService securityService)
+    public SecurityController(AppDbContext db, PasswordHasher<User> hasher, SecurityService securityService, JwtTokenService jwt)
     {
         _db = db;
         _hasher = hasher;
         _securityService = securityService;
+        _jwt = jwt;
     }
 
     // --- USERS ---
@@ -50,7 +52,8 @@ public class SecurityController : ControllerBase
             u.DisplayName,
             u.IsActive,
             u.UserRoles.Select(ur => new RoleLiteDto(ur.Role.Id, ur.Role.Code, ur.Role.Name, ur.Role.Rank)).ToList(),
-            u.CreatedAt
+            u.CreatedAt,
+            u.PersonId
         )).ToList();
     }
 
@@ -67,7 +70,8 @@ public class SecurityController : ControllerBase
             DisplayName = req.DisplayName,
             IsActive = req.IsActive,
             MustChangePassword = req.MustChangePassword,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            PersonId = req.PersonId
         };
         user.PasswordHash = _hasher.HashPassword(user, req.InitialPassword);
 
@@ -80,11 +84,19 @@ public class SecurityController : ControllerBase
         }
 
         _db.Users.Add(user);
+
+        // Also update Person record if PersonId is provided (bidirectional link)
+        if (user.PersonId.HasValue)
+        {
+            var p = await _db.People.FirstOrDefaultAsync(x => x.Id == user.PersonId.Value);
+            if (p != null) p.UserId = user.Id;
+        }
+
         await _db.SaveChangesAsync();
 
         return CreatedAtAction(nameof(ListUsers), new UserSecurityDto(
             user.Id, user.Username, user.DisplayName, user.IsActive,
-            await GetUserRolesAsync(user.Id), user.CreatedAt));
+            await GetUserRolesAsync(user.Id), user.CreatedAt, user.PersonId));
     }
 
     [HttpPatch("users/{id:guid}")]
@@ -103,7 +115,23 @@ public class SecurityController : ControllerBase
             }
         }
 
+        if (req.Username != null && req.Username.Trim().ToLower() != user.Username.ToLower())
+        {
+            if (await _db.Users.AnyAsync(u => u.Id != id && u.Username.ToLower() == req.Username.Trim().ToLower()))
+                return Conflict("Username already exists.");
+            user.Username = req.Username.Trim();
+        }
+
         if (req.DisplayName != null) user.DisplayName = req.DisplayName;
+
+        bool willBeActive = req.IsActive ?? user.IsActive;
+        bool willBeAdmin = req.RoleIds != null ? IsR0InList(req.RoleIds) : IsR0InList(user.UserRoles.Select(ur => ur.RoleId).ToList());
+
+        if ((!willBeActive || !willBeAdmin) && await IsLastR0(user))
+        {
+            return BadRequest("Nu se poate dezactiva sau retrage rolul ultimului administrator sistem activ.");
+        }
+
         if (req.IsActive != null) user.IsActive = req.IsActive.Value;
 
         if (req.RoleIds != null)
@@ -231,8 +259,17 @@ public class SecurityController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
-        // Caching is per user. Since a role update can affect many users, 
-        // we'll rely on the 5-minute TTL or implement a global cache versioning if needed.
+        
+        // CRITICAL: Clear cache for all users who have this role
+        var affectedUserIds = await _db.UserRoles
+            .Where(ur => ur.RoleId == id)
+            .Select(ur => ur.UserId)
+            .ToListAsync();
+        
+        foreach (var userId in affectedUserIds)
+        {
+            _securityService.ClearUserCache(userId);
+        }
         
         return Ok();
     }
@@ -302,6 +339,44 @@ public class SecurityController : ControllerBase
         return Ok();
     }
 
+    [HttpPost("impersonate")]
+    [Authorize(Policy = "Perm:SECURITY_USERS_READ")]
+    public async Task<ActionResult<ImpersonateResp>> Impersonate([FromBody] ImpersonateReq req)
+    {
+        var adminIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(adminIdStr, out var adminId)) return Unauthorized();
+
+        var targetUser = await _db.Users
+            .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.Id == req.ImpersonatedUserId);
+
+        if (targetUser == null) return NotFound("Target user not found.");
+        if (!targetUser.IsActive) return BadRequest("Cannot impersonate inactive users.");
+
+        bool isTargetAdmin = targetUser.UserRoles.Any(ur => ur.Role.Rank == 0 || ur.Role.Code == "R0_SYSTEM_ADMIN");
+        if (isTargetAdmin) return BadRequest("Cannot impersonate administrators.");
+
+        var roleCodes = targetUser.UserRoles.Select(ur => ur.Role.Code).ToList();
+        var permissions = await _securityService.GetEffectivePermissionsAsync(targetUser.Id);
+
+        var token = _jwt.CreateToken(targetUser, roleCodes, permissions, isImpersonation: true, actorAdminId: adminId.ToString());
+
+        // LOG Audit
+        _db.AuditLogs.Add(new AuditLog
+        {
+            ActorUserId = adminId.ToString(),
+            Action = "IMPERSONATE_START",
+            TargetType = "User",
+            TargetId = targetUser.Id.ToString(),
+            PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { targetUsername = targetUser.Username }),
+            CreatedAt = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        return Ok(new ImpersonateResp(token));
+    }
+
     // --- HELPERS ---
 
     private bool IsR0InList(List<Guid> roleIds)
@@ -331,3 +406,23 @@ public class SecurityController : ControllerBase
             .ToListAsync();
     }
 }
+
+public record UserSecurityDto(
+    Guid Id,
+    string Username,
+    string DisplayName,
+    bool IsActive,
+    List<RoleLiteDto> Roles,
+    DateTime CreatedAt,
+    Guid? PersonId
+);
+
+public record CreateUserReq(
+    string Username,
+    string DisplayName,
+    string InitialPassword,
+    bool MustChangePassword,
+    bool IsActive,
+    List<Guid> RoleIds,
+    Guid? PersonId
+);

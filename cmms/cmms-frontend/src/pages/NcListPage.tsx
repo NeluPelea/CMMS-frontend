@@ -4,7 +4,8 @@ import AppShell from "../components/AppShell";
 import {
     ncApi,
     type NcOrderSummaryDto,
-    type SupplierDto
+    type SupplierDto,
+    hasPerm
 } from "../api";
 import { NcOrderStatus, ncStatusLabel } from "../domain/enums";
 import {
@@ -131,7 +132,9 @@ export default function NcListPage() {
                     </div>
                 }
                 right={
-                    <Button variant="primary" onClick={handleCreate}>Adaugă NC</Button>
+                    hasPerm("NC_CREATE") && (
+                        <Button variant="primary" onClick={handleCreate}>Adaugă NC</Button>
+                    )
                 }
             />
 

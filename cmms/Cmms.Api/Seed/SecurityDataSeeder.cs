@@ -190,6 +190,22 @@ public static class SecurityDataSeeder
         Add(list, "SUPPLIERS", "SUPPLIER_PARTS_READ", "Vizualizare catalog piese furnizori");
         Add(list, "SUPPLIERS", "SUPPLIER_PARTS_UPDATE", "Gestionare catalog piese furnizori");
 
+        // PEOPLE
+        Add(list, "PEOPLE", "PEOPLE_READ", "Vizualizare personal");
+        Add(list, "PEOPLE", "PEOPLE_CREATE", "Adaugare personal");
+        Add(list, "PEOPLE", "PEOPLE_UPDATE", "Editare personal");
+        Add(list, "PEOPLE", "PEOPLE_DELETE", "Stergere personal");
+
+        // EXTRA JOBS
+        Add(list, "EXTRA_JOBS", "EXTRA_READ", "Vizualizare activitati extra");
+        Add(list, "EXTRA_JOBS", "EXTRA_CREATE", "Adaugare activitati extra");
+        Add(list, "EXTRA_JOBS", "EXTRA_UPDATE", "Editare activitati extra");
+        Add(list, "EXTRA_JOBS", "EXTRA_DELETE", "Stergere activitati extra");
+        Add(list, "EXTRA_JOBS", "EXTRA_EXECUTE", "Executie activitati extra");
+
+        // AI
+        Add(list, "AI", "AI_COPILOT_VIEW", "Vizualizare AI Copilot");
+
         return list;
     }
 
@@ -240,8 +256,10 @@ public static class SecurityDataSeeder
                 codes.AddRange(new[] { "WO_READ", "WO_CREATE", "WO_UPDATE" });
                 // reports export
                 codes.AddRange(new[] { "REPORTS_VIEW", "REPORTS_EXPORT" });
-                // integrations read
-                codes.Add("INTEGRATIONS_READ");
+                // integrations read / AI
+                codes.AddRange(new[] { "INTEGRATIONS_READ", "AI_COPILOT_VIEW" });
+                // People
+                codes.AddRange(new[] { "PEOPLE_READ", "PEOPLE_CREATE", "PEOPLE_UPDATE" });
                 // NC
                 codes.AddRange(new[] {
                     "NC_READ", "NC_CREATE", "NC_UPDATE", "NC_CANCEL", "NC_ATTACHMENTS_UPDATE", "NC_PDF_GENERATE"
@@ -258,11 +276,15 @@ public static class SecurityDataSeeder
                 break;
 
             case "R3_PLANNER":
-                codes.AddRange(new[] { "DASHBOARD_VIEW", "WO_READ", "WO_CREATE", "WO_UPDATE", "WO_EXECUTE", "PM_READ", "PM_EXECUTE", "REPORTS_VIEW" });
+                codes.AddRange(new[] { 
+                    "DASHBOARD_VIEW", "WO_READ", "WO_CREATE", "WO_UPDATE", "WO_EXECUTE", 
+                    "PM_READ", "PM_EXECUTE", "REPORTS_VIEW", 
+                    "EXTRA_READ", "EXTRA_EXECUTE", "AI_COPILOT_VIEW" 
+                });
                 break;
 
             case "R4_OPERATOR":
-                codes.AddRange(new[] { "DASHBOARD_VIEW", "WO_READ", "WO_EXECUTE" });
+                codes.AddRange(new[] { "DASHBOARD_VIEW", "WO_READ", "WO_EXECUTE", "EXTRA_READ", "EXTRA_EXECUTE" });
                 break;
 
             case "R5_VIEWER":
@@ -278,7 +300,8 @@ public static class SecurityDataSeeder
                     "DASHBOARD_VIEW", "DASHBOARD_VIEW_LOGISTICS", "WO_READ", "REPORTS_VIEW", "PART_READ", "INV_READ", 
                     "NC_READ", "NC_CREATE", "NC_UPDATE", "NC_PDF_GENERATE",
                     "SUPPLIERS_READ", "SUPPLIERS_CREATE", "SUPPLIERS_UPDATE", "SUPPLIERS_DELETE", 
-                    "SUPPLIER_CONTACTS_UPDATE", "SUPPLIER_PARTS_READ", "SUPPLIER_PARTS_UPDATE"
+                    "SUPPLIER_CONTACTS_UPDATE", "SUPPLIER_PARTS_READ", "SUPPLIER_PARTS_UPDATE",
+                    "AI_COPILOT_VIEW"
                 });
                 break;
         }

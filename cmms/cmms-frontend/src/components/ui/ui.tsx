@@ -102,15 +102,19 @@ export function Button(
 export function IconButton(
     props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
         variant?: "ghost" | "danger";
+        size?: "sm" | "md";
         "aria-label": string;
     }
 ) {
     const v = props.variant ?? "ghost";
+    const size = props.size ?? "md";
+    const sizeCls = size === "sm" ? "h-7 w-7 text-xs" : "h-9 w-9";
     return (
         <button
             {...props}
             className={cx(
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl ring-1",
+                "inline-flex items-center justify-center rounded-xl ring-1",
+                sizeCls,
                 v === "danger"
                     ? "bg-rose-500/10 text-rose-200 ring-rose-400/20 hover:bg-rose-500/15"
                     : "bg-white/10 text-zinc-200 ring-white/15 hover:bg-white/15",
@@ -340,10 +344,14 @@ export function Modal(props: {
     title?: string;
     children: React.ReactNode;
     onClose: () => void;
+    open?: boolean;
     widthClassName?: string;
 }) {
-    useOnEscape(true, props.onClose);
-    useLockBodyScroll(true);
+    const isOpen = props.open ?? true;
+    useOnEscape(isOpen, props.onClose);
+    useLockBodyScroll(isOpen);
+
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

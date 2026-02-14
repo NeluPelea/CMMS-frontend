@@ -24,6 +24,7 @@ public record CreateUserReq(
 
 public record UpdateUserReq(
     string? DisplayName,
+    string? Username,
     bool? IsActive,
     List<Guid>? RoleIds
 );
@@ -85,4 +86,12 @@ public record PermissionItemDto(
 public record SetOverrideReq(
     string PermissionCode,
     bool? IsGranted // null = remove override
+);
+
+public record ImpersonateReq(
+    Guid ImpersonatedUserId
+);
+
+public record ImpersonateResp(
+    string Token
 );

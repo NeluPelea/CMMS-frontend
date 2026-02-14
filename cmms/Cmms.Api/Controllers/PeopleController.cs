@@ -318,6 +318,7 @@ public sealed class PeopleController : ControllerBase
     }
 
     [HttpPost("{id:guid}/activate")]
+    [Authorize(Policy = "Perm:PEOPLE_UPDATE")]
     public async Task<IActionResult> Activate(Guid id, CancellationToken ct = default)
     {
         var p = await _db.People.FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -333,6 +334,7 @@ public sealed class PeopleController : ControllerBase
     }
 
     [HttpPost("{id:guid}/deactivate")]
+    [Authorize(Policy = "Perm:PEOPLE_UPDATE")]
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct = default)
     {
         var p = await _db.People.FirstOrDefaultAsync(x => x.Id == id, ct);

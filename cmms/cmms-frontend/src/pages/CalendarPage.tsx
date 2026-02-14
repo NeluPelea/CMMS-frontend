@@ -22,6 +22,7 @@ import {
   updateUnitWorkSchedule,
   updateBlackout,
 } from "../api/calendar";
+import { hasPerm } from "../api";
 import type { CalendarDayDto, UnitWorkSchedule } from "../api/calendar";
 
 function getErrMessage(err: unknown) {
@@ -182,20 +183,26 @@ function HolidaysPanel({ year }: { year: number }) {
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div className="flex-1 w-full max-w-2xl flex flex-col gap-4 md:flex-row md:items-end">
-          <div className="w-full md:w-48">
-            <Input label="Data" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div className="flex-1">
-            <Input
-              label="Nume Sarbatoare"
-              placeholder="Ex: Paste, Craciun..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <Button variant="primary" onClick={handleAdd} disabled={!date || submitting}>
-            Adauga
-          </Button>
+          {hasPerm("CALENDAR_UPDATE") && (
+            <div className="w-full md:w-48">
+              <Input label="Data" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          )}
+          {hasPerm("CALENDAR_UPDATE") && (
+            <div className="flex-1">
+              <Input
+                label="Nume Sarbatoare"
+                placeholder="Ex: Paste, Craciun..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+          )}
+          {hasPerm("CALENDAR_UPDATE") && (
+            <Button variant="primary" onClick={handleAdd} disabled={!date || submitting}>
+              Adauga
+            </Button>
+          )}
         </div>
 
         <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer select-none">
@@ -254,19 +261,21 @@ function HolidaysPanel({ year }: { year: number }) {
                             <Button variant="primary" onClick={() => handleUpdate(simpleDate)} disabled={submitting}>Salveaza</Button>
                           </>
                         ) : isDeleted ? (
-                          <Button variant="ghost" className="text-teal-400" onClick={() => handleRestore(it.date)} disabled={submitting}>Restaureaza</Button>
+                          hasPerm("CALENDAR_UPDATE") && <Button variant="ghost" className="text-teal-400" onClick={() => handleRestore(it.date)} disabled={submitting}>Restaureaza</Button>
                         ) : (
-                          <>
-                            <Button variant="ghost" onClick={() => startEdit(it)} disabled={submitting}>Modifica</Button>
-                            <IconButton
-                              aria-label="Sterge"
-                              variant="danger"
-                              onClick={() => handleDelete(it.date)}
-                              disabled={submitting}
-                            >
-                              🗑️
-                            </IconButton>
-                          </>
+                          hasPerm("CALENDAR_UPDATE") && (
+                            <>
+                              <Button variant="ghost" onClick={() => startEdit(it)} disabled={submitting}>Modifica</Button>
+                              <IconButton
+                                aria-label="Sterge"
+                                variant="danger"
+                                onClick={() => handleDelete(it.date)}
+                                disabled={submitting}
+                              >
+                                🗑️
+                              </IconButton>
+                            </>
+                          )
                         )}
                       </div>
                     </td>
@@ -385,20 +394,26 @@ function BlackoutsPanel({ year }: { year: number }) {
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div className="flex-1 w-full max-w-2xl flex flex-col gap-4 md:flex-row md:items-end">
-          <div className="w-full md:w-48">
-            <Input label="Data" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div className="flex-1">
-            <Input
-              label="Motiv / Nume"
-              placeholder="Ex: Inventar, Revizie Generala..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <Button variant="primary" onClick={handleAdd} disabled={!date || submitting}>
-            Adauga
-          </Button>
+          {hasPerm("CALENDAR_UPDATE") && (
+            <div className="w-full md:w-48">
+              <Input label="Data" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          )}
+          {hasPerm("CALENDAR_UPDATE") && (
+            <div className="flex-1">
+              <Input
+                label="Motiv / Nume"
+                placeholder="Ex: Inventar, Revizie Generala..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+          )}
+          {hasPerm("CALENDAR_UPDATE") && (
+            <Button variant="primary" onClick={handleAdd} disabled={!date || submitting}>
+              Adauga
+            </Button>
+          )}
         </div>
 
         <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer select-none">
@@ -457,19 +472,21 @@ function BlackoutsPanel({ year }: { year: number }) {
                             <Button variant="primary" onClick={() => handleUpdate(simpleDate)} disabled={submitting}>Salveaza</Button>
                           </>
                         ) : isDeleted ? (
-                          <Button variant="ghost" className="text-teal-400" onClick={() => handleRestore(it.date)} disabled={submitting}>Restaureaza</Button>
+                          hasPerm("CALENDAR_UPDATE") && <Button variant="ghost" className="text-teal-400" onClick={() => handleRestore(it.date)} disabled={submitting}>Restaureaza</Button>
                         ) : (
-                          <>
-                            <Button variant="ghost" onClick={() => startEdit(it)} disabled={submitting}>Modifica</Button>
-                            <IconButton
-                              aria-label="Sterge"
-                              variant="danger"
-                              onClick={() => handleDelete(it.date)}
-                              disabled={submitting}
-                            >
-                              🗑️
-                            </IconButton>
-                          </>
+                          hasPerm("CALENDAR_UPDATE") && (
+                            <>
+                              <Button variant="ghost" onClick={() => startEdit(it)} disabled={submitting}>Modifica</Button>
+                              <IconButton
+                                aria-label="Sterge"
+                                variant="danger"
+                                onClick={() => handleDelete(it.date)}
+                                disabled={submitting}
+                              >
+                                🗑️
+                              </IconButton>
+                            </>
+                          )
                         )}
                       </div>
                     </td>
@@ -682,7 +699,7 @@ function UnitSchedulePanel() {
               </Button>
             </>
           ) : (
-            <Button variant="primary" onClick={() => setEditMode(true)}>Modifica Program Lucru</Button>
+            hasPerm("CALENDAR_UPDATE") && <Button variant="primary" onClick={() => setEditMode(true)}>Modifica Program Lucru</Button>
           )}
         </div>
       </div>

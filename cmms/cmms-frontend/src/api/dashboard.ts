@@ -8,6 +8,11 @@ export type KpisDto = {
   pmOnTime: number;
   pmLate: number;
   assetsInMaintenance: number;
+  extraJobs: {
+    closedThisMonth: number;
+    closedToday: number;
+    inProgress: number;
+  };
 };
 
 export type AssetInMaintDto = {

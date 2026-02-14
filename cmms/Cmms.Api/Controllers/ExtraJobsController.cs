@@ -25,6 +25,26 @@ public sealed class ExtraJobsController : ControllerBase
         return string.IsNullOrWhiteSpace(v) ? null : v;
     }
 
+    private async Task<bool> IsR0Async()
+    {
+        var userIdStr = GetActorId();
+        if (userIdStr == null || !Guid.TryParse(userIdStr, out var userId)) return false;
+
+        return await _db.UserRoles
+            .AnyAsync(ur => ur.UserId == userId && (ur.Role.Rank == 0 || ur.Role.Code == "R0_SYSTEM_ADMIN"));
+    }
+
+    private async Task<Guid?> GetCurrentPersonIdAsync()
+    {
+        var userIdStr = GetActorId();
+        if (userIdStr == null || !Guid.TryParse(userIdStr, out var userId)) return null;
+
+        return await _db.People
+            .Where(p => p.UserId == userId)
+            .Select(p => (Guid?)p.Id)
+            .FirstOrDefaultAsync();
+    }
+
     private void AddEvent(
         Guid extraJobId,
         WorkOrderEventKind kind,
@@ -56,11 +76,25 @@ public sealed class ExtraJobsController : ControllerBase
     {
         var q = _db.ExtraJobs.AsNoTracking();
         
-        // Helper filter for legacy "done" param
         if (done.HasValue) 
         {
             if (done.Value) q = q.Where(x => x.Status == WorkOrderStatus.Done || x.Status == WorkOrderStatus.Cancelled);
             else q = q.Where(x => x.Status == WorkOrderStatus.Open || x.Status == WorkOrderStatus.InProgress);
+        }
+
+        // --- OWNERSHIP FILTER ---
+        if (!await IsR0Async())
+        {
+            var userIdStr = GetActorId();
+            if (userIdStr != null && Guid.TryParse(userIdStr, out var currentUserId))
+            {
+                var personId = await GetCurrentPersonIdAsync();
+                q = q.Where(x => x.CreatedByUserId == currentUserId || (personId != null && x.AssignedToPersonId == personId));
+            }
+            else
+            {
+                return Ok(new List<ExtraJobDto>()); // Unauthorized effectively
+            }
         }
 
         var items = await q
@@ -68,6 +102,7 @@ public sealed class ExtraJobsController : ControllerBase
             .Skip(skip)
             .Take(take)
             .Include(x => x.AssignedToPerson)
+            .Include(x => x.CreatedByUser)
             .Select(x => new ExtraJobDto
             {
                 Id = x.Id,
@@ -77,7 +112,10 @@ public sealed class ExtraJobsController : ControllerBase
                 Status = x.Status,
                 AssignedToPersonId = x.AssignedToPersonId,
                 AssignedToPersonName = x.AssignedToPerson != null ? x.AssignedToPerson.DisplayName : null,
+                ResponsibleName = x.AssignedToPerson != null ? x.AssignedToPerson.DisplayName : (x.CreatedByUser != null ? x.CreatedByUser.DisplayName : "(neasignat)"),
                 CreatedAt = x.CreatedAt,
+                CreatedByUserId = x.CreatedByUserId,
+                CreatedByUserName = x.CreatedByUser != null ? x.CreatedByUser.DisplayName : null,
                 FinishedAt = x.StopAt ?? x.FinishedAt, // fallback
                 StartAt = x.StartAt,
                 StopAt = x.StopAt
@@ -93,13 +131,18 @@ public sealed class ExtraJobsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(req.Title)) return BadRequest("Title required");
 
+        var userIdStr = GetActorId();
+        Guid? currentUserId = userIdStr != null && Guid.TryParse(userIdStr, out var uid) ? uid : null;
+        bool isR0 = await IsR0Async();
+
         var ent = new ExtraJob
         {
             Id = Guid.NewGuid(),
             Title = req.Title.Trim(),
             Description = req.Description,
             Status = WorkOrderStatus.Open,
-            AssignedToPersonId = req.AssignedToPersonId,
+            AssignedToPersonId = isR0 ? req.AssignedToPersonId : await GetCurrentPersonIdAsync(),
+            CreatedByUserId = currentUserId,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
@@ -111,7 +154,28 @@ public sealed class ExtraJobsController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        return Ok(Map(ent));
+        // Reload with navigation properties for mapping
+        var freshEnt = await _db.ExtraJobs
+            .Include(x => x.AssignedToPerson)
+            .Include(x => x.CreatedByUser)
+            .FirstAsync(x => x.Id == ent.Id);
+
+        return Ok(Map(freshEnt));
+    }
+
+    private async Task<bool> CanManageJobAsync(ExtraJob job)
+    {
+        if (await IsR0Async()) return true;
+
+        var userIdStr = GetActorId();
+        if (userIdStr == null || !Guid.TryParse(userIdStr, out var currentUserId)) return false;
+
+        if (job.CreatedByUserId == currentUserId) return true;
+
+        var personId = await GetCurrentPersonIdAsync();
+        if (personId != null && job.AssignedToPersonId == personId) return true;
+
+        return false;
     }
 
     [HttpPut("{id:guid}")]
@@ -120,6 +184,8 @@ public sealed class ExtraJobsController : ControllerBase
     {
          var ent = await _db.ExtraJobs.FirstOrDefaultAsync(x => x.Id == id);
          if (ent == null) return NotFound();
+
+         if (!await CanManageJobAsync(ent)) return Forbid();
 
          if (string.IsNullOrWhiteSpace(req.Title)) return BadRequest("Title required");
 
@@ -146,6 +212,8 @@ public sealed class ExtraJobsController : ControllerBase
         var ent = await _db.ExtraJobs.FirstOrDefaultAsync(x => x.Id == id);
         if (ent == null) return NotFound();
 
+        if (!await CanManageJobAsync(ent)) return Forbid();
+
         _db.ExtraJobs.Remove(ent);
         await _db.SaveChangesAsync();
         return NoContent();
@@ -159,6 +227,8 @@ public sealed class ExtraJobsController : ControllerBase
     {
         var ent = await _db.ExtraJobs.FirstOrDefaultAsync(x => x.Id == id);
         if (ent == null) return NotFound();
+
+        if (!await CanManageJobAsync(ent)) return Forbid();
 
         // Safeguard against double-click
         if (ent.Status == WorkOrderStatus.InProgress) return Ok(Map(ent));
@@ -197,10 +267,13 @@ public sealed class ExtraJobsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/stop")]
+    [Authorize(Policy = "Perm:EXTRA_EXECUTE")]
     public async Task<IActionResult> Stop(Guid id)
     {
         var ent = await _db.ExtraJobs.FirstOrDefaultAsync(x => x.Id == id);
         if (ent == null) return NotFound();
+
+        if (!await CanManageJobAsync(ent)) return Forbid();
 
         if (ent.Status != WorkOrderStatus.InProgress) return BadRequest("Stop allowed only when InProgress.");
 
@@ -217,10 +290,13 @@ public sealed class ExtraJobsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = "Perm:EXTRA_EXECUTE")]
     public async Task<IActionResult> Cancel(Guid id)
     {
         var ent = await _db.ExtraJobs.FirstOrDefaultAsync(x => x.Id == id);
         if (ent == null) return NotFound();
+
+        if (!await CanManageJobAsync(ent)) return Forbid();
 
         if (ent.Status == WorkOrderStatus.Done || ent.Status == WorkOrderStatus.Cancelled) return BadRequest("Already final status.");
 
@@ -235,10 +311,13 @@ public sealed class ExtraJobsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/reopen")]
+    [Authorize(Policy = "Perm:EXTRA_EXECUTE")]
     public async Task<IActionResult> Reopen(Guid id)
     {
         var ent = await _db.ExtraJobs.FirstOrDefaultAsync(x => x.Id == id);
         if (ent == null) return NotFound();
+
+        if (!await CanManageJobAsync(ent)) return Forbid();
 
         if (ent.Status != WorkOrderStatus.Done && ent.Status != WorkOrderStatus.Cancelled) return BadRequest("Can only reopen Done/Cancelled.");
 
@@ -267,7 +346,11 @@ public sealed class ExtraJobsController : ControllerBase
             IsDone = x.Status == WorkOrderStatus.Done || x.Status == WorkOrderStatus.Cancelled, 
             Status = x.Status,
             AssignedToPersonId = x.AssignedToPersonId,
+            AssignedToPersonName = x.AssignedToPerson?.DisplayName,
+            ResponsibleName = x.AssignedToPerson?.DisplayName ?? x.CreatedByUser?.DisplayName ?? "(neasignat)",
             CreatedAt = x.CreatedAt,
+            CreatedByUserId = x.CreatedByUserId,
+            CreatedByUserName = x.CreatedByUser?.DisplayName,
             StartAt = x.StartAt,
             StopAt = x.StopAt,
             FinishedAt = x.StopAt ?? x.FinishedAt
@@ -284,7 +367,10 @@ public sealed class ExtraJobsController : ControllerBase
         public WorkOrderStatus Status { get; set; } // new field
         public Guid? AssignedToPersonId { get; set; }
         public string? AssignedToPersonName { get; set; }
+        public string? ResponsibleName { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
+        public Guid? CreatedByUserId { get; set; }
+        public string? CreatedByUserName { get; set; }
         public DateTimeOffset? StartAt { get; set; }
         public DateTimeOffset? StopAt { get; set; }
         public DateTimeOffset? FinishedAt { get; set; }

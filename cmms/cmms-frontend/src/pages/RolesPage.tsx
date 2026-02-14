@@ -6,6 +6,7 @@ import {
     updateRole,
     type RoleDto,
 } from "../api/roles";
+import { hasPerm } from "../api/auth";
 
 import { Button, Card, ErrorBox, Input, PageToolbar, TableShell, Pill } from "../components/ui";
 
@@ -120,16 +121,18 @@ export default function RolesPage() {
 
             {err ? <ErrorBox message={err} onClose={() => setErr(null)} /> : null}
 
-            <Card title="Creeaza Rol">
-                <div className="grid gap-3 sm:grid-cols-12 items-end">
-                    <div className="sm:col-span-9">
-                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nume rol" />
+            {hasPerm("SETTINGS_UPDATE") && (
+                <Card title="Creeaza Rol">
+                    <div className="grid gap-3 sm:grid-cols-12 items-end">
+                        <div className="sm:col-span-9">
+                            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nume rol" />
+                        </div>
+                        <div className="sm:col-span-3 flex justify-end">
+                            <Button variant="primary" onClick={onCreate} disabled={name.trim().length < 2}>{"Creeaza"}</Button>
+                        </div>
                     </div>
-                    <div className="sm:col-span-3 flex justify-end">
-                        <Button variant="primary" onClick={onCreate} disabled={name.trim().length < 2}>{"Creeaza"}</Button>
-                    </div>
-                </div>
-            </Card>
+                </Card>
+            )}
 
             <div className="mt-6" />
 
@@ -156,12 +159,18 @@ export default function RolesPage() {
                                         {editingId === r.id ? (
                                             <>
                                                 <Button variant="ghost" onClick={cancelEdit}>Anuleaza</Button>
-                                                <Button variant="primary" onClick={() => handleSave(r.id)}>Salveaza</Button>
+                                                {hasPerm("SETTINGS_UPDATE") && (
+                                                    <Button variant="primary" onClick={() => handleSave(r.id)}>Salveaza</Button>
+                                                )}
                                             </>
                                         ) : (
                                             <>
-                                                <Button variant="ghost" onClick={() => startEdit(r)}>Modifica</Button>
-                                                <Button variant="ghost" onClick={() => handleDelete(r.id)}>Sterge</Button>
+                                                {hasPerm("SETTINGS_UPDATE") && (
+                                                    <>
+                                                        <Button variant="ghost" onClick={() => startEdit(r)}>Modifica</Button>
+                                                        <Button variant="ghost" onClick={() => handleDelete(r.id)}>Sterge</Button>
+                                                    </>
+                                                )}
                                             </>
                                         )}
                                     </div>

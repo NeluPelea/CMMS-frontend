@@ -21,7 +21,11 @@ export default function LoginPage() {
       const to = loc?.state?.from || "/work-orders";
       nav(to, { replace: true });
     } catch (ex: any) {
-      setErr(ex?.message || String(ex));
+      if (ex.status === 403) {
+        alert("Acces restricionat!!! Contactati Admin pentru detalii.");
+      } else {
+        setErr(ex?.message || String(ex));
+      }
     } finally {
       setLoading(false);
     }

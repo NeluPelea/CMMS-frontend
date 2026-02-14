@@ -9,7 +9,8 @@ import {
     getParts,
     type PartDto,
     type ContactSaveReq,
-    type SupplierUpdateReq
+    type SupplierUpdateReq,
+    hasPerm
 } from "../api";
 import {
     Button,
@@ -143,7 +144,9 @@ export default function SuppliersPage() {
                         </div>
                     }
                     right={
-                        <Button variant="primary" onClick={handleAddSupplier}>+ Adaugă Furnizor</Button>
+                        hasPerm("SUPPLIERS_CREATE") && (
+                            <Button variant="primary" onClick={handleAddSupplier}>+ Adaugă Furnizor</Button>
+                        )
                     }
                 />
 
@@ -401,9 +404,11 @@ function TabGeneral({ details, onUpdate }: { details: SupplierDetailsDto, onUpda
                 <div className="text-sm text-zinc-300 whitespace-pre-wrap">{details.notes || "Fără note."}</div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-white/5">
-                <Button onClick={() => setEdit(true)} variant="primary">Editează Date Generale</Button>
-            </div>
+            {hasPerm("SUPPLIERS_UPDATE") && (
+                <div className="flex justify-end pt-4 border-t border-white/5">
+                    <Button onClick={() => setEdit(true)} variant="primary">Editează Date Generale</Button>
+                </div>
+            )}
         </div>
     );
 }
@@ -494,9 +499,11 @@ function TabCompany({ details, onUpdate }: { details: SupplierDetailsDto, onUpda
                 </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-white/5">
-                <Button onClick={() => setEdit(true)} variant="primary">Editează Date Firmă</Button>
-            </div>
+            {hasPerm("SUPPLIERS_UPDATE") && (
+                <div className="flex justify-end pt-4 border-t border-white/5">
+                    <Button onClick={() => setEdit(true)} variant="primary">Editează Date Firmă</Button>
+                </div>
+            )}
         </div>
     );
 }
@@ -537,9 +544,11 @@ function TabContacts({ details, onUpdate }: { details: SupplierDetailsDto, onUpd
 
     return (
         <div className="p-4 space-y-4">
-            <div className="flex justify-end">
-                <Button variant="ghost" size="sm" onClick={() => setModal({ open: true, contact: {} })}>+ Adaugă Contact</Button>
-            </div>
+            {hasPerm("SUPPLIERS_UPDATE") && (
+                <div className="flex justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => setModal({ open: true, contact: {} })}>+ Adaugă Contact</Button>
+                </div>
+            )}
 
             {modal.open && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -597,8 +606,12 @@ function TabContacts({ details, onUpdate }: { details: SupplierDetailsDto, onUpd
                                     {c.isPrimary ? <span className="text-amber-400">★</span> : <span className="text-zinc-800">—</span>}
                                 </td>
                                 <td className="px-3 py-3 text-right flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="sm" onClick={() => setModal({ open: true, contact: c })}>Editează</Button>
-                                    <Button variant="ghost" size="sm" className="text-rose-400" onClick={() => handleDelete(c.id)}>Sterge</Button>
+                                    {hasPerm("SUPPLIERS_UPDATE") && (
+                                        <>
+                                            <Button variant="ghost" size="sm" onClick={() => setModal({ open: true, contact: c })}>Editează</Button>
+                                            <Button variant="ghost" size="sm" className="text-rose-400" onClick={() => handleDelete(c.id)}>Sterge</Button>
+                                        </>
+                                    )}
                                 </td>
                             </tr>
                         ))}
@@ -721,9 +734,11 @@ function TabParts({ details, onUpdate }: { details: SupplierDetailsDto, onUpdate
         <div className="p-4 space-y-4">
             <div className="flex justify-between items-center px-1">
                 <span className="text-xs text-zinc-500">{details.parts.length} piese în catalog</span>
-                <Button variant="primary" size="sm" onClick={() => setShowAdd(!showAdd)}>
-                    {showAdd ? "Închide" : "+ Asociază Piesă"}
-                </Button>
+                {hasPerm("SUPPLIERS_UPDATE") && (
+                    <Button variant="primary" size="sm" onClick={() => setShowAdd(!showAdd)}>
+                        {showAdd ? "Închide" : "+ Asociază Piesă"}
+                    </Button>
+                )}
             </div>
 
             {showAdd && (
@@ -920,10 +935,14 @@ function TabParts({ details, onUpdate }: { details: SupplierDetailsDto, onUpdate
                                         </div>
                                     ) : (
                                         <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="sm" onClick={() => startEdit(p)}>Editează</Button>
-                                            <button onClick={() => handleDelete(p.id)} className="text-rose-400/50 hover:text-rose-400 p-1">
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            </button>
+                                            {hasPerm("SUPPLIERS_UPDATE") && (
+                                                <>
+                                                    <Button variant="ghost" size="sm" onClick={() => startEdit(p)}>Editează</Button>
+                                                    <button onClick={() => handleDelete(p.id)} className="text-rose-400/50 hover:text-rose-400 p-1">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </td>

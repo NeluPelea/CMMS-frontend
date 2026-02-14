@@ -26,6 +26,14 @@ public sealed class Asset
     // A/B/C/D... (single char)
     public string? Ranking { get; set; }
 
+    public string? SerialNumber { get; set; }
+    public string? InventoryNumber { get; set; }
+
+    public string? AssetClass { get; set; }
+    public string? Manufacturer { get; set; }
+    public int? ManufactureYear { get; set; }
+    public DateOnly? CommissionedAt { get; set; }
+
     public AssetStatus Status { get; set; } = AssetStatus.Operational;
 }
 
@@ -54,6 +62,7 @@ public sealed class Person
     public string Phone { get; set; } = "";
     public string? Email { get; set; }
     public bool IsActive { get; set; } = true;
+    public Guid? UserId { get; set; } // Link to Security User
 
     // Navigation
     public PersonWorkSchedule? WorkSchedule { get; set; }
@@ -384,6 +393,8 @@ public sealed class ExtraJob
     public Person? AssignedToPerson { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public Guid? CreatedByUserId { get; set; }
+    public User? CreatedByUser { get; set; }
     public DateTimeOffset? FinishedAt { get; set; } // Legacy, map to StopAt
 
     public ICollection<ExtraJobEvent> ExtraJobEvents { get; set; } = new List<ExtraJobEvent>();

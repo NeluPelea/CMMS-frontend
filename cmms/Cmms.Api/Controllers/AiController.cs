@@ -35,6 +35,7 @@ public class AiController : ControllerBase
     }
 
     [HttpPost("chat")]
+    [Authorize(Policy = "Perm:AI_COPILOT_VIEW")]
     public async Task<ActionResult<AiChatResponseDto>> Chat([FromBody] AiChatRequestDto request, CancellationToken ct = default)
     {
         var correlationId = Guid.NewGuid().ToString("N")[..8];

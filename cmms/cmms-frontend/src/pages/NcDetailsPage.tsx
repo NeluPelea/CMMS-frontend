@@ -5,6 +5,7 @@ import {
     ncApi,
     type NcOrderDetailsDto,
     type SupplierDto,
+    hasPerm
 } from "../api";
 import { NcOrderStatus, ncStatusLabel } from "../domain/enums";
 import {
@@ -173,10 +174,16 @@ export default function NcDetailsPage() {
                             <a href={ncApi.getPdfUrl(order.id)} target="_blank" rel="noreferrer">
                                 <Button variant="ghost">Generare PDF</Button>
                             </a>
-                            {canEdit && <Button variant="primary" onClick={handleSaveHeader}>Salvează Header</Button>}
-                            {order.status === NcOrderStatus.Draft && order.lines.length > 0 && <Button variant="primary" className="bg-amber-500 hover:bg-amber-600 text-white border-0" onClick={() => handleChangeStatus(NcOrderStatus.Sent)}>Trimite NC</Button>}
-                            {order.status === NcOrderStatus.Sent && <Button variant="primary" className="bg-emerald-500 hover:bg-emerald-600 text-white border-0" onClick={() => handleChangeStatus(NcOrderStatus.Confirmed)}>Confirmă NC</Button>}
-                            {order.status !== NcOrderStatus.Cancelled && order.status !== NcOrderStatus.Received && <Button variant="ghost" className="text-rose-400 hover:bg-rose-500/10" onClick={() => handleChangeStatus(NcOrderStatus.Cancelled)}>Anulează</Button>}
+                            {canEdit && hasPerm("NC_CREATE") && <Button variant="primary" onClick={handleSaveHeader}>Salvează Header</Button>}
+                            {order.status === NcOrderStatus.Draft && order.lines.length > 0 && hasPerm("NC_EXECUTE") && (
+                                <Button variant="primary" className="bg-amber-500 hover:bg-amber-600 text-white border-0" onClick={() => handleChangeStatus(NcOrderStatus.Sent)}>Trimite NC</Button>
+                            )}
+                            {order.status === NcOrderStatus.Sent && hasPerm("NC_EXECUTE") && (
+                                <Button variant="primary" className="bg-emerald-500 hover:bg-emerald-600 text-white border-0" onClick={() => handleChangeStatus(NcOrderStatus.Confirmed)}>Confirmă NC</Button>
+                            )}
+                            {order.status !== NcOrderStatus.Cancelled && order.status !== NcOrderStatus.Received && hasPerm("NC_EXECUTE") && (
+                                <Button variant="ghost" className="text-rose-400 hover:bg-rose-500/10" onClick={() => handleChangeStatus(NcOrderStatus.Cancelled)}>Anulează</Button>
+                            )}
                         </div>
                     }
                 />
@@ -287,15 +294,17 @@ export default function NcDetailsPage() {
                                                     <td className="px-4 py-3 text-right font-mono font-bold text-zinc-200">{line.lineTotal.toLocaleString("ro-RO", { minimumFractionDigits: 2 })}</td>
                                                     {canEdit && (
                                                         <td className="px-4 py-3 text-right">
-                                                            <button onClick={() => handleDeleteLine(line.id)} className="text-rose-400/50 hover:text-rose-400 transition-colors">
-                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                            </button>
+                                                            {hasPerm("NC_CREATE") && (
+                                                                <button onClick={() => handleDeleteLine(line.id)} className="text-rose-400/50 hover:text-rose-400 transition-colors">
+                                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                                </button>
+                                                            )}
                                                         </td>
                                                     )}
                                                 </tr>
                                             ))}
 
-                                            {canEdit && (
+                                            {canEdit && hasPerm("NC_CREATE") && (
                                                 <tr className="bg-teal-400/5 border-t border-teal-400/10">
                                                     <td className="px-3 py-3">
                                                         <input type="text" placeholder="Descriere articol..." value={linePartName} onChange={e => setLinePartName(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-teal-400" />

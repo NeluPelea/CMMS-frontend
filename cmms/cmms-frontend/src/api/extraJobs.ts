@@ -18,7 +18,10 @@ export interface ExtraJobDto {
     status: WorkOrderStatus; // new
     assignedToPersonId?: string;
     assignedToPersonName?: string;
+    responsibleName?: string;
     createdAt: string;
+    createdByUserId?: string;
+    createdByUserName?: string;
     startAt?: string;
     stopAt?: string;
     finishedAt?: string;

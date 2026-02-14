@@ -48,6 +48,7 @@ export type WorkOrderDto = {
     teamId?: string | null;
     coordinatorPersonId?: string | null;
     coordinatorPerson?: { id: string; displayName: string } | null;
+    tasks?: { text: string; isCompleted: boolean; }[];
 };
 
 export interface WorkOrdersParams {

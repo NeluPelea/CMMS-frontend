@@ -44,13 +44,14 @@ import {
     type LaborLogDto,
     getTeams,
     type TeamDto,
+    hasPerm,
 } from "../api";
 
 import { getWorkOrderDecoration, getResponsibleDisplayName } from "../domain/workOrderDecorations";
 import { isoToLocalDisplay, isoToLocalInputValue, localInputToIso } from "../domain/datetime";
 import { WorkOrderClassification, WorkOrderStatus, WorkOrderType, woStatusLabel } from "../domain/enums";
 import AppShell from "../components/AppShell";
-import { Button, Card, Drawer, ErrorBox, Input, PageToolbar, Pill, PillButton, Select, Tabs, cx } from "../components/ui";
+import { Button, Drawer, ErrorBox, Input, PageToolbar, Pill, PillButton, Select, Tabs, cx } from "../components/ui";
 
 function safeArray<T>(x: unknown): T[] {
     return Array.isArray(x) ? (x as T[]) : [];
@@ -118,7 +119,8 @@ export default function WorkOrdersPage() {
     });
 
     // ---------------- UI state ----------------
-    const [createOpen, setCreateOpen] = useState(false);
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [drawerMode, setDrawerMode] = useState<"create" | "edit">("create");
     const [activeTab, setActiveTab] = useState<TabKey>("details");
 
     // ---------------- Selection & detail draft ----------------
@@ -149,7 +151,21 @@ export default function WorkOrdersPage() {
         if (newTeamId && !newCoordId) return false;
         return true;
     }, [newTitle, actionLoading, newTeamId, newCoordId]);
-    const canSave = useMemo(() => dTitle.trim().length >= 2 && !!selected && !actionLoading, [dTitle, selected, actionLoading]);
+
+    const isDirty = useMemo(() => {
+        if (!selected) return false;
+        if (dTitle.trim() !== (selected.title || "")) return true;
+        if (dDesc.trim() !== (selected.description || "")) return true;
+        if (dStatus !== selected.status) return true;
+        if (dClassification !== (selected.classification || WorkOrderClassification.Reactive)) return true;
+        if (dAssetId !== (selected.assetId || "")) return true;
+        if (dAssignedId !== (selected.assignedToPersonId || "")) return true;
+        if (isoToLocalInputValue(selected.startAt) !== dStartAt) return true;
+        if (isoToLocalInputValue(selected.stopAt) !== dStopAt) return true;
+        return false;
+    }, [selected, dTitle, dDesc, dStatus, dClassification, dAssetId, dAssignedId, dStartAt, dStopAt]);
+
+    const canSave = useMemo(() => dTitle.trim().length >= 2 && !!selected && !actionLoading && isDirty, [dTitle, selected, actionLoading, isDirty]);
 
     // ---------------- Parts (WO Parts) ----------------
     const [woParts, setWoParts] = useState<WorkOrderPartDto[]>([]);
@@ -402,7 +418,7 @@ export default function WorkOrdersPage() {
         } finally {
             setLoading(false);
         }
-    }, [q, status, type, locId, assetId, take, skip, selId]);
+    }, [q, status, type, locId, assetId, take, skip]);
 
     const loadCounts = useCallback(async () => {
         try {
@@ -524,15 +540,19 @@ export default function WorkOrdersPage() {
 
             await loadList(0);
             loadCounts();
-            if (wo?.id) setSelId(wo.id);
-            setCreateOpen(false);
+            if (wo?.id) {
+                setSelId(wo.id);
+                setDrawerMode("edit");
+            } else {
+                setDrawerOpen(false);
+            }
         } catch (e) {
             const error = e as Error;
             setErr(error.message || "Eroare la creare");
         } finally {
             setActionLoading(false);
         }
-    }, [canCreate, newTitle, newDesc, newType, newAssetId, loadList]);
+    }, [canCreate, newTitle, newDesc, newType, newAssetId, newClassification, newTeamId, newCoordId, loadList, loadCounts]);
 
     const onSave = useCallback(async () => {
         if (!selected || !canSave) return;
@@ -552,13 +572,21 @@ export default function WorkOrdersPage() {
             });
 
             setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+            setDrawerOpen(false);
         } catch (e) {
             const error = e as Error;
             setErr(error.message || "Eroare la salvare");
         } finally {
             setActionLoading(false);
         }
-    }, [selected, canSave, dTitle, dDesc, dStatus, dAssetId, dAssignedId, dStartAt, dStopAt]);
+    }, [selected, canSave, dTitle, dDesc, dStatus, dClassification, dAssetId, dAssignedId, dStartAt, dStopAt]);
+
+    const handleCloseDrawer = useCallback(() => {
+        if (drawerMode === "edit" && isDirty) {
+            if (!window.confirm("Ai modificari nesalvate. Sigur inchizi?")) return;
+        }
+        setDrawerOpen(false);
+    }, [drawerMode, isDirty]);
 
     const applyAction = useCallback(async (action: "start" | "stop" | "cancel" | "reopen") => {
         if (!selected || actionLoading) return;
@@ -692,9 +720,17 @@ export default function WorkOrdersPage() {
             <PageToolbar
                 left={
                     <div className="flex items-center gap-2">
-                        <Button variant="primary" onClick={() => setCreateOpen(true)}>
-                            + Nou
-                        </Button>
+                        {hasPerm("WO_CREATE") && (
+                            <Button
+                                variant="primary"
+                                onClick={() => {
+                                    setDrawerMode("create");
+                                    setDrawerOpen(true);
+                                }}
+                            >
+                                + Nou
+                            </Button>
+                        )}
                         <Button onClick={() => loadList(0)} variant="ghost" disabled={loading}>
                             Actualizeaza
                         </Button>
@@ -732,77 +768,426 @@ export default function WorkOrdersPage() {
             {err ? <ErrorBox message={err} onClose={() => setErr(null)} /> : null}
 
             <Drawer
-                open={createOpen}
-                onClose={() => setCreateOpen(false)}
-                title="Ordin de Lucru Nou"
+                open={drawerOpen}
+                title={drawerMode === "create" ? "Ordin de Lucru Nou" : "Detalii Ordin de Lucru"}
+                onClose={handleCloseDrawer}
                 footer={
                     <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" onClick={() => setCreateOpen(false)} disabled={actionLoading}>
+                        <Button variant="ghost" onClick={handleCloseDrawer} disabled={actionLoading}>
                             Anuleaza
                         </Button>
-                        <Button variant="primary" disabled={!canCreate} onClick={onCreate}>
-                            Creeaza Ordin
-                        </Button>
+                        {drawerMode === "create" ? (
+                            <Button variant="primary" disabled={!canCreate} onClick={onCreate}>
+                                Creeaza Ordin
+                            </Button>
+                        ) : (
+                            hasPerm("WO_UPDATE") && (
+                                <Button onClick={onSave} disabled={!canSave} variant="primary">
+                                    Salveaza Modificarile
+                                </Button>
+                            )
+                        )}
                     </div>
                 }
             >
-                <div className="grid gap-4">
-                    <Input label="Titlu" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Ce trebuie facut?" />
+                {drawerMode === "create" ? (
+                    <div className="grid gap-4">
+                        <Input label="Titlu" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Ce trebuie facut?" />
 
-                    <Select label="Tip" value={newType} onChange={(e) => setNewType(Number(e.target.value) as WorkOrderType)}>
-                        <option value={WorkOrderType.Corrective}>Corectiv</option>
-                        <option value={WorkOrderType.Preventive}>Preventiv</option>
-                    </Select>
+                        <Select label="Tip" value={newType} onChange={(e) => setNewType(Number(e.target.value) as WorkOrderType)}>
+                            <option value={WorkOrderType.Corrective}>Corectiv</option>
+                            <option value={WorkOrderType.Preventive}>Preventiv</option>
+                        </Select>
 
-                    <Select label="Clasificare" value={newClassification} onChange={(e) => setNewClassification(Number(e.target.value) as WorkOrderClassification)}>
-                        <option value={WorkOrderClassification.Proactive}>Proactiv</option>
-                        <option value={WorkOrderClassification.Reactive}>Reactiv</option>
-                    </Select>
+                        <Select label="Clasificare" value={newClassification} onChange={(e) => setNewClassification(Number(e.target.value) as WorkOrderClassification)}>
+                            <option value={WorkOrderClassification.Proactive}>Proactiv</option>
+                            <option value={WorkOrderClassification.Reactive}>Reactiv</option>
+                        </Select>
 
-                    <Select label="Utilaj (optional)" value={newAssetId} onChange={(e) => setNewAssetId(e.target.value)}>
-                        <option value="">(Niciunul)</option>
-                        {assets.map((a) => (
-                            <option key={a.id} value={a.id}>
-                                {a.name}
-                            </option>
-                        ))}
-                    </Select>
-
-                    <Select label="Echipa (Explodeaza WO)" value={newTeamId} onChange={(e) => {
-                        setNewTeamId(e.target.value);
-                        setNewCoordId("");
-                    }}>
-                        <option value="">(Individual / Fara Echipa)</option>
-                        {teams.map((t) => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                        ))}
-                    </Select>
-
-                    {newTeamId && (
-                        <Select label="Coordonator (Obligatoriu)" value={newCoordId} onChange={(e) => setNewCoordId(e.target.value)}>
-                            <option value="">(Selecteaza Coordonator)</option>
-                            {teams.find(t => t.id === newTeamId)?.members.map((m) => (
-                                <option key={m.personId} value={m.personId}>
-                                    {m.displayName}
+                        <Select label="Utilaj (optional)" value={newAssetId} onChange={(e) => setNewAssetId(e.target.value)}>
+                            <option value="">(Niciunul)</option>
+                            {assets.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                    {a.name}
                                 </option>
                             ))}
                         </Select>
-                    )}
 
-                    <div>
-                        <label className="mb-1 block text-xs font-medium text-zinc-400">Descriere (optional)</label>
-                        <textarea
-                            className="min-h-[120px] w-full rounded-xl border border-white/10 bg-white/5 p-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
-                            value={newDesc}
-                            onChange={(e) => setNewDesc(e.target.value)}
+                        <Select label="Echipa (Explodeaza WO)" value={newTeamId} onChange={(e) => {
+                            setNewTeamId(e.target.value);
+                            setNewCoordId("");
+                        }}>
+                            <option value="">(Individual / Fara Echipa)</option>
+                            {teams.map((t) => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </Select>
+
+                        {newTeamId && (
+                            <Select label="Coordonator (Obligatoriu)" value={newCoordId} onChange={(e) => setNewCoordId(e.target.value)}>
+                                <option value="">(Selecteaza Coordonator)</option>
+                                {teams.find(t => t.id === newTeamId)?.members.map((m) => (
+                                    <option key={m.personId} value={m.personId}>
+                                        {m.displayName}
+                                    </option>
+                                ))}
+                            </Select>
+                        )}
+
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-zinc-400">Descriere (optional)</label>
+                            <textarea
+                                className="min-h-[120px] w-full rounded-xl border border-white/10 bg-white/5 p-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
+                                value={newDesc}
+                                onChange={(e) => setNewDesc(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                ) : selected ? (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-white/5 p-3">
+                            <div className="flex flex-wrap gap-2">
+                                {hasPerm("WO_EXECUTE") && (
+                                    <>
+                                        <Button size="sm" onClick={() => applyAction("start")} disabled={selected.status !== WorkOrderStatus.Open || actionLoading} variant="ghost">
+                                            Start
+                                        </Button>
+                                        <Button size="sm" onClick={() => applyAction("stop")} disabled={selected.status !== WorkOrderStatus.InProgress || actionLoading} variant="ghost">
+                                            Stop
+                                        </Button>
+                                    </>
+                                )}
+                                {hasPerm("WO_UPDATE") && (
+                                    <>
+                                        <Button size="sm" onClick={() => applyAction("cancel")} disabled={selected.status === WorkOrderStatus.Done || actionLoading} variant="ghost">
+                                            Cancel
+                                        </Button>
+                                        <Button size="sm" onClick={() => applyAction("reopen")} disabled={selected.status !== WorkOrderStatus.Cancelled || actionLoading} variant="ghost">
+                                            Reopen
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+
+                            <Link to={`/work-orders/${selected.id}`} className="text-sm text-teal-400 hover:underline">
+                                Detalii Complete →
+                            </Link>
+                        </div>
+
+                        <Tabs
+                            items={[
+                                { key: "details", label: "Detalii" },
+                                { key: "activity", label: "Activitate" },
+                                { key: "parts", label: "Piese de schimb" },
+                            ]}
+                            value={activeTab}
+                            onChange={(k) => setActiveTab(k as TabKey)}
+                            render={(k) => {
+                                if (k === "details") {
+                                    return (
+                                        <>
+                                            <div className="grid gap-4 sm:grid-cols-2">
+                                                <Input label="Title" value={dTitle} onChange={(e) => setDTitle(e.target.value)} />
+
+                                                <Select label="Status" value={dStatus} onChange={(e) => setDStatus(Number(e.target.value) as WorkOrderStatus)}>
+                                                    <option value={WorkOrderStatus.Open}>Deschis</option>
+                                                    <option value={WorkOrderStatus.InProgress}>În Lucru</option>
+                                                    <option value={WorkOrderStatus.Done}>Finalizat</option>
+                                                    <option value={WorkOrderStatus.Cancelled}>Anulat</option>
+                                                </Select>
+
+                                                <Select label="Utilaj" value={dAssetId} onChange={(e) => setDAssetId(e.target.value)}>
+                                                    <option value="">(Niciunul)</option>
+                                                    {assets.map((a) => (
+                                                        <option key={a.id} value={a.id}>
+                                                            {a.name}
+                                                        </option>
+                                                    ))}
+                                                </Select>
+
+                                                <Select label="Clasificare" value={dClassification} onChange={(e) => setDClassification(Number(e.target.value) as WorkOrderClassification)}>
+                                                    <option value={WorkOrderClassification.Proactive}>Proactiv</option>
+                                                    <option value={WorkOrderClassification.Reactive}>Reactiv</option>
+                                                </Select>
+
+                                                <Select label="Alocat angajat" value={dAssignedId} onChange={(e) => setDAssignedId(e.target.value)}>
+                                                    <option value="">(Nealocat)</option>
+                                                    {people.map((p) => (
+                                                        <option key={p.id} value={p.id}>
+                                                            {p.displayName}
+                                                        </option>
+                                                    ))}
+                                                </Select>
+
+                                                <Input type="datetime-local" label="Data Start" value={dStartAt} onChange={(e) => setDStartAt(e.target.value)} />
+                                                <Input type="datetime-local" label="Data Stop" value={dStopAt} onChange={(e) => setDStopAt(e.target.value)} />
+                                            </div>
+
+                                            <div className="mt-4">
+                                                <label className="mb-1 block text-xs font-medium text-zinc-400">Descriere</label>
+                                                <textarea
+                                                    className="min-h-[110px] w-full rounded-xl border border-white/10 bg-white/5 p-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
+                                                    value={dDesc}
+                                                    onChange={(e) => setDDesc(e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div className="mt-6 text-xs text-zinc-500">
+                                                {selected.durationMinutes ? `Durata Finala: ${selected.durationMinutes} min` : "In lucru..."}
+                                            </div>
+                                        </>
+                                    );
+                                }
+
+                                if (k === "activity") {
+                                    return (
+                                        <div className="space-y-4">
+                                            {/* Assignments */}
+                                            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                                <div className="mb-3 flex items-center justify-between">
+                                                    <div className="text-sm font-semibold text-zinc-200">Alocari echipa</div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={asgLoading || actionLoading}
+                                                        onClick={() => selected && loadAssignments(selected.id)}
+                                                    >
+                                                        Actualizeaza
+                                                    </Button>
+                                                </div>
+
+                                                {asgErr ? <ErrorBox message={asgErr} onClose={() => setAsgErr(null)} /> : null}
+
+                                                <div className="grid gap-3 sm:grid-cols-2">
+                                                    <Select label="Angajat" value={asgPersonId} onChange={(e) => setAsgPersonId(e.target.value)}>
+                                                        <option value="">(Selecteaza angajat)</option>
+                                                        {peopleForAssignment.map((p) => (
+                                                            <option key={p.id} value={p.id}>
+                                                                {p.displayName}
+                                                            </option>
+                                                        ))}
+                                                    </Select>
+
+                                                    <Select label="Rol" value={asgRoleId} onChange={(e) => setAsgRoleId(e.target.value)}>
+                                                        <option value="">(Selecteaza rol)</option>
+                                                        {rolesForAssignment.map((r) => (
+                                                            <option key={r.id} value={r.id}>
+                                                                {r.name}
+                                                            </option>
+                                                        ))}
+                                                    </Select>
+
+                                                    <Input type="datetime-local" label="Planificat din" value={asgFrom} onChange={(e) => setAsgFrom(e.target.value)} />
+                                                    <Input type="datetime-local" label="Planificat pana la" value={asgTo} onChange={(e) => setAsgTo(e.target.value)} />
+
+                                                    <div className="sm:col-span-2">
+                                                        <label className="mb-1 block text-xs font-medium text-zinc-400">Note (optional)</label>
+                                                        <textarea
+                                                            className="min-h-[80px] w-full rounded-xl border border-white/10 bg-white/5 p-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
+                                                            value={asgNotes}
+                                                            onChange={(e) => setAsgNotes(e.target.value)}
+                                                        />
+                                                    </div>
+
+                                                    <div className="sm:col-span-2 flex justify-end">
+                                                        <Button variant="primary" disabled={actionLoading} onClick={onCreateAssignment}>
+                                                            Adauga alocare
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4">
+                                                    {asgLoading ? (
+                                                        <div className="text-sm text-zinc-400">Se incarca...</div>
+                                                    ) : assignments.length === 0 ? (
+                                                        <div className="text-sm text-zinc-400">Nu exista alocari.</div>
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            {assignments.map((a) => (
+                                                                <div key={a.id} className="flex flex-col gap-2 rounded-xl border border-white/10 bg-zinc-950/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+                                                                    <div className="min-w-0">
+                                                                        <div className="truncate text-sm font-medium text-zinc-100">
+                                                                            {a.personName} <span className="text-zinc-400">— {a.roleName}</span>
+                                                                        </div>
+                                                                        <div className="text-xs text-zinc-400">
+                                                                            {isoToLocalDisplay(a.plannedFrom)} → {isoToLocalDisplay(a.plannedTo)}
+                                                                            {a.notes ? <span className="text-zinc-500"> · {a.notes}</span> : null}
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button variant="ghost" size="sm" disabled={actionLoading} onClick={() => onDeleteAssignment(a)}>
+                                                                        Sterge
+                                                                    </Button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Labor logs */}
+                                            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                                <div className="mb-3 flex items-center justify-between">
+                                                    <div className="text-sm font-semibold text-zinc-200">Pontaj (Labor logs)</div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={laborLoading || actionLoading}
+                                                        onClick={() => selected && loadLabor(selected.id)}
+                                                    >
+                                                        Actualizeaza
+                                                    </Button>
+                                                </div>
+
+                                                {laborErr ? <ErrorBox message={laborErr} onClose={() => setLaborErr(null)} /> : null}
+
+                                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_120px_1fr_100px]">
+                                                    <Select label="Angajat" value={laborPersonId} onChange={(e) => setLaborPersonId(e.target.value)}>
+                                                        <option value="">(Selecteaza angajat)</option>
+                                                        {people.map((p) => (
+                                                            <option key={p.id} value={p.id}>
+                                                                {p.displayName}
+                                                            </option>
+                                                        ))}
+                                                    </Select>
+
+                                                    <Input
+                                                        label="Minute"
+                                                        type="number"
+                                                        min={1}
+                                                        step="1"
+                                                        value={laborMinutes}
+                                                        onChange={(e) => setLaborMinutes(e.target.value)}
+                                                    />
+
+                                                    <Input
+                                                        label="Descriere (optional)"
+                                                        value={laborDesc}
+                                                        onChange={(e) => setLaborDesc(e.target.value)}
+                                                        placeholder="ex: inlocuit curea, reglaj..."
+                                                    />
+
+                                                    <div className="flex items-end">
+                                                        <Button variant="primary" disabled={actionLoading} onClick={onAddLabor}>
+                                                            Adauga
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4">
+                                                    {laborLoading ? (
+                                                        <div className="text-sm text-zinc-400">Se incarca...</div>
+                                                    ) : labor.length === 0 ? (
+                                                        <div className="text-sm text-zinc-400">Nu exista pontaje.</div>
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            {labor.map((l) => (
+                                                                <div key={l.id} className="flex flex-col gap-2 rounded-xl border border-white/10 bg-zinc-950/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+                                                                    <div className="min-w-0">
+                                                                        <div className="truncate text-sm font-medium text-zinc-100">
+                                                                            {l.personName ?? l.personId} <span className="text-zinc-400">— {l.minutes} min</span>
+                                                                        </div>
+                                                                        <div className="text-xs text-zinc-400">
+                                                                            {isoToLocalDisplay(l.createdAt)}
+                                                                            {l.description ? <span className="text-zinc-500"> · {l.description}</span> : null}
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button variant="ghost" size="sm" disabled={actionLoading} onClick={() => onDeleteLabor(l)}>
+                                                                        Sterge
+                                                                    </Button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                // PARTS
+                                return (
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <div className="text-sm font-semibold text-zinc-200">Piese utilizate</div>
+                                            <Button variant="ghost" size="sm" disabled={woPartsLoading || actionLoading} onClick={() => selected && loadWoParts(selected.id)}>
+                                                Actualizeaza
+                                            </Button>
+                                        </div>
+
+                                        {woPartsErr ? <ErrorBox message={woPartsErr} onClose={() => setWoPartsErr(null)} /> : null}
+
+                                        <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_120px_100px]">
+                                            <Select label="Piesa" value={partIdInput} onChange={(e) => setPartIdInput(e.target.value)}>
+                                                <option value="">(Selecteaza piesa)</option>
+                                                {partsCatalog.map((p) => (
+                                                    <option key={p.id} value={p.id}>
+                                                        {p.name}{p.code ? ` (${p.code})` : ""}
+                                                    </option>
+                                                ))}
+                                            </Select>
+
+                                            <Input label="Cantitate" type="number" min={0.0001} step="0.01" value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} />
+
+                                            <div className="flex items-end">
+                                                <Button variant="primary" disabled={actionLoading} onClick={onAddPart}>
+                                                    Adauga
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {woPartsLoading ? (
+                                            <div className="text-sm text-zinc-400">Se incarca...</div>
+                                        ) : woParts.length === 0 ? (
+                                            <div className="text-sm text-zinc-400">Nu exista piese.</div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {woParts.map((row) => (
+                                                    <div key={row.id} className="flex flex-col gap-2 rounded-xl border border-white/10 bg-zinc-950/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+                                                        <div className="min-w-0">
+                                                            <div className="truncate text-sm font-medium text-zinc-100">
+                                                                {row.partName} {row.partCode ? <span className="text-zinc-400">({row.partCode})</span> : null}
+                                                            </div>
+                                                            <div className="text-xs text-zinc-400">{row.uom ?? ""}</div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2">
+                                                            <Input
+                                                                type="number"
+                                                                min={0.0001}
+                                                                step="0.01"
+                                                                value={toQtyString(row.qtyUsed)}
+                                                                onChange={(e) => {
+                                                                    const v = Number(e.target.value);
+                                                                    if (!Number.isFinite(v)) return;
+                                                                    setWoParts((prev) => prev.map((x) => (x.id === row.id ? { ...x, qtyUsed: v } : x)));
+                                                                }}
+                                                                onBlur={(e) => {
+                                                                    const v = Number(e.target.value);
+                                                                    if (Number.isFinite(v) && v > 0) onSetPartQty(row, v);
+                                                                    else if (selected) loadWoParts(selected.id);
+                                                                }}
+                                                                className="w-[100px]"
+                                                            />
+
+                                                            <Button variant="ghost" size="sm" disabled={actionLoading} onClick={() => onDeletePart(row)}>
+                                                                Delete
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }}
                         />
                     </div>
-                </div>
+                ) : null}
             </Drawer>
 
-            <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
-                {/* LEFT LIST */}
-                <div className="h-fit overflow-hidden rounded-xl border border-white/10 bg-zinc-900/50">
+            <div className="grid gap-6">
+                {/* LIST */}
+                <div className="overflow-hidden rounded-xl border border-white/10 bg-zinc-900/50">
                     <div className="border-b border-white/10 bg-zinc-950/30 p-3">
                         <div className="grid gap-3">
                             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cauta ordine de lucru..." />
@@ -870,11 +1255,15 @@ export default function WorkOrdersPage() {
                             return (
                                 <button
                                     key={w.id}
-                                    onClick={() => setSelId(w.id)}
+                                    onClick={() => {
+                                        setSelId(w.id);
+                                        setDrawerMode("edit");
+                                        setDrawerOpen(true);
+                                    }}
                                     className={cx(
                                         "w-full border-b border-white/5 p-4 text-left transition hover:bg-white/5",
                                         style.borderClass,
-                                        selId === w.id && "bg-teal-500/10"
+                                        selId === w.id && "bg-teal-500/10 border-l-2 border-l-teal-500"
                                     )}
                                 >
                                     <div className="mb-1 flex items-start justify-between">
@@ -908,351 +1297,6 @@ export default function WorkOrdersPage() {
                             <div className="p-6 text-center text-sm text-zinc-400">{loading ? "Se incarca..." : "Nu exista ordine de lucru."}</div>
                         ) : null}
                     </div>
-                </div>
-
-                {/* RIGHT DETAIL */}
-                <div className="space-y-6">
-                    {selected ? (
-                        <Card title="Ordin de Lucru">
-                            <div className="mb-5 flex items-center justify-between gap-3 rounded-xl bg-white/5 p-3">
-                                <div className="flex flex-wrap gap-2">
-                                    <Button size="sm" onClick={() => applyAction("start")} disabled={selected.status !== WorkOrderStatus.Open || actionLoading} variant="ghost">
-                                        Start
-                                    </Button>
-                                    <Button size="sm" onClick={() => applyAction("stop")} disabled={selected.status !== WorkOrderStatus.InProgress || actionLoading} variant="ghost">
-                                        Stop
-                                    </Button>
-                                    <Button size="sm" onClick={() => applyAction("cancel")} disabled={selected.status === WorkOrderStatus.Done || actionLoading} variant="ghost">
-                                        Cancel
-                                    </Button>
-                                    <Button size="sm" onClick={() => applyAction("reopen")} disabled={selected.status !== WorkOrderStatus.Cancelled || actionLoading} variant="ghost">
-                                        Reopen
-                                    </Button>
-                                </div>
-
-                                <Link to={`/work-orders/${selected.id}`} className="text-sm text-teal-400 hover:underline">
-                                    Detalii Complete →
-                                </Link>
-                            </div>
-
-                            <Tabs
-                                items={[
-                                    { key: "details", label: "Detalii" },
-                                    { key: "activity", label: "Activitate" },
-                                    { key: "parts", label: "Piese de schimb" },
-                                ]}
-                                value={activeTab}
-                                onChange={(k) => setActiveTab(k as TabKey)}
-                                render={(k) => {
-                                    if (k === "details") {
-                                        return (
-                                            <>
-                                                <div className="grid gap-4 lg:grid-cols-2">
-                                                    <Input label="Title" value={dTitle} onChange={(e) => setDTitle(e.target.value)} />
-
-                                                    <Select label="Status" value={dStatus} onChange={(e) => setDStatus(Number(e.target.value) as WorkOrderStatus)}>
-                                                        <option value={WorkOrderStatus.Open}>Deschis</option>
-                                                        <option value={WorkOrderStatus.InProgress}>În Lucru</option>
-                                                        <option value={WorkOrderStatus.Done}>Finalizat</option>
-                                                        <option value={WorkOrderStatus.Cancelled}>Anulat</option>
-                                                    </Select>
-
-                                                    <Select label="Utilaj" value={dAssetId} onChange={(e) => setDAssetId(e.target.value)}>
-                                                        <option value="">(Niciunul)</option>
-                                                        {assets.map((a) => (
-                                                            <option key={a.id} value={a.id}>
-                                                                {a.name}
-                                                            </option>
-                                                        ))}
-                                                    </Select>
-
-                                                    <Select label="Clasificare" value={dClassification} onChange={(e) => setDClassification(Number(e.target.value) as WorkOrderClassification)}>
-                                                        <option value={WorkOrderClassification.Proactive}>Proactiv</option>
-                                                        <option value={WorkOrderClassification.Reactive}>Reactiv</option>
-                                                    </Select>
-
-                                                    <Select label="Alocat angajat" value={dAssignedId} onChange={(e) => setDAssignedId(e.target.value)}>
-                                                        <option value="">(Nealocat)</option>
-                                                        {people.map((p) => (
-                                                            <option key={p.id} value={p.id}>
-                                                                {p.displayName}
-                                                            </option>
-                                                        ))}
-                                                    </Select>
-
-                                                    <Input type="datetime-local" label="Data Start" value={dStartAt} onChange={(e) => setDStartAt(e.target.value)} />
-                                                    <Input type="datetime-local" label="Data Stop" value={dStopAt} onChange={(e) => setDStopAt(e.target.value)} />
-                                                </div>
-
-                                                <div className="mt-4">
-                                                    <label className="mb-1 block text-xs font-medium text-zinc-400">Descriere</label>
-                                                    <textarea
-                                                        className="min-h-[110px] w-full rounded-xl border border-white/10 bg-white/5 p-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
-                                                        value={dDesc}
-                                                        onChange={(e) => setDDesc(e.target.value)}
-                                                    />
-                                                </div>
-
-                                                <div className="mt-6 flex items-center justify-between">
-                                                    <div className="text-xs text-zinc-500">
-                                                        {selected.durationMinutes ? `Durata Finala: ${selected.durationMinutes} min` : "In lucru..."}
-                                                    </div>
-                                                    <Button onClick={onSave} disabled={!canSave} variant="primary">
-                                                        Salveaza Modificarile
-                                                    </Button>
-                                                </div>
-                                            </>
-                                        );
-                                    }
-
-                                    if (k === "activity") {
-                                        return (
-                                            <div className="space-y-4">
-                                                {/* Assignments */}
-                                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                                                    <div className="mb-3 flex items-center justify-between">
-                                                        <div className="text-sm font-semibold text-zinc-200">Alocari echipa</div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            disabled={asgLoading || actionLoading}
-                                                            onClick={() => selected && loadAssignments(selected.id)}
-                                                        >
-                                                            Actualizeaza
-                                                        </Button>
-                                                    </div>
-
-                                                    {asgErr ? <ErrorBox message={asgErr} onClose={() => setAsgErr(null)} /> : null}
-
-                                                    <div className="grid gap-3 lg:grid-cols-2">
-                                                        <Select label="Angajat" value={asgPersonId} onChange={(e) => setAsgPersonId(e.target.value)}>
-                                                            <option value="">(Selecteaza angajat)</option>
-                                                            {peopleForAssignment.map((p) => (
-                                                                <option key={p.id} value={p.id}>
-                                                                    {p.displayName}
-                                                                </option>
-                                                            ))}
-                                                        </Select>
-
-                                                        <Select label="Rol" value={asgRoleId} onChange={(e) => setAsgRoleId(e.target.value)}>
-                                                            <option value="">(Selecteaza rol)</option>
-                                                            {rolesForAssignment.map((r) => (
-                                                                <option key={r.id} value={r.id}>
-                                                                    {r.name}
-                                                                </option>
-                                                            ))}
-                                                        </Select>
-
-                                                        <Input type="datetime-local" label="Planificat din" value={asgFrom} onChange={(e) => setAsgFrom(e.target.value)} />
-                                                        <Input type="datetime-local" label="Planificat pana la" value={asgTo} onChange={(e) => setAsgTo(e.target.value)} />
-
-                                                        <div className="lg:col-span-2">
-                                                            <label className="mb-1 block text-xs font-medium text-zinc-400">Note (optional)</label>
-                                                            <textarea
-                                                                className="min-h-[80px] w-full rounded-xl border border-white/10 bg-white/5 p-2 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-teal-400/40"
-                                                                value={asgNotes}
-                                                                onChange={(e) => setAsgNotes(e.target.value)}
-                                                            />
-                                                        </div>
-
-                                                        <div className="lg:col-span-2 flex justify-end">
-                                                            <Button variant="primary" disabled={actionLoading} onClick={onCreateAssignment}>
-                                                                Adauga alocare
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="mt-4">
-                                                        {asgLoading ? (
-                                                            <div className="text-sm text-zinc-400">Se incarca...</div>
-                                                        ) : assignments.length === 0 ? (
-                                                            <div className="text-sm text-zinc-400">Nu exista alocari.</div>
-                                                        ) : (
-                                                            <div className="space-y-2">
-                                                                {assignments.map((a) => (
-                                                                    <div key={a.id} className="flex flex-col gap-2 rounded-xl border border-white/10 bg-zinc-950/30 p-3 lg:flex-row lg:items-center lg:justify-between">
-                                                                        <div className="min-w-0">
-                                                                            <div className="truncate text-sm font-medium text-zinc-100">
-                                                                                {a.personName} <span className="text-zinc-400">— {a.roleName}</span>
-                                                                            </div>
-                                                                            <div className="text-xs text-zinc-400">
-                                                                                {isoToLocalDisplay(a.plannedFrom)} → {isoToLocalDisplay(a.plannedTo)}
-                                                                                {a.notes ? <span className="text-zinc-500"> · {a.notes}</span> : null}
-                                                                            </div>
-                                                                        </div>
-                                                                        <Button variant="ghost" size="sm" disabled={actionLoading} onClick={() => onDeleteAssignment(a)}>
-                                                                            Sterge
-                                                                        </Button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Labor logs */}
-                                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                                                    <div className="mb-3 flex items-center justify-between">
-                                                        <div className="text-sm font-semibold text-zinc-200">Pontaj (Labor logs)</div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            disabled={laborLoading || actionLoading}
-                                                            onClick={() => selected && loadLabor(selected.id)}
-                                                        >
-                                                            Actualizeaza
-                                                        </Button>
-                                                    </div>
-
-                                                    {laborErr ? <ErrorBox message={laborErr} onClose={() => setLaborErr(null)} /> : null}
-
-                                                    <div className="grid gap-3 lg:grid-cols-[1fr_160px_1fr_140px]">
-                                                        <Select label="Angajat" value={laborPersonId} onChange={(e) => setLaborPersonId(e.target.value)}>
-                                                            <option value="">(Selecteaza angajat)</option>
-                                                            {people.map((p) => (
-                                                                <option key={p.id} value={p.id}>
-                                                                    {p.displayName}
-                                                                </option>
-                                                            ))}
-                                                        </Select>
-
-                                                        <Input
-                                                            label="Minute"
-                                                            type="number"
-                                                            min={1}
-                                                            step="1"
-                                                            value={laborMinutes}
-                                                            onChange={(e) => setLaborMinutes(e.target.value)}
-                                                        />
-
-                                                        <Input
-                                                            label="Descriere (optional)"
-                                                            value={laborDesc}
-                                                            onChange={(e) => setLaborDesc(e.target.value)}
-                                                            placeholder="ex: inlocuit curea, reglaj, verificare"
-                                                        />
-
-                                                        <div className="flex items-end">
-                                                            <Button variant="primary" disabled={actionLoading} onClick={onAddLabor}>
-                                                                Adauga
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="mt-4">
-                                                        {laborLoading ? (
-                                                            <div className="text-sm text-zinc-400">Se incarca...</div>
-                                                        ) : labor.length === 0 ? (
-                                                            <div className="text-sm text-zinc-400">Nu exista pontaje.</div>
-                                                        ) : (
-                                                            <div className="space-y-2">
-                                                                {labor.map((l) => (
-                                                                    <div key={l.id} className="flex flex-col gap-2 rounded-xl border border-white/10 bg-zinc-950/30 p-3 lg:flex-row lg:items-center lg:justify-between">
-                                                                        <div className="min-w-0">
-                                                                            <div className="truncate text-sm font-medium text-zinc-100">
-                                                                                {l.personName ?? l.personId} <span className="text-zinc-400">— {l.minutes} min</span>
-                                                                            </div>
-                                                                            <div className="text-xs text-zinc-400">
-                                                                                {isoToLocalDisplay(l.createdAt)}
-                                                                                {l.description ? <span className="text-zinc-500"> · {l.description}</span> : null}
-                                                                            </div>
-                                                                        </div>
-                                                                        <Button variant="ghost" size="sm" disabled={actionLoading} onClick={() => onDeleteLabor(l)}>
-                                                                            Sterge
-                                                                        </Button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-
-                                    // PARTS
-                                    return (
-                                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                                            <div className="mb-3 flex items-center justify-between">
-                                                <div className="text-sm font-semibold text-zinc-200">Piese utilizate</div>
-                                                <Button variant="ghost" size="sm" disabled={woPartsLoading || actionLoading} onClick={() => selected && loadWoParts(selected.id)}>
-                                                    Actualizeaza
-                                                </Button>
-                                            </div>
-
-                                            {woPartsErr ? <ErrorBox message={woPartsErr} onClose={() => setWoPartsErr(null)} /> : null}
-
-                                            <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_160px_140px]">
-                                                <Select label="Piesa" value={partIdInput} onChange={(e) => setPartIdInput(e.target.value)}>
-                                                    <option value="">(Selecteaza piesa)</option>
-                                                    {partsCatalog.map((p) => (
-                                                        <option key={p.id} value={p.id}>
-                                                            {p.name}{p.code ? ` (${p.code})` : ""}
-                                                        </option>
-                                                    ))}
-                                                </Select>
-
-                                                <Input label="Cantitate" type="number" min={0.0001} step="0.01" value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} />
-
-                                                <div className="flex items-end">
-                                                    <Button variant="primary" disabled={actionLoading} onClick={onAddPart}>
-                                                        Adauga
-                                                    </Button>
-                                                </div>
-                                            </div>
-
-                                            {woPartsLoading ? (
-                                                <div className="text-sm text-zinc-400">Se incarca...</div>
-                                            ) : woParts.length === 0 ? (
-                                                <div className="text-sm text-zinc-400">Nu exista piese pe acest ordin de lucru.</div>
-                                            ) : (
-                                                <div className="space-y-2">
-                                                    {woParts.map((row) => (
-                                                        <div key={row.id} className="flex flex-col gap-2 rounded-xl border border-white/10 bg-zinc-950/30 p-3 lg:flex-row lg:items-center lg:justify-between">
-                                                            <div className="min-w-0">
-                                                                <div className="truncate text-sm font-medium text-zinc-100">
-                                                                    {row.partName} {row.partCode ? <span className="text-zinc-400">({row.partCode})</span> : null}
-                                                                </div>
-                                                                <div className="text-xs text-zinc-400">{row.uom ?? ""}</div>
-                                                            </div>
-
-                                                            <div className="flex items-center gap-2">
-                                                                <Input
-                                                                    type="number"
-                                                                    min={0.0001}
-                                                                    step="0.01"
-                                                                    value={toQtyString(row.qtyUsed)}
-                                                                    onChange={(e) => {
-                                                                        const v = Number(e.target.value);
-                                                                        if (!Number.isFinite(v)) return;
-                                                                        setWoParts((prev) => prev.map((x) => (x.id === row.id ? { ...x, qtyUsed: v } : x)));
-                                                                    }}
-                                                                    onBlur={(e) => {
-                                                                        const v = Number(e.target.value);
-                                                                        if (Number.isFinite(v) && v > 0) onSetPartQty(row, v);
-                                                                        else if (selected) loadWoParts(selected.id);
-                                                                    }}
-                                                                    className="w-[140px]"
-                                                                />
-
-                                                                <Button variant="ghost" size="sm" disabled={actionLoading} onClick={() => onDeletePart(row)}>
-                                                                    Delete
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                }}
-                            />
-                        </Card>
-                    ) : (
-                        <div className="flex h-64 items-center justify-center rounded-xl border-2 border-dashed border-white/5 text-zinc-500">
-                            Select a work order from the list to view details
-                        </div>
-                    )}
                 </div>
             </div>
         </AppShell>

@@ -5,17 +5,22 @@ const DEFAULT_API_BASE = "http://localhost:5026";
 // VITE_API_BASE=http://localhost:5026
 export const API_BASE: string = (import.meta as any)?.env?.VITE_API_BASE || DEFAULT_API_BASE;
 
-const TOKEN_KEY = "cmms_token";
+export const TOKEN_KEY = "cmms_token";
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
 }
 
-export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
+export function setToken(token: string, isSessionOnly: boolean = false) {
+  if (isSessionOnly) {
+    sessionStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.setItem(TOKEN_KEY, token);
+  }
 }
 
 export function clearToken() {
+  sessionStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
 }
 
@@ -61,7 +66,9 @@ export async function apiFetch<T = any>(path: string, init: RequestInit = {}): P
   const token = getToken();
   const headers = new Headers(init.headers);
 
-  if (!headers.has("Content-Type") && init.body) headers.set("Content-Type", "application/json");
+  if (!headers.has("Content-Type") && init.body && !(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });

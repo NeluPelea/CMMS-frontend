@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
 import { Button, Card, Input, Select, PageToolbar, TableShell, ErrorBox } from "../components/ui";
 import { getGoodsReceipts, createGoodsReceipt, type CreateGoodsReceiptDto, type GoodsReceiptDto } from "../api/goodsReceipts";
+import { hasPerm } from "../api";
 import { suppliersApi, type SupplierSummaryDto } from "../api/suppliers";
 import { getSettings, type SettingsDto } from "../api/settings";
 import { getParts, type PartDto } from "../api/parts"; // Search parts
@@ -62,9 +63,11 @@ function GoodsReceiptList({ onCreate }: { onCreate: () => void }) {
                     </div>
                 }
                 right={
-                    <Button variant="primary" onClick={onCreate}>
-                        + Receptie Noua
-                    </Button>
+                    hasPerm("GR_CREATE") && (
+                        <Button variant="primary" onClick={onCreate}>
+                            + Receptie Noua
+                        </Button>
+                    )
                 }
             />
             {err && <ErrorBox message={err} />}

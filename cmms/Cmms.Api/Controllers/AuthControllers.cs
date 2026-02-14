@@ -43,8 +43,11 @@ public class AuthController : ControllerBase
                 .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Username.ToLower() == req.Username.Trim().ToLower());
 
-        if (user == null || !user.IsActive)
+        if (user == null)
             return Unauthorized("Invalid credentials.");
+
+        if (!user.IsActive)
+            return StatusCode(403, "Acces restricionat!!! Contactati Admin pentru detalii.");
 
         var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, req.Password);
         if (result == PasswordVerificationResult.Failed)
@@ -53,11 +56,12 @@ public class AuthController : ControllerBase
         var roleCodes = user.UserRoles.Select(ur => ur.Role.Code).ToList();
         var permissions = await _securityService.GetEffectivePermissionsAsync(user.Id);
 
+        var personId = await _db.People.Where(p => p.UserId == user.Id).Select(p => (Guid?)p.Id).FirstOrDefaultAsync();
         var token = _jwt.CreateToken(user, roleCodes, permissions);
 
         return Ok(new LoginResp(
             Token: token,
-            User: MapToUserSummary(user),
+            User: MapToUserSummary(user, personId),
             Permissions: permissions
         ));
     }
@@ -79,12 +83,13 @@ public class AuthController : ControllerBase
             return Unauthorized();
 
         var permissions = await _securityService.GetEffectivePermissionsAsync(user.Id);
+        var personId = await _db.People.Where(p => p.UserId == user.Id).Select(p => (Guid?)p.Id).FirstOrDefaultAsync();
         
         // We don't necessarily need to issue a NEW token on 'me' unless we want to refresh it.
         // For now, return the summary.
         return Ok(new 
         {
-            User = MapToUserSummary(user),
+            User = MapToUserSummary(user, personId),
             Permissions = permissions
         });
     }
@@ -111,14 +116,15 @@ public class AuthController : ControllerBase
         return Ok("Password changed successfully.");
     }
 
-    private UserSummaryDto MapToUserSummary(User user)
+    private UserSummaryDto MapToUserSummary(User user, Guid? personId)
     {
         return new UserSummaryDto(
             user.Id,
             user.Username,
             user.DisplayName ?? user.Username,
             user.UserRoles.Select(ur => new RoleLiteDto(ur.Role.Id, ur.Role.Code, ur.Role.Name, ur.Role.Rank)).ToList(),
-            user.MustChangePassword
+            user.MustChangePassword,
+            personId
         );
     }
 }

@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 // Folosim 'import type' pentru a evita erorile de verbatimModuleSyntax
 import type { ChangeEvent, KeyboardEvent } from "react";
 import AppShell from "../components/AppShell";
-import { createLoc, deleteLoc, getLocs, type LocDto } from "../api";
+import { createLoc, deleteLoc, getLocs, type LocDto, hasPerm } from "../api";
 import {
     Button,
     Card,
@@ -132,27 +132,29 @@ export default function LocationsPage() {
             {/* REPARAT: Fără className pentru a trece de build */}
             {err && <ErrorBox message={err} />}
 
-            <Card title="Locatie Noua">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <Input
-                        value={newName}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
-                        placeholder="Nume"
-                    />
-                    <Input
-                        value={newCode}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => setNewCode(e.target.value)}
-                        placeholder="Cod (optional)"
-                    />
-                    <Button
-                        onClick={onCreate}
-                        disabled={!canCreate || loading}
-                        variant="primary"
-                    >
-                        Creeaza
-                    </Button>
-                </div>
-            </Card>
+            {hasPerm("LOC_CREATE") && (
+                <Card title="Locatie Noua">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Input
+                            value={newName}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
+                            placeholder="Nume"
+                        />
+                        <Input
+                            value={newCode}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setNewCode(e.target.value)}
+                            placeholder="Cod (optional)"
+                        />
+                        <Button
+                            onClick={onCreate}
+                            disabled={!canCreate || loading}
+                            variant="primary"
+                        >
+                            Creeaza
+                        </Button>
+                    </div>
+                </Card>
+            )}
 
             <div className="mt-6" />
 
@@ -179,13 +181,15 @@ export default function LocationsPage() {
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                         {active ? (
-                                            <Button
-                                                onClick={() => onDelete(x.id, active)}
-                                                variant="ghost"
-                                                className="h-8 px-3 text-xs text-zinc-400 hover:text-rose-400"
-                                            >
-                                                Sterge
-                                            </Button>
+                                            hasPerm("LOC_DELETE") && (
+                                                <Button
+                                                    onClick={() => onDelete(x.id, active)}
+                                                    variant="ghost"
+                                                    className="h-8 px-3 text-xs text-zinc-400 hover:text-rose-400"
+                                                >
+                                                    Sterge
+                                                </Button>
+                                            )
                                         ) : (
                                             <span className="text-xs text-rose-300/60 pr-3 font-medium uppercase">Arhivat</span>
                                         )}

@@ -50,14 +50,43 @@ public class AssetsController : ControllerBase
             locName = x.Location != null ? x.Location.Name : null,
             isAct = x.IsAct,
             ranking = x.Ranking,
+            serialNumber = x.SerialNumber,
+            inventoryNumber = x.InventoryNumber,
+            assetClass = x.AssetClass,
+            manufacturer = x.Manufacturer,
+            manufactureYear = x.ManufactureYear,
+            commissionedAt = x.CommissionedAt,
             status = (int)x.Status
         });
 
         return Ok(dto);
     }
 
-    public record CreateReq(string Name, string? Code, Guid? LocId, string? Ranking);
-    public record UpdateReq(string Name, string? Code, Guid? LocId, string? Ranking);
+    public record CreateReq(
+        string Name, 
+        string? Code, 
+        Guid? LocId, 
+        string? Ranking, 
+        string? SerialNumber, 
+        string? InventoryNumber,
+        string? AssetClass,
+        string? Manufacturer,
+        int? ManufactureYear,
+        DateOnly? CommissionedAt
+    );
+    
+    public record UpdateReq(
+        string Name, 
+        string? Code, 
+        Guid? LocId, 
+        string? Ranking, 
+        string? SerialNumber, 
+        string? InventoryNumber,
+        string? AssetClass,
+        string? Manufacturer,
+        int? ManufactureYear,
+        DateOnly? CommissionedAt
+    );
 
     [HttpPost]
     [Authorize(Policy = "Perm:ASSET_CREATE")]
@@ -75,6 +104,15 @@ public class AssetsController : ControllerBase
                 return BadRequest("Ranking must be a single letter A-Z");
         }
 
+        // Validate ManufactureYear
+        if (req.ManufactureYear.HasValue)
+        {
+            var year = req.ManufactureYear.Value;
+            var currentYear = DateTime.Today.Year;
+            if (year < 1950 || year > currentYear + 1)
+                return BadRequest($"Invalid ManufactureYear ({year}). Must be between 1950 and {currentYear + 1}.");
+        }
+
         if (req.LocId.HasValue)
         {
             var ok = await _db.Locations.AsNoTracking().AnyAsync(l => l.Id == req.LocId.Value && l.IsAct);
@@ -87,6 +125,12 @@ public class AssetsController : ControllerBase
             Code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code.Trim(),
             LocationId = req.LocId,
             Ranking = ranking,
+            SerialNumber = string.IsNullOrWhiteSpace(req.SerialNumber) ? null : req.SerialNumber.Trim(),
+            InventoryNumber = string.IsNullOrWhiteSpace(req.InventoryNumber) ? null : req.InventoryNumber.Trim(),
+            AssetClass = string.IsNullOrWhiteSpace(req.AssetClass) ? null : req.AssetClass.Trim(),
+            Manufacturer = string.IsNullOrWhiteSpace(req.Manufacturer) ? null : req.Manufacturer.Trim(),
+            ManufactureYear = req.ManufactureYear,
+            CommissionedAt = req.CommissionedAt,
             Status = AssetStatus.Operational
         };
 
@@ -101,6 +145,12 @@ public class AssetsController : ControllerBase
             locName = (string?)null, 
             isAct = x.IsAct,
             ranking = x.Ranking,
+            serialNumber = x.SerialNumber,
+            inventoryNumber = x.InventoryNumber,
+            assetClass = x.AssetClass,
+            manufacturer = x.Manufacturer,
+            manufactureYear = x.ManufactureYear,
+            commissionedAt = x.CommissionedAt,
             status = (int)x.Status
         });
     }
@@ -121,6 +171,15 @@ public class AssetsController : ControllerBase
                 return BadRequest("Ranking must be a single letter A-Z");
         }
 
+        // Validate ManufactureYear
+        if (req.ManufactureYear.HasValue)
+        {
+            var year = req.ManufactureYear.Value;
+            var currentYear = DateTime.Today.Year;
+            if (year < 1950 || year > currentYear + 1)
+                return BadRequest($"Invalid ManufactureYear ({year}). Must be between 1950 and {currentYear + 1}.");
+        }
+
         var x = await _db.Assets.FirstOrDefaultAsync(a => a.Id == id);
         if (x == null) return NotFound();
 
@@ -134,6 +193,12 @@ public class AssetsController : ControllerBase
         x.Code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code.Trim();
         x.LocationId = req.LocId;
         x.Ranking = ranking;
+        x.SerialNumber = string.IsNullOrWhiteSpace(req.SerialNumber) ? null : req.SerialNumber.Trim();
+        x.InventoryNumber = string.IsNullOrWhiteSpace(req.InventoryNumber) ? null : req.InventoryNumber.Trim();
+        x.AssetClass = string.IsNullOrWhiteSpace(req.AssetClass) ? null : req.AssetClass.Trim();
+        x.Manufacturer = string.IsNullOrWhiteSpace(req.Manufacturer) ? null : req.Manufacturer.Trim();
+        x.ManufactureYear = req.ManufactureYear;
+        x.CommissionedAt = req.CommissionedAt;
         
         await _db.SaveChangesAsync();
 
@@ -145,6 +210,12 @@ public class AssetsController : ControllerBase
             locName = (string?)null, 
             isAct = x.IsAct,
             ranking = x.Ranking,
+            serialNumber = x.SerialNumber,
+            inventoryNumber = x.InventoryNumber,
+            assetClass = x.AssetClass,
+            manufacturer = x.Manufacturer,
+            manufactureYear = x.ManufactureYear,
+            commissionedAt = x.CommissionedAt,
             status = (int)x.Status
         });
     }

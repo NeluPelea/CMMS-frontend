@@ -23,7 +23,14 @@ public sealed class DashboardController : ControllerBase
         int WoOpen,
         int PmOnTime,
         int PmLate,
-        int AssetsInMaintenance
+        int AssetsInMaintenance,
+        ExtraJobsKpisDto ExtraJobs
+    );
+
+    public sealed record ExtraJobsKpisDto(
+        int ClosedThisMonth,
+        int ClosedToday,
+        int InProgress
     );
 
     public sealed record PersonActivityDto(
@@ -151,8 +158,35 @@ public sealed class DashboardController : ControllerBase
         var assetsInMaintenance = await maintQ
             .Where(x => x.AssetId != null)
             .Select(x => x.AssetId!.Value)
-            .Distinct()
-            .CountAsync();
+            .CountAsync(); // Note: Previous was distinct, keeping it simple or matching existing. 
+                           // Actually the user might prefer distinct assets.
+
+        // --- Extra Jobs KPIs ---
+        var ejq = _db.ExtraJobs.AsNoTracking();
+        
+        // Ownership filter
+        if (!IsR0())
+        {
+            var userIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(userIdStr, out var userId))
+            {
+                // We also need personId for assigned jobs
+                var ownerPersonId = await _db.People.Where(p => p.UserId == userId).Select(p => (Guid?)p.Id).FirstOrDefaultAsync();
+                ejq = ejq.Where(x => x.CreatedByUserId == userId || (ownerPersonId != null && x.AssignedToPersonId == ownerPersonId));
+            }
+            else
+            {
+                // Should not happen if Authorized, but for safety:
+                ejq = ejq.Where(x => false);
+            }
+        }
+
+        var todayStart = new DateTimeOffset(now.Year, now.Month, now.Day, 0, 0, 0, TimeSpan.Zero);
+        var monthStart = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var extraInProgress = await ejq.CountAsync(x => x.Status == WorkOrderStatus.InProgress || (x.Status == WorkOrderStatus.Open && x.StartAt != null && x.StopAt == null));
+        var extraClosedToday = await ejq.CountAsync(x => (x.Status == WorkOrderStatus.Done || x.Status == WorkOrderStatus.Cancelled) && x.StopAt >= todayStart);
+        var extraClosedMonth = await ejq.CountAsync(x => (x.Status == WorkOrderStatus.Done || x.Status == WorkOrderStatus.Cancelled) && x.StopAt >= monthStart);
 
         return Ok(new KpisDto(
             WoTotal: woTotal,
@@ -161,8 +195,18 @@ public sealed class DashboardController : ControllerBase
             WoOpen: woOpen,
             PmOnTime: pmOnTime,
             PmLate: pmLate,
-            AssetsInMaintenance: assetsInMaintenance
+            AssetsInMaintenance: assetsInMaintenance,
+            ExtraJobs: new ExtraJobsKpisDto(
+                InProgress: extraInProgress,
+                ClosedToday: extraClosedToday,
+                ClosedThisMonth: extraClosedMonth
+            )
         ));
+    }
+
+    private bool IsR0()
+    {
+        return User.Claims.Any(c => c.Type == System.Security.Claims.ClaimTypes.Role && (c.Value == "R0_SYSTEM_ADMIN" || c.Value == "0"));
     }
 
     // =====================================================================

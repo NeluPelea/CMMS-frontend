@@ -67,11 +67,31 @@ public sealed class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
 
+    public DbSet<AssetDocument> AssetDocuments => Set<AssetDocument>();
+
+    // ...
 
     protected override void OnModelCreating(ModelBuilder b)
-
     {
         base.OnModelCreating(b);
+
+        b.Entity<AssetDocument>(e =>
+        {
+            e.ToTable("AssetDocuments");
+            e.HasKey(x => x.Id);
+
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.Property(x => x.FileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.StoragePath).HasMaxLength(500).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100);
+
+            e.HasOne(x => x.Asset)
+                .WithMany()
+                .HasForeignKey(x => x.AssetId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.AssetId, x.CreatedAt });
+        });
 
         b.Entity<FileAttachment>(e =>
         {
@@ -112,6 +132,11 @@ public sealed class AppDbContext : DbContext
         // ---------------- Index / existing ----------------
         b.Entity<Location>().HasIndex(x => x.Name);
         b.Entity<Asset>().HasIndex(x => x.Name);
+        b.Entity<Asset>().Property(x => x.SerialNumber).HasMaxLength(128);
+        b.Entity<Asset>().Property(x => x.InventoryNumber).HasMaxLength(128);
+        b.Entity<Asset>().Property(x => x.AssetClass).HasMaxLength(200);
+        b.Entity<Asset>().Property(x => x.Manufacturer).HasMaxLength(200);
+        b.Entity<Asset>().Property(x => x.CommissionedAt).HasColumnType("date");
 
         // optional: soft delete global pe Location/Asset
         b.Entity<Location>().HasQueryFilter(x => x.IsAct);
@@ -165,6 +190,9 @@ public sealed class AppDbContext : DbContext
         b.Entity<Person>()
             .Property(x => x.FullName)
             .HasMaxLength(200);
+
+        b.Entity<Person>()
+            .HasIndex(x => x.UserId);
 
         b.Entity<Person>()
             .Property(x => x.JobTitle)
@@ -435,6 +463,16 @@ public sealed class AppDbContext : DbContext
         });
 
         // ---------------- ExtraJobs ----------------
+        b.Entity<ExtraJob>(e =>
+        {
+            e.HasIndex(x => x.CreatedByUserId);
+
+            e.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         b.Entity<ExtraJobEvent>(e =>
         {
             e.ToTable("extra_job_events");

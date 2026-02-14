@@ -16,7 +16,7 @@ public class JwtTokenService
         _cfg = cfg;
     }
 
-    public string CreateToken(User user, IEnumerable<string> roles, IEnumerable<string> permissions)
+    public string CreateToken(User user, IEnumerable<string> roles, IEnumerable<string> permissions, bool isImpersonation = false, string? actorAdminId = null)
     {
         var keyStr = _cfg["Jwt:Key"] ?? "";
         if (Encoding.UTF8.GetByteCount(keyStr) < 32)
@@ -35,6 +35,12 @@ public class JwtTokenService
             new Claim("display_name", user.DisplayName ?? user.Username),
         };
 
+        if (isImpersonation)
+        {
+            claims.Add(new Claim("imp", "true"));
+            if (actorAdminId != null) claims.Add(new Claim("actorAdminId", actorAdminId));
+        }
+
         foreach (var r in roles)
         {
             claims.Add(new Claim(ClaimTypes.Role, r));
@@ -43,11 +49,13 @@ public class JwtTokenService
         // We are NOT packing permissions into JWT anymore per Prompt 2 recommendation.
         // PermissionHandler uses SecurityService (cached) instead.
 
+        var expiration = isImpersonation ? TimeSpan.FromMinutes(60) : TimeSpan.FromDays(7);
+
         var token = new JwtSecurityToken(
             issuer: issuer,
             audience: audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddDays(7),
+            expires: DateTime.UtcNow.Add(expiration),
             signingCredentials: creds
         );
 

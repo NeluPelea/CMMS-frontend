@@ -3,6 +3,7 @@ import AppShell from "../components/AppShell";
 import { Card, ErrorBox, Input, Button } from "../components/ui";
 import { apiFetch, API_BASE, getToken } from "../api/http";
 import { getSettings, updateSettings, type SettingsDto } from "../api/settings";
+import { hasPerm } from "../api/auth";
 
 interface TemplateMetadata {
     type: number;
@@ -137,11 +138,13 @@ export default function SettingsPage() {
                                     <span className="text-zinc-400 font-bold text-lg">%</span>
                                 </div>
                             </div>
-                            <div className="pt-2">
-                                <Button onClick={onSaveSettings} disabled={loading} variant="primary">
-                                    Salveaza
-                                </Button>
-                            </div>
+                            {hasPerm("SETTINGS_UPDATE") && (
+                                <div className="pt-2">
+                                    <Button onClick={onSaveSettings} disabled={loading} variant="primary">
+                                        Salveaza
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </Card>
 
@@ -206,18 +209,22 @@ export default function SettingsPage() {
                                             className="max-h-full max-w-full object-contain"
                                         />
                                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                                            <label className="cursor-pointer bg-white text-black px-4 py-2 rounded-lg font-medium text-sm">
-                                                Schimba PNG
-                                                <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "header-png")} disabled={loading} />
-                                            </label>
+                                            {hasPerm("SETTINGS_UPDATE") && (
+                                                <label className="cursor-pointer bg-white text-black px-4 py-2 rounded-lg font-medium text-sm">
+                                                    Schimba PNG
+                                                    <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "header-png")} disabled={loading} />
+                                                </label>
+                                            )}
                                         </div>
                                     </>
                                 ) : (
-                                    <label className="cursor-pointer flex flex-col items-center gap-2">
-                                        <div className="text-2xl">🖼️</div>
-                                        <span className="text-sm text-zinc-400">Click pentru a incarca header.png</span>
-                                        <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "header-png")} disabled={loading} />
-                                    </label>
+                                    hasPerm("SETTINGS_UPDATE") && (
+                                        <label className="cursor-pointer flex flex-col items-center gap-2">
+                                            <div className="text-2xl">🖼️</div>
+                                            <span className="text-sm text-zinc-400">Click pentru a incarca header.png</span>
+                                            <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "header-png")} disabled={loading} />
+                                        </label>
+                                    )
                                 )}
                             </div>
 
@@ -249,18 +256,22 @@ export default function SettingsPage() {
                                             className="max-h-full max-w-full object-contain"
                                         />
                                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                                            <label className="cursor-pointer bg-white text-black px-4 py-2 rounded-lg font-medium text-sm">
-                                                Schimba PNG
-                                                <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "footer-png")} disabled={loading} />
-                                            </label>
+                                            {hasPerm("SETTINGS_UPDATE") && (
+                                                <label className="cursor-pointer bg-white text-black px-4 py-2 rounded-lg font-medium text-sm">
+                                                    Schimba PNG
+                                                    <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "footer-png")} disabled={loading} />
+                                                </label>
+                                            )}
                                         </div>
                                     </>
                                 ) : (
-                                    <label className="cursor-pointer flex flex-col items-center gap-2">
-                                        <div className="text-2xl">🖼️</div>
-                                        <span className="text-sm text-zinc-400">Click pentru a incarca footer.png</span>
-                                        <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "footer-png")} disabled={loading} />
-                                    </label>
+                                    hasPerm("SETTINGS_UPDATE") && (
+                                        <label className="cursor-pointer flex flex-col items-center gap-2">
+                                            <div className="text-2xl">🖼️</div>
+                                            <span className="text-sm text-zinc-400">Click pentru a incarca footer.png</span>
+                                            <input type="file" accept=".png" className="hidden" onChange={(e) => handleUpload(e, "footer-png")} disabled={loading} />
+                                        </label>
+                                    )
                                 )}
                             </div>
 

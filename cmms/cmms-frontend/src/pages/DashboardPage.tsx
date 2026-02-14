@@ -75,7 +75,7 @@ function KpiCard(props: {
   label: string;
   value: number | null | undefined;
   hint?: string;
-  tone?: "neutral" | "good" | "warn" | "bad";
+  tone?: "neutral" | "good" | "warn" | "bad" | "blue1" | "blue2" | "blue3";
 }) {
   const { label, value, hint, tone = "neutral" } = props;
 
@@ -92,7 +92,13 @@ function KpiCard(props: {
         ? "bg-amber-400"
         : tone === "bad"
           ? "bg-rose-400"
-          : "bg-teal-400";
+          : tone === "blue1"
+            ? "bg-blue-600"
+            : tone === "blue2"
+              ? "bg-blue-400"
+              : tone === "blue3"
+                ? "bg-sky-400"
+                : "bg-teal-400";
 
   const valueColor =
     tone === "good"
@@ -101,7 +107,9 @@ function KpiCard(props: {
         ? "text-amber-200"
         : tone === "bad"
           ? "text-rose-200"
-          : "text-teal-200";
+          : tone?.startsWith("blue")
+            ? "text-blue-200"
+            : "text-teal-200";
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -245,6 +253,13 @@ export default function DashboardPage() {
           value={kpis?.assetsInMaintenance}
           hint="Ordine in Lucru"
         />
+      </div>
+
+      {/* Extra Jobs KPIs */}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <KpiCard label="Extra: Închise (Lună)" value={kpis?.extraJobs?.closedThisMonth} hint="Luna curentă" tone="blue1" />
+        <KpiCard label="Extra: Închise (Azi)" value={kpis?.extraJobs?.closedToday} hint="Azi" tone="blue2" />
+        <KpiCard label="Extra: În derulare" value={kpis?.extraJobs?.inProgress} hint="În derulare" tone="blue3" />
       </div>
 
       {/* Employee activity */}

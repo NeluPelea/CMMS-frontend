@@ -46,21 +46,21 @@ namespace Cmms.Infrastructure.Migrations
                         {
                             Key = "VAT_RATE",
                             Description = "Cota TVA (%)",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 13, 8, 38, 30, 919, DateTimeKind.Unspecified).AddTicks(7969), new TimeSpan(0, 0, 0, 0, 0)),
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 14, 17, 30, 2, 751, DateTimeKind.Unspecified).AddTicks(7635), new TimeSpan(0, 0, 0, 0, 0)),
                             Value = "19"
                         },
                         new
                         {
                             Key = "FX_RON_EUR",
                             Description = "Curs RON/EUR",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 13, 8, 38, 30, 919, DateTimeKind.Unspecified).AddTicks(7976), new TimeSpan(0, 0, 0, 0, 0)),
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 14, 17, 30, 2, 751, DateTimeKind.Unspecified).AddTicks(7639), new TimeSpan(0, 0, 0, 0, 0)),
                             Value = "4.950000"
                         },
                         new
                         {
                             Key = "FX_RON_USD",
                             Description = "Curs RON/USD",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 13, 8, 38, 30, 919, DateTimeKind.Unspecified).AddTicks(7977), new TimeSpan(0, 0, 0, 0, 0)),
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 2, 14, 17, 30, 2, 751, DateTimeKind.Unspecified).AddTicks(7640), new TimeSpan(0, 0, 0, 0, 0)),
                             Value = "4.600000"
                         });
                 });
@@ -71,8 +71,19 @@ namespace Cmms.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AssetClass")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("Code")
                         .HasColumnType("text");
+
+                    b.Property<DateOnly?>("CommissionedAt")
+                        .HasColumnType("date");
+
+                    b.Property<string>("InventoryNumber")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<bool>("IsAct")
                         .HasColumnType("boolean");
@@ -80,12 +91,23 @@ namespace Cmms.Infrastructure.Migrations
                     b.Property<Guid?>("LocationId")
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("ManufactureYear")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Manufacturer")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Ranking")
                         .HasColumnType("text");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -97,6 +119,53 @@ namespace Cmms.Infrastructure.Migrations
                     b.HasIndex("Name");
 
                     b.ToTable("Assets");
+                });
+
+            modelBuilder.Entity("Cmms.Domain.AssetDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("AssetId", "CreatedAt");
+
+                    b.ToTable("AssetDocuments", (string)null);
                 });
 
             modelBuilder.Entity("Cmms.Domain.AssetPart", b =>
@@ -250,6 +319,9 @@ namespace Cmms.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
@@ -275,6 +347,8 @@ namespace Cmms.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedToPersonId");
+
+                    b.HasIndex("CreatedByUserId");
 
                     b.ToTable("ExtraJobs");
                 });
@@ -809,7 +883,12 @@ namespace Cmms.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("People");
                 });
@@ -1386,6 +1465,9 @@ namespace Cmms.Infrastructure.Migrations
                     b.Property<string>("PasswordSalt")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1694,6 +1776,23 @@ namespace Cmms.Infrastructure.Migrations
                     b.Navigation("Location");
                 });
 
+            modelBuilder.Entity("Cmms.Domain.AssetDocument", b =>
+                {
+                    b.HasOne("Cmms.Domain.Asset", "Asset")
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Cmms.Domain.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.Navigation("Asset");
+
+                    b.Navigation("CreatedByUser");
+                });
+
             modelBuilder.Entity("Cmms.Domain.AssetPart", b =>
                 {
                     b.HasOne("Cmms.Domain.Asset", "Asset")
@@ -1719,7 +1818,14 @@ namespace Cmms.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("AssignedToPersonId");
 
+                    b.HasOne("Cmms.Domain.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("AssignedToPerson");
+
+                    b.Navigation("CreatedByUser");
                 });
 
             modelBuilder.Entity("Cmms.Domain.ExtraJobEvent", b =>

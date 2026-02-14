@@ -14,7 +14,8 @@ import {
     securityRolesApi,
     securityPermissionsApi,
     type RoleSecurityDto,
-    type PermissionGroupDto
+    type PermissionGroupDto,
+    hasPerm
 } from "../api";
 
 function FieldLabel(props: { children: React.ReactNode }) {
@@ -53,7 +54,7 @@ export default function SecurityRolesPage() {
 
     function handleEditRole(role: RoleSecurityDto) {
         setIsCreating(false); setSelectedRoleId(role.id); setName(role.name); setCode(role.code);
-        setRank(role.rank); setDescription(role.description); setSelectedPerms(role.permissionCodes);
+        setRank(role.rank); setDescription(role.description || ""); setSelectedPerms(role.permissionCodes);
         setIsEditOpen(true);
     }
 
@@ -90,7 +91,9 @@ export default function SecurityRolesPage() {
                 left={<h2 className="text-zinc-400 text-sm italic font-normal">Gestionare roluri sistem</h2>}
                 right={<div className="flex gap-2">
                     <Button onClick={loadData} variant="ghost">Actualizează</Button>
-                    <Button variant="primary" onClick={handleInitiateCreate}>Adaugă Rol</Button>
+                    {hasPerm("SECURITY_ROLES_UPDATE") && (
+                        <Button variant="primary" onClick={handleInitiateCreate}>Adaugă Rol</Button>
+                    )}
                 </div>}
             />
 
@@ -114,7 +117,11 @@ export default function SecurityRolesPage() {
                                 <td className="px-4 py-3 text-zinc-400 font-mono text-[11px]">{r.code}</td>
                                 <td className="px-4 py-3"><div className="bg-white/5 border border-white/10 px-2 py-0.5 rounded text-[11px] inline-block font-bold">R{r.rank}</div></td>
                                 <td className="px-4 py-3 text-zinc-500 max-w-[300px] truncate">{r.description}</td>
-                                <td className="px-4 py-3 text-right"><Button size="sm" onClick={() => handleEditRole(r)}>Configurează</Button></td>
+                                <td className="px-4 py-3 text-right">
+                                    {hasPerm("SECURITY_ROLES_UPDATE") && (
+                                        <Button size="sm" onClick={() => handleEditRole(r)}>Configurează</Button>
+                                    )}
+                                </td>
                             </tr>
                         ))}
                     </tbody>
@@ -154,8 +161,8 @@ export default function SecurityRolesPage() {
                         </div>
                     </div>
                     <div className="flex justify-between items-center pt-4 border-t border-white/10">
-                        <div>{!isCreating && !currentRole?.isSystem && <Button variant="ghost" onClick={handleDelete}>Șterge Rol</Button>}</div>
-                        <div className="flex gap-2"><Button onClick={() => setIsEditOpen(false)}>Anulează</Button><Button variant="primary" onClick={handleSave} disabled={loading || !name || !code}>Salvează</Button></div>
+                        <div>{!isCreating && !currentRole?.isSystem && hasPerm("SECURITY_ROLES_UPDATE") && <Button variant="ghost" onClick={handleDelete}>Șterge Rol</Button>}</div>
+                        <div className="flex gap-2"><Button onClick={() => setIsEditOpen(false)}>Anulează</Button>{hasPerm("SECURITY_ROLES_UPDATE") && <Button variant="primary" onClick={handleSave} disabled={loading || !name || !code}>Salvează</Button>}</div>
                     </div>
                 </div>
             </Drawer>

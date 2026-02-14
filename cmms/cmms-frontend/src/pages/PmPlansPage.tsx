@@ -1,7 +1,7 @@
 ﻿// src/pages/PmPlansPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
-import { getAssets, getLocs, type AssetDto, type LocDto } from "../api";
+import { getAssets, getLocs, type AssetDto, type LocDto, hasPerm } from "../api";
 import {
   createPmPlan,
   generateDuePmPlans,
@@ -335,76 +335,80 @@ export default function PmPlansPage() {
             <Button onClick={load} disabled={loading} variant="ghost">
               Actualizeaza
             </Button>
-            <Button onClick={onGenerateDue} disabled={loading} variant="ghost">
-              Genereaza scadente
-            </Button>
+            {hasPerm("PM_EXECUTE") && (
+              <Button onClick={onGenerateDue} disabled={loading} variant="ghost">
+                Genereaza scadente
+              </Button>
+            )}
           </div>
         }
       />
 
       {err ? <ErrorBox message={err} /> : null}
 
-      <Card title="Creeaza Plan Mentenanta">
-        <div className="grid gap-3 lg:grid-cols-4">
-          <div className="lg:col-span-2">
-            <FieldLabel>Utilaj</FieldLabel>
-            <Select value={cAssetId} onChange={(e) => setCAssetId(e.target.value)}>
-              <option value="">Selecteaza utilaj...</option>
-              {assets.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} {a.code ? `(${a.code})` : ""}
-                </option>
-              ))}
-            </Select>
+      {hasPerm("PM_CREATE") && (
+        <Card title="Creeaza Plan Mentenanta">
+          <div className="grid gap-3 lg:grid-cols-4">
+            <div className="lg:col-span-2">
+              <FieldLabel>Utilaj</FieldLabel>
+              <Select value={cAssetId} onChange={(e) => setCAssetId(e.target.value)}>
+                <option value="">Selecteaza utilaj...</option>
+                {assets.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} {a.code ? `(${a.code})` : ""}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div>
+              <FieldLabel>Frecventa</FieldLabel>
+              <Select value={cFreq} onChange={(e) => setCFreq(Number(e.target.value))}>
+                <option value={PmFrequency.Daily}>Zilnic</option>
+                <option value={PmFrequency.Weekly}>Saptamanal</option>
+                <option value={PmFrequency.Monthly}>Lunar</option>
+              </Select>
+            </div>
+
+            <div>
+              <FieldLabel>Urmatoarea scadenta</FieldLabel>
+              <DateTimeLocalInput
+                value={cNextDueLocal}
+                onChange={(e) => setCNextDueLocal(e.target.value)}
+              />
+            </div>
+
+            <div className="lg:col-span-4">
+              <FieldLabel>Nume</FieldLabel>
+              <Input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Nume plan" />
+            </div>
           </div>
 
-          <div>
-            <FieldLabel>Frecventa</FieldLabel>
-            <Select value={cFreq} onChange={(e) => setCFreq(Number(e.target.value))}>
-              <option value={PmFrequency.Daily}>Zilnic</option>
-              <option value={PmFrequency.Weekly}>Saptamanal</option>
-              <option value={PmFrequency.Monthly}>Lunar</option>
-            </Select>
-          </div>
-
-          <div>
-            <FieldLabel>Urmatoarea scadenta</FieldLabel>
-            <DateTimeLocalInput
-              value={cNextDueLocal}
-              onChange={(e) => setCNextDueLocal(e.target.value)}
+          <div className="mt-3">
+            <FieldLabel>Lista sarcini</FieldLabel>
+            <TextArea
+              value={cChecklist}
+              onChange={(e) => setCChecklist(e.target.value)}
+              rows={4}
+              placeholder={"Un item pe linie\nExemplu:\n- Verificare nivel ulei\n- Inspectie curele\n- Curatare filtre"}
             />
           </div>
 
-          <div className="lg:col-span-4">
-            <FieldLabel>Nume</FieldLabel>
-            <Input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Nume plan" />
+          <div className="mt-3 flex justify-end">
+            <Button
+              onClick={onCreate}
+              disabled={loading || cName.trim().length < 2 || !cAssetId}
+              variant="primary"
+            >
+              Creeaza
+            </Button>
           </div>
-        </div>
 
-        <div className="mt-3">
-          <FieldLabel>Lista sarcini</FieldLabel>
-          <TextArea
-            value={cChecklist}
-            onChange={(e) => setCChecklist(e.target.value)}
-            rows={4}
-            placeholder={"Un item pe linie\nExemplu:\n- Verificare nivel ulei\n- Inspectie curele\n- Curatare filtre"}
-          />
-        </div>
-
-        <div className="mt-3 flex justify-end">
-          <Button
-            onClick={onCreate}
-            disabled={loading || cName.trim().length < 2 || !cAssetId}
-            variant="primary"
-          >
-            Creeaza
-          </Button>
-        </div>
-
-        <div className="mt-2 text-xs text-zinc-500">
-          Sfat: Lista de sarcini este salvata ca elemente individuale; ordinea este pastrata prin sortare.
-        </div>
-      </Card>
+          <div className="mt-2 text-xs text-zinc-500">
+            Sfat: Lista de sarcini este salvata ca elemente individuale; ordinea este pastrata prin sortare.
+          </div>
+        </Card>
+      )}
 
       <div className="mt-6" />
 
@@ -445,9 +449,11 @@ export default function PmPlansPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Button variant="ghost" onClick={() => openEdit(p.id)}>
-                    Edit
-                  </Button>
+                  {hasPerm("PM_UPDATE") && (
+                    <Button variant="ghost" onClick={() => openEdit(p.id)}>
+                      Edit
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}

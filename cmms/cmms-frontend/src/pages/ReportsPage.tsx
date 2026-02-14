@@ -8,6 +8,7 @@ import {
     PageToolbar,
     TableShell,
 } from "../components/ui";
+import { hasPerm } from "../api";
 import {
     getLaborByPersonReport,
     getPartsReport,
@@ -369,7 +370,7 @@ function ReportsContent() {
                 }
             />
 
-            {tab === "extra" && !loading && (
+            {tab === "extra" && !loading && hasPerm("REPORTS_EXPORT") && (
                 <div className="flex justify-end mb-4">
                     <Button
                         variant="primary"
@@ -382,7 +383,7 @@ function ReportsContent() {
                 </div>
             )}
 
-            {tab === "labor" && !loading && (
+            {tab === "labor" && !loading && hasPerm("REPORTS_EXPORT") && (
                 <div className="flex justify-end mb-4">
                     <Button
                         variant="primary"
@@ -395,7 +396,7 @@ function ReportsContent() {
                 </div>
             )}
 
-            {tab === "labor-asset" && !loading && (
+            {tab === "labor-asset" && !loading && hasPerm("REPORTS_EXPORT") && (
                 <div className="flex justify-end mb-4">
                     <Button
                         variant="primary"
@@ -408,7 +409,7 @@ function ReportsContent() {
                 </div>
             )}
 
-            {tab === "labor-asset-daily" && !loading && (
+            {tab === "labor-asset-daily" && !loading && hasPerm("REPORTS_EXPORT") && (
                 <div className="flex justify-end mb-4">
                     <Button
                         variant="primary"

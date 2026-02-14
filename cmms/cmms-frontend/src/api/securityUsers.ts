@@ -1,5 +1,6 @@
 import { apiFetch } from "./http";
 import type { RoleLiteDto } from "./auth";
+import type { RoleSecurityDto } from "./securityRoles";
 
 export interface UserSecurityDto {
     id: string;
@@ -8,6 +9,7 @@ export interface UserSecurityDto {
     isActive: boolean;
     roles: RoleLiteDto[];
     createdAt: string;
+    personId?: string;
 }
 
 export interface CreateUserReq {
@@ -17,10 +19,12 @@ export interface CreateUserReq {
     mustChangePassword: boolean;
     isActive: boolean;
     roleIds: string[];
+    personId?: string;
 }
 
 export interface UpdateUserReq {
     displayName?: string;
+    username?: string;
     isActive?: boolean;
     roleIds?: string[];
 }
@@ -61,5 +65,10 @@ export const securityUsersApi = {
         apiFetch(`/api/security/users/${id}/permission-overrides`, {
             method: "PUT",
             body: JSON.stringify(req)
-        })
+        }),
+    getRoles: () => apiFetch<RoleSecurityDto[]>("/api/security/roles"),
+    impersonate: (id: string) => apiFetch<{ token: string }>("/api/security/impersonate", {
+        method: "POST",
+        body: JSON.stringify({ impersonatedUserId: id })
+    })
 };
