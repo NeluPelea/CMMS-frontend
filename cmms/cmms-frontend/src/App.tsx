@@ -30,6 +30,7 @@ import GoodsReceiptsPage from "./pages/GoodsReceiptsPage";
 import GoodsReceiptDetailsPage from "./pages/GoodsReceiptDetailsPage";
 import ProcurementPage from "./pages/ProcurementPage";
 import ImpersonatePage from "./pages/ImpersonatePage";
+import AssetDocumentsPage from "./pages/AssetDocumentsPage";
 
 export default function App() {
     return (

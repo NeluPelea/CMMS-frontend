@@ -1,5 +1,5 @@
 // src/api/assets.ts
-import { apiFetch } from "./http";
+import { apiFetch, API_BASE } from "./http";
 
 /**
  * Asset DTO as used by the frontend.
@@ -87,6 +87,13 @@ export interface UpdateAssetRequest {
 }
 
 /**
+ * GET /api/as/{id}
+ */
+export async function getAsset(id: string): Promise<AssetDto> {
+    return apiFetch<AssetDto>(`/api/as/${id}`, { method: "GET" });
+}
+
+/**
  * POST /api/as
  */
 export async function createAsset(req: CreateAssetRequest): Promise<AssetDto> {
@@ -155,40 +162,16 @@ export async function getAssetDocuments(assetId: string): Promise<AssetDocumentD
     return apiFetch<AssetDocumentDto[]>(`/api/assets/${assetId}/documents`, { method: "GET" });
 }
 
+// Helper to ensure apiFetch doesn't break FormData
 export async function uploadAssetDocument(assetId: string, title: string, file: File): Promise<{ id: string }> {
     const formData = new FormData();
-    formData.append("title", title);
-    formData.append("file", file);
+    formData.append("Title", title); // Match backend property casing if needed, usually case-insensitive but "Title" matches class.
+    formData.append("File", file);
 
-    // We use fetch directly here because apiFetch might assume JSON by default or we need custom body
-    // actually apiFetch handles body if string, but for FormData we usually let browser set content-type
-
-    // Let's use a small wrapper or just fetch with auth
-    // const token = localStorage.getItem("token");
-    // importing getToken from http? it's not exported.
-    // simpler to rely on apiFetch handling FormData? 
-    // Usually apiFetch sets Content-Type: application/json if body is not string/FormData. 
-    // Let's assume apiFetch can handle it OR implement extended logic.
-    // Looking at assets.ts imports: import { apiFetch } from "./http";
-    // Let's assume apiFetch is a wrapper around fetch.
-
-    // If apiFetch doesn't support FormData, we might need to bypass it or update it.
-    // Safety check: let's try to pass FormData to apiFetch.
-    // If apiFetch sets 'Content-Type': 'application/json' blindly, it will fail for FormData.
-
-    // Alternative: direct fetch with auth
-    // We need to know how to get token. src/api/http.ts usually has a getToken or similar.
-    // In the previous replace attempt I used `getToken()` but it wasn't imported.
-    // Let's check http.ts content or assumes it handles auth header.
-
-    // Re-reading assets.ts: it uses `apiFetch`.
-    // Let's see if we can use apiFetch for FormData.
-    // If I cannot check http.ts, I will risk using apiFetch with FormData and hope it doesn't force JSON.
-    // Update: I will read http.ts briefly to be sure.
-
+    // Note: apiFetch automatically handles lack of Content-Type for FormData
     return apiFetch<{ id: string }>(`/api/assets/${assetId}/documents`, {
         method: "POST",
-        body: formData as any
+        body: formData
     });
 }
 
@@ -203,19 +186,53 @@ export async function deleteAssetDocument(assetId: string, docId: string): Promi
     await apiFetch<void>(`/api/assets/${assetId}/documents/${docId}`, { method: "DELETE" });
 }
 
-export function getAssetDocumentDownloadUrl(assetId: string, docId: string): string {
-    // This needs the absolute URL or relative if proxy
-    // We can use the imported API_BASE from http if available, but it is not imported in the current file view.
-    // However, I saw API_BASE exported in http.ts in previous turn errors.
-    // Let's import API_BASE from "./http"
-    // Wait, I cannot change imports easily with replace_file_content at the top.
-    // I'll assume relative path /api/... works if on same domain, otherwise I need API_BASE.
-    // The previous error showed `API_BASE` export in `src/api/http.ts`.
-    // I'll add `import { apiFetch, API_BASE } from "./http";` to the top in a separate edit if needed.
-    // For now returning relative path.
-    return `/api/assets/${assetId}/documents/${docId}/download`;
-}
+export async function fetchAssetDocumentContent(assetId: string, docId: string, mode: "download" | "preview"): Promise<{ blob: Blob; fileName?: string }> {
+    // If strict return types are needed invoke apiFetch via a custom call to access raw response if needed, 
+    // or just use apiFetch's internal fetch logic.
+    // Since apiFetch currently returns parsed JSON or text, we need a method that returns a Blob.
+    // We'll reimplement a small fetch wrapper here or modify apiFetch.
+    // Ideally, we should export a method from http.ts to get raw response or blob, but for minimal changes:
 
-export function getAssetDocumentPreviewUrl(assetId: string, docId: string): string {
-    return `/api/assets/${assetId}/documents/${docId}/preview`;
+    // We'll assume we can use the same base URL logic.
+    // Importing API_BASE or defining it here:
+    // We need to import API_BASE or re-declare. It's usually better to use the HTTP helper.
+    // But `apiFetch` in `http.ts` parses body.
+
+    // Let's implement a direct fetch here using getToken from `http`.
+    // We need to import getToken, API_BASE.
+    // I will use a relative URL if API_BASE is not easily reachable, but `http.ts` exported it.
+    // I'll rely on `apiFetch` to HAVE a blob option or do it manually.
+    // Since I cannot easily change `http.ts` interface without potentially breaking others, I'll do manual fetch here.
+
+    const token = localStorage.getItem("cmms_token") || sessionStorage.getItem("cmms_token");
+    const headers: HeadersInit = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    // Get API_BASE from global or environment if possible, or fallback to relative /api
+    // AssetsPage.tsx behaves as if backend is same origin or proxied?
+    // User said: "Build ABSOLUTE URLs ... const API_BASE = ...". 
+    // I should probably follow that pattern or use the one from http.ts if I can import it.
+    // I'll try to import API_BASE from "./http".
+
+    const url = `${API_BASE}/api/assets/${assetId}/documents/${docId}/${mode}`;
+
+    // We'll use relative path which vite proxy or browser resolves. 
+    // If exact absolute needed, user provided: `import.meta.env.VITE_API_BASE_URL`
+
+    const response = await fetch(url, { headers });
+    if (!response.ok) throw new Error(`Download failed: ${response.statusText}`);
+
+    const blob = await response.blob();
+
+    // Try to extract filename from Content-Disposition
+    const disposition = response.headers.get("Content-Disposition");
+    let fileName = "document";
+    if (disposition && disposition.indexOf("filename=") !== -1) {
+        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+        if (matches != null && matches[1]) {
+            fileName = matches[1].replace(/['"]/g, '');
+        }
+    }
+
+    return { blob, fileName };
 }

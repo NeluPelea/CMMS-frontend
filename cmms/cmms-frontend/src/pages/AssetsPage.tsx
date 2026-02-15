@@ -1,5 +1,5 @@
-// src/pages/AssetsPage.tsx
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import AppShell from "../components/AppShell";
 import {
@@ -25,221 +25,25 @@ import {
     type AssetDto,
     type LocDto,
     hasPerm,
-    getAssetDocuments,
-    uploadAssetDocument,
-    updateAssetDocumentTitle,
-    deleteAssetDocument,
-    getAssetDocumentDownloadUrl,
-    getAssetDocumentPreviewUrl,
-    type AssetDocumentDto,
 } from "../api";
-
-// ... existing imports
-
-// --- Document Modal ---
-function AssetDocumentationModal({ asset, onClose }: { asset: AssetDto; onClose: () => void }) {
-    const [docs, setDocs] = useState<AssetDocumentDto[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [err, setErr] = useState<string | null>(null);
-
-    // Upload state
-    const [title, setTitle] = useState("");
-    const [file, setFile] = useState<File | null>(null);
-
-    // Preview
-    const [previewDoc, setPreviewDoc] = useState<AssetDocumentDto | null>(null);
-
-    const loadDocs = useCallback(async () => {
-        setLoading(true);
-        try {
-            const data = await getAssetDocuments(asset.id);
-            setDocs(data);
-        } catch (e) {
-            setErr((e as Error).message);
-        } finally {
-            setLoading(false);
-        }
-    }, [asset.id]);
-
-    useEffect(() => {
-        loadDocs();
-    }, [loadDocs]);
-
-    async function onUpload() {
-        if (!file || !title.trim()) return;
-        setUploading(true);
-        setErr(null);
-        try {
-            await uploadAssetDocument(asset.id, title.trim(), file);
-            setTitle("");
-            setFile(null);
-            // Reset file input if possible, or just let React handle it via key or controlled ref
-            // simple way: 
-            const fileInput = document.getElementById("doc-file-input") as HTMLInputElement;
-            if (fileInput) fileInput.value = "";
-
-            await loadDocs();
-        } catch (e) {
-            setErr((e as Error).message);
-        } finally {
-            setUploading(false);
-        }
-    }
-
-    async function onDeleteDoc(id: string) {
-        if (!confirm("Stergeti documentul?")) return;
-        try {
-            await deleteAssetDocument(asset.id, id);
-            if (previewDoc?.id === id) setPreviewDoc(null);
-            await loadDocs();
-        } catch (e) {
-            alert((e as Error).message);
-        }
-    }
-
-    async function onRename(doc: AssetDocumentDto) {
-        const newTitle = prompt("Denumire noua:", doc.title);
-        if (!newTitle || newTitle === doc.title) return;
-        try {
-            await updateAssetDocumentTitle(asset.id, doc.id, newTitle.trim());
-            loadDocs();
-        } catch (e) {
-            alert((e as Error).message);
-        }
-    }
-
-    const isImage = (ct: string) => ct.startsWith("image/");
-    const isPdf = (ct: string) => ct === "application/pdf";
-
-    return (
-        <Modal title={`Documentatie: ${asset.name}`} onClose={onClose} widthClassName="max-w-4xl">
-            <div className="space-y-6">
-                {err && <ErrorBox message={err} onClose={() => setErr(null)} />}
-                {/* ... content ... */}
-                {/* Upload Section */}
-                {hasPerm("ASSET_UPDATE") && (
-                    <div className="bg-white/5 p-4 rounded-lg border border-white/10 flex flex-col sm:flex-row gap-4 items-end">
-                        <div className="flex-1 w-full">
-                            <FieldLabel>Denumire document</FieldLabel>
-                            <Input
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="ex: Manual utilizare"
-                            />
-                        </div>
-                        <div className="w-full sm:w-auto">
-                            <FieldLabel>Fisier</FieldLabel>
-                            <input
-                                id="doc-file-input"
-                                type="file"
-                                className="text-sm text-zinc-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
-                                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
-                            />
-                        </div>
-                        <Button
-                            variant="primary"
-                            onClick={onUpload}
-                            disabled={!file || !title.trim() || uploading}
-                        >
-                            {uploading ? "Se incarca..." : "Incarca"}
-                        </Button>
-                    </div>
-                )}
-
-                {/* List & Preview Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* List */}
-                    <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-zinc-300">Lista Documente</h3>
-                        {loading && <div className="text-sm text-zinc-500">Se incarca...</div>}
-                        {!loading && docs.length === 0 && <div className="text-sm text-zinc-500 italic">Niciun document atasat.</div>}
-
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                            {docs.map(doc => (
-                                <div key={doc.id} className="bg-white/5 p-3 rounded border border-white/10 flex flex-col gap-1">
-                                    <div className="flex justify-between items-start">
-                                        <div className="font-medium text-zinc-200">{doc.title}</div>
-                                        <div className="text-xs text-zinc-500">{new Date(doc.createdAt).toLocaleDateString("ro-RO")}</div>
-                                    </div>
-                                    <div className="text-xs text-zinc-400 flex gap-2">
-                                        <span>{(doc.sizeBytes / 1024).toFixed(1)} KB</span>
-                                        <span>•</span>
-                                        <span>{doc.fileName}</span>
-                                    </div>
-                                    <div className="flex gap-2 mt-2 justify-end">
-                                        {(isImage(doc.contentType) || isPdf(doc.contentType)) && (
-                                            <button
-                                                onClick={() => setPreviewDoc(doc)}
-                                                className="text-xs text-indigo-300 hover:text-indigo-200"
-                                            >
-                                                Previzualizeaza
-                                            </button>
-                                        )}
-                                        <a
-                                            href={getAssetDocumentDownloadUrl(asset.id, doc.id)}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="text-xs text-indigo-300 hover:text-indigo-200"
-                                        >
-                                            Descarca
-                                        </a>
-                                        {hasPerm("ASSET_UPDATE") && (
-                                            <>
-                                                <button onClick={() => onRename(doc)} className="text-xs text-yellow-300 hover:text-yellow-200">Redenumeste</button>
-                                                <button onClick={() => onDeleteDoc(doc.id)} className="text-xs text-red-300 hover:text-red-200">Sterge</button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Preview */}
-                    <div className="bg-zinc-900 border border-white/10 rounded-lg p-4 min-h-[300px] flex flex-col">
-                        <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                            Preview: {previewDoc ? previewDoc.title : "Selecteaza un document"}
-                        </h3>
-                        <div className="flex-1 flex items-center justify-center bg-black/20 rounded overflow-hidden relative">
-                            {previewDoc ? (
-                                <>
-                                    {isImage(previewDoc.contentType) && (
-                                        <img
-                                            src={getAssetDocumentPreviewUrl(asset.id, previewDoc.id)}
-                                            alt={previewDoc.title}
-                                            className="max-w-full max-h-[400px] object-contain"
-                                        />
-                                    )}
-                                    {isPdf(previewDoc.contentType) && (
-                                        <iframe
-                                            src={getAssetDocumentPreviewUrl(asset.id, previewDoc.id)}
-                                            className="w-full h-[400px]"
-                                            title={previewDoc.title}
-                                        />
-                                    )}
-                                </>
-                            ) : (
-                                <div className="text-zinc-600 text-sm">Previzualizare disponibila pentru PDF si Imagini</div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Modal>
-    );
-}
+import AssetDocumentationModal from "../components/AssetDocumentationModal";
 
 function StatusPill({ isActive }: { isActive: boolean }) {
     if (isActive) return <Pill tone="emerald">Activ</Pill>;
     return <Pill tone="rose">Sters</Pill>;
 }
 
+
+
+
+
 export default function AssetsPage() {
-    // ... existing state
+    const navigate = useNavigate();
     const [items, setItems] = useState<AssetDto[]>([]);
     const [locs, setLocs] = useState<LocDto[]>([]);
+    // Document Modal State
+    const [docAsset, setDocAsset] = useState<AssetDto | null>(null);
+
 
     // ... existing state variables (q, showDel, etc.)
     const [q, setQ] = useState("");
@@ -270,9 +74,6 @@ export default function AssetsPage() {
 
     const [saving, setSaving] = useState(false);
     const [detailItem, setDetailItem] = useState<AssetDto | null>(null);
-
-    // Document Modal State
-    const [docAsset, setDocAsset] = useState<AssetDto | null>(null);
 
     const canCreate = useMemo(() => newName.trim().length >= 2, [newName]);
 
@@ -495,7 +296,11 @@ export default function AssetsPage() {
                                         <Button
                                             variant="ghost"
                                             className="h-7 px-2 text-xs"
-                                            onClick={() => setDocAsset(x)}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setDocAsset(x);
+                                            }}
                                         >
                                             Documentatie
                                         </Button>
@@ -591,13 +396,13 @@ export default function AssetsPage() {
                 </Modal>
             )}
 
-            {/* Document Modal */}
             {docAsset && (
                 <AssetDocumentationModal
                     asset={docAsset}
                     onClose={() => setDocAsset(null)}
                 />
             )}
+
         </AppShell>
     );
 }

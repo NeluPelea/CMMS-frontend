@@ -56,12 +56,16 @@ public class AssetDocumentsController : ControllerBase
         return null;
     }
 
-    public record UploadReq(string Title, IFormFile File);
+    public class UploadDocModel
+    {
+        public string Title { get; set; } = "";
+        public IFormFile File { get; set; } = null!;
+    }
 
     // POST /api/assets/{assetId}/documents
     [HttpPost]
     [Authorize(Policy = "Perm:ASSET_UPDATE")]
-    public async Task<IActionResult> Upload(Guid assetId, [FromForm] UploadReq req)
+    public async Task<IActionResult> Upload(Guid assetId, [FromForm] UploadDocModel req)
     {
         // 1. Validate
         if (req.File == null || req.File.Length == 0)
@@ -78,16 +82,14 @@ public class AssetDocumentsController : ControllerBase
         var ext = Path.GetExtension(req.File.FileName).ToLowerInvariant();
         var allowed = new[] { ".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv" };
         if (!allowed.Contains(ext))
-            return BadRequest("File type not allowed");
+            return BadRequest($"File type '{ext}' not allowed");
 
-        // e.g. /data/uploads/assets/{assetId}/{docId}{ext}
-        // or configure base path
         var userId = GetActorUserId();
 
         var docId = Guid.NewGuid();
         var safeFileName = $"{docId}{ext}";
         
-        // Base storage path priority: Config -> Env -> Default
+        // Storage path
         var storageRoot = _config["Storage:AssetsPath"] 
                           ?? Environment.GetEnvironmentVariable("ASSETS_STORAGE_PATH") 
                           ?? Path.Combine(Directory.GetCurrentDirectory(), "data", "uploads", "assets");
@@ -98,30 +100,41 @@ public class AssetDocumentsController : ControllerBase
 
         var fullPath = Path.Combine(assetFolder, safeFileName);
 
-        // 3. Save File
-        using (var stream = new FileStream(fullPath, FileMode.Create))
+        try 
         {
-            await req.File.CopyToAsync(stream);
+            // 3. Save File
+            using (var stream = new FileStream(fullPath, FileMode.Create))
+            {
+                await req.File.CopyToAsync(stream);
+            }
+
+            // 4. Save DB Entity
+            var entity = new AssetDocument
+            {
+                Id = docId,
+                AssetId = assetId,
+                Title = req.Title.Trim(),
+                FileName = req.File.FileName, // original name
+                ContentType = req.File.ContentType,
+                SizeBytes = req.File.Length,
+                StoragePath = fullPath,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedByUserId = userId
+            };
+
+            _db.AssetDocuments.Add(entity);
+            await _db.SaveChangesAsync();
+
+            return Ok(new { id = entity.Id });
         }
-
-        // 4. Save DB Entity
-        var entity = new AssetDocument
+        catch (Exception ex)
         {
-            Id = docId,
-            AssetId = assetId,
-            Title = req.Title.Trim(),
-            FileName = req.File.FileName, // original name
-            ContentType = req.File.ContentType,
-            SizeBytes = req.File.Length,
-            StoragePath = fullPath,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedByUserId = userId
-        };
-
-        _db.AssetDocuments.Add(entity);
-        await _db.SaveChangesAsync();
-
-        return Ok(new { id = entity.Id });
+            // Cleanup file if DB save fails
+            if (System.IO.File.Exists(fullPath))
+                System.IO.File.Delete(fullPath);
+                
+            return StatusCode(500, $"Internal server error: {ex.Message}");
+        }
     }
 
     public record UpdateTitleReq(string Title);
